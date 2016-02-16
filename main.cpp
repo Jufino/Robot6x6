@@ -12,6 +12,9 @@
 	#include <sys/stat.h>
 	#include <fcntl.h>
 	#include <termios.h>
+	extern "C"{
+		#include <gpio.h>
+	}
 	int file;
 	int lastAddr = 0x00;       
 	char *filename = "/dev/i2c-1";
@@ -21,7 +24,23 @@
                         perror("Problem s otvorenim portu.\n");
                         exit(1);
                 }
+		gpio_open(17,0);
+                gpio_open(27,0);
+                gpio_open(22,0);
+
         }
+	void closeRobot(){
+		gpio_close(17);
+                gpio_close(27);
+                gpio_close(22);
+	}
+	unsigned char tlacitka(char pozicia){
+		switch(pozicia){
+			case 1: return !gpio_read(27); break;		
+			case 2:	return !gpio_read(17); break;
+			case 3: return !gpio_read(22); break;
+		}
+	}
 	void setDevice(int addr){
                 if(addr != lastAddr){
                         if (ioctl(file, I2C_SLAVE, addr) < 0) {
@@ -107,8 +126,11 @@
 	unsigned int ultrazvuk(){
                 return readRegister16(0x0A,6);
         }
-	unsigned int napetie(){
-		return readRegister16(0x08,5);
+	float napetie(){
+		return (float)readRegister16(0x08,5)/27.55;
+	}
+	float napetiePercenta(){
+		return (float)readRegister16(0x08,5)*1.51-950;
 	}
 	unsigned int prud(){
                 return readRegister16(0x08,6);
@@ -283,8 +305,12 @@ int kbhit(void)
 		char lastznak='0';
 		char znak='0';
 		int pocet = 0;
+		
+		printf("%f,%f\n",napetie(),napetiePercenta());
 		while(1){ 
-			if(kbhit() == 1){
+			printf("%d,%d,%d\n", tlacitka(1),tlacitka(2),tlacitka(3));
+			usleep(300000);
+	/*		if(kbhit() == 1){
 				znak = getchar();
 				if(znak != lastznak){
 				switch(znak){
@@ -346,7 +372,7 @@ int kbhit(void)
 					pocet++;
 					usleep(5000);
 				}
-			}
+			}*/
 }
 /*			        signed int accX = readRegister16(0x68,0x3B);
         signed int accY = readRegisters16(0x68,0x3D);
@@ -359,5 +385,6 @@ int kbhit(void)
 			printf("%d, %d, %d, %f, %d, %d, %d\n",accX,accY,accZ,Tmp/360+36.53,GyX,GyY,GyZ);
 			usleep(100000);
 		}*/
+		gpio_close(22);
 		return 0;
 }
