@@ -12,12 +12,34 @@
 	#include <sys/stat.h>
 	#include <fcntl.h>
 	#include <termios.h>
+	#include <inttypes.h>
+	#include <unistd.h>	
+
+	#include <opencv2/opencv.hpp>
+
+	#include <netinet/in.h>
+	#include <sys/socket.h>
+	#include <arpa/inet.h>
+	
 	extern "C"{
 		#include <gpio.h>
+		#include "semafor.h"
 	}
 	int file;
 	int lastAddr = 0x00;       
 	char *filename = "/dev/i2c-1";
+	int serversock_snimace,serversock_camera;
+	int clientsock_snimace,clientsock_camera;
+	#define Wifi_camera  1
+	#define Wifi_snimace 1
+	#define PORT_snimace 1213
+	#define PORT_camera  1212
+
+	void sigctrl(int param);
+	void sigpipe(int param);
+	
+	using namespace std;
+	using namespace cv;
 
 	void initRobot(){
                 if ((file = open(filename, O_RDWR)) < 0) {
@@ -27,13 +49,79 @@
 		gpio_open(17,0);
                 gpio_open(27,0);
                 gpio_open(22,0);
-
+		if(Wifi_snimace == 1){
+			struct sockaddr_in server;
+                        if ((serversock_snimace = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+				perror("socket() failed");
+				exit(1);
+			}
+                        memset(&server, 0, sizeof(server));
+                        server.sin_family = AF_INET;
+                        server.sin_port = htons(PORT_snimace);
+                        server.sin_addr.s_addr = INADDR_ANY;
+                        if (bind(serversock_snimace, (struct sockaddr *)&server, sizeof(server)) == -1){
+				perror("bind() failed");
+				exit(1);
+			}
+                        if (listen(serversock_snimace, 10) == -1){
+                                perror("listen() failed.");
+				exit(1);
+			}
+                        printf("Cakanie spojenia pre snimace na porte: %d\n", PORT_snimace);
+                        if ((clientsock_snimace = accept(serversock_snimace, NULL, NULL)) == -1){
+		                perror("accept() failed");
+				exit(1);
+			}
+			printf("Spojenie na porte %d ok.\n",PORT_snimace);
+		}
+		if(Wifi_camera == 1){
+                	struct sockaddr_in server1;
+                	if ((serversock_camera = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+		                perror("socket() failed");
+				exit(1);
+			}
+                	memset(&server1, 0, sizeof(server1));
+                	server1.sin_family = AF_INET;
+                	server1.sin_port = htons(PORT_camera);
+                	server1.sin_addr.s_addr = INADDR_ANY;
+                	if (bind(serversock_camera, (struct sockaddr *)&server1, sizeof(server1)) == -1){
+ 				perror("bind() failed");
+				exit(1);
+			}
+                	if (listen(serversock_camera, 10) == -1){
+                                perror("listen() failed.");
+				exit(1);
+			}
+                	printf("Cakanie spojenia pre kameru na porte: %d\n", PORT_camera);
+                	if ((clientsock_camera = accept(serversock_camera, NULL, NULL)) == -1){
+		                perror("accept() failed");
+				exit(1);
+			}
+			printf("Spojenie na porte %d ok.\n",PORT_camera);
+		}
+		if(Wifi_camera == 1 || Wifi_snimace == 1){
+			signal(SIGPIPE, sigpipe);
+		}
         }
 	void closeRobot(){
 		gpio_close(17);
                 gpio_close(27);
                 gpio_close(22);
 	}
+	void send_img(int socket, Mat img,int kvalita){
+                vector<uchar> buff;
+                vector<int> param = vector<int>(2);
+                param[0] = CV_IMWRITE_JPEG_QUALITY;
+                param[1] = kvalita;
+                imencode(".jpg", img, buff, param);
+                char len[10];
+                sprintf(len, "%.8d", buff.size());
+                send(socket, len, strlen(len), 0);
+
+                send(socket, &buff[0],buff.size(), 0);
+                buff.clear();
+	}
+
 	unsigned char tlacitka(char pozicia){
 		switch(pozicia){
 			case 1: return !gpio_read(27); break;		
@@ -126,11 +214,22 @@
 	unsigned int ultrazvuk(){
                 return readRegister16(0x0A,6);
         }
-	float napetie(){
-		return (float)readRegister16(0x08,5)/27.55;
+	int napetieRaw(){
+		return readRegister16(0x08,5);
 	}
-	float napetiePercenta(){
-		return (float)readRegister16(0x08,5)*1.51-950;
+	#define R2 5.3L
+	#define R1 31.4L
+	#define maxVolt 5L
+	#define rozlisenieADC 1023L
+	float napetieVolt(){
+		float napHod = (float)napetieRaw()*(maxVolt/rozlisenieADC)*((R1+R2)/R2);
+		return napHod;
+	}
+	#define maxNapetie 25.2L
+	#define minNapetie 22.8L
+	float napetiePercent(){
+		float napHod = (float)napetieVolt()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
+		return napHod;
 	}
 	unsigned int prud(){
                 return readRegister16(0x08,6);
@@ -193,7 +292,7 @@
                                 else{
                                         Led(3,'Z',1);
                                         Led(3,'C',1);
-                                }
+                               } 
                         }
 		}
 	}
@@ -305,11 +404,12 @@ int kbhit(void)
 		char lastznak='0';
 		char znak='0';
 		int pocet = 0;
-		
-		printf("%f,%f\n",napetie(),napetiePercenta());
+		Led(3,'Z',1);	
+		//printf("%f,%f\n",napetie(),napetiePercenta());
 		while(1){ 
-			printf("%d,%d,%d\n", tlacitka(1),tlacitka(2),tlacitka(3));
-			usleep(300000);
+		//	printf("%d,%d,%d\n", tlacitka(1),tlacitka(2),tlacitka(3));
+			printf("%d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent());
+			usleep(20000);
 	/*		if(kbhit() == 1){
 				znak = getchar();
 				if(znak != lastznak){
@@ -388,3 +488,32 @@ int kbhit(void)
 		gpio_close(22);
 		return 0;
 }
+void sigctrl(int param){
+  printf("Server sa vypina\n");
+  sleep(2);
+  //semRem(sem_id);
+  if(Wifi_camera == 1){
+        close(serversock_camera);
+        close(clientsock_camera);
+  }	
+  if(Wifi_snimace == 1){
+        close(serversock_snimace);
+        close(clientsock_snimace);
+  }
+  exit(0);
+
+}
+void sigpipe(int param){
+  printf("Client sa odpojil\n");
+  //semRem(sem_id);
+  if(Wifi_camera == 1){
+        close(serversock_camera);
+        close(clientsock_camera);
+  }
+  if(Wifi_snimace == 1){
+        close(serversock_snimace);
+        close(clientsock_snimace);
+  }
+  exit(0);
+}
+
