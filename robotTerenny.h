@@ -1,0 +1,179 @@
+#ifndef _LIBROBOT_H
+    #define _LIBROBOT_H
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <errno.h>
+    #include <string.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+    #include <linux/i2c-dev.h>
+    #include <sys/ioctl.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <termios.h>
+    #include <inttypes.h>
+    #include <unistd.h>
+
+    #include <opencv2/opencv.hpp>
+
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <arpa/inet.h>
+
+    extern "C"{
+        #include <gpio.h>
+        #include "semafor.h"
+        #include <serial.h>
+    }
+    int file;
+    int lastAddr = 0x00;
+    char *filename = "/dev/i2c-1";
+    int serversock_snimace,serversock_camera;
+    int clientsock_snimace,clientsock_camera;
+    int portHandle;
+    #define Wifi_camera  1
+    #define Wifi_snimace 1
+    #define PORT_snimace 1213
+    #define PORT_camera  1212
+
+    #define R2 5.3L
+    #define R1 31.4L
+    #define maxVolt 5L
+    #define rozlisenieADC 1023L
+    #define maxNapetie 25.2L
+    #define minNapetie 22.8L
+
+    struct GPGGA_struct{
+    	char UTCTime[9];
+    	float Latitude;
+    	char NSIndicator;
+    	float Longitude;
+    	char EWindicator;
+    	int PositionFixIndictor;
+    	int SatellitesUsed;
+    	float HDOP;
+    	float MSLAltitude;
+    	char Units1;
+    	int GeoidSeparation;
+    	char Units2;
+    	int AgeofDifferentialCorrections;
+    	int DiffRefereceCorrections;
+    	char Checksum[3];
+    };
+    struct GPGLL_struct{
+    	float Latitude;
+    	char NSIndicator;
+    	float Longitude;
+    	char EWIndicator;
+    	char UTCTime[9];
+    	char Status;
+    	char ModeIndicator;
+    	char Checksum[3];
+    };
+    struct GPGSA_struct{
+    	char ModeChar;
+    	int ModeInt;
+    	int SatellitesUsedCH1;
+    	int SatellitesUsedCH2;
+    	int SatellitesUsedCH3;
+            int SatellitesUsedCH4;
+    	int SatellitesUsedCH5;
+            int SatellitesUsedCH6;
+    	int SatellitesUsedCH7;
+            int SatellitesUsedCH8;
+    	int SatellitesUsedCH9;
+            int SatellitesUsedCH10;
+    	int SatellitesUsedCH11;
+            int SatellitesUsedCH12;
+    	float PDOP;
+    	float HDOP;
+    	float VDOP;
+    	char Checksum[3];
+    };
+    struct GPGSV_struct{
+    	int NumberOfMessages;
+    	int MessageNumber;
+    	int SatellitesInView;
+    	int SatelliteId1;
+    	int Elevation1;
+    	int Azimuth1;
+    	int SNR1;
+    	int SatelliteId2;
+            int Elevation2;
+            int Azimuth2;
+            int SNR2;
+    	int SatelliteId3;
+            int Elevation3;
+            int Azimuth3;
+            int SNR3;
+    	int SatelliteId4;
+            int Elevation4;
+            int Azimuth4;
+            int SNR4;
+    	char Checksum[3];
+    };
+    struct GPRMC_struct{
+    	char UTCTime[9];
+    	char Status;
+    	float Latitude;
+    	char NSIndicator;
+    	float Longitude;
+    	char EWIndicator;
+    	float SpeedOverGround;
+    	float CourseOverGround;
+    	char Date[6];
+    	char Mode;
+    	char Checksum[3];
+    };
+    struct GPVTG_struct{
+    	float CourseTrue;
+    	char ReferenceTrue;
+    	float CourseMagnetic;
+    	char ReferenceMagnetic;
+    	float SpeedKnots;
+    	float SpeedKmh;
+    	char UnitsKnots;
+    	char UnitsKmh;
+    	char Mode;
+    	char Checksum[3];
+    };
+
+    GPGGA_struct GPGGA;
+    GPGLL_struct GPGLL;
+    GPRMC_struct GPRMC;
+    GPGSA_struct GPGSA;
+    GPGSV_struct GPGSV;
+    GPVTG_struct GPVTG;
+
+    void initRobot();
+    void closeRobot();
+
+    void setDevice(int addr);
+    void writeRegister(int addr,unsigned char reg, unsigned char value);
+    unsigned int readRegister16(int addr,unsigned char reg);
+    signed int readRegisters16(int addr,unsigned char reg);
+    unsigned char readRegister8(int addr,unsigned char reg);
+
+    void odosliMat(int socket, Mat img,int kvalita);
+    void motor(int poradie,signed char smer,unsigned char rychlost,bool reg);
+    unsigned int rychlost(int poradie);
+    unsigned int vzdialenost(int poradie);
+    unsigned char tlacitka(char pozicia);
+    void resetVzdialenost(int poradie);
+    void servo(int pozicia);
+    unsigned int ultrazvuk();
+    int napetieRaw();
+    float napetieVolt();
+    float napetiePercent();
+    unsigned int prud();
+    void led(int poradie,char nazov,bool stav);
+    void napajanie(bool stav);
+
+    int kbhit(void);
+    void sigctrl_fun(int param);
+    void sigpipe_fun(int param);
+#endif
+	
