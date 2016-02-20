@@ -1,5 +1,5 @@
-#ifndef _LIBROBOT_H
-    #define _LIBROBOT_H
+#ifndef _LIBROBOTTERENNY_H
+    #define _LIBROBOTTERENNY_H
     #include <stdio.h>
     #include <stdlib.h>
     #include <string.h>
@@ -18,24 +18,21 @@
     #include <unistd.h>
 
     #include <opencv2/opencv.hpp>
-
+	
+    using namespace std;
+    using namespace cv;
+    
     #include <netinet/in.h>
     #include <sys/socket.h>
     #include <arpa/inet.h>
-
+    #include <serial.h>
     extern "C"{
-        #include <gpio.h>
         #include "semafor.h"
-        #include <serial.h>
+	#include <gpio.h>
     }
-    int file;
-    int lastAddr = 0x00;
-    char *filename = "/dev/i2c-1";
-    int serversock_snimace,serversock_camera;
-    int clientsock_snimace,clientsock_camera;
-    int portHandle;
-    #define Wifi_camera  1
-    #define Wifi_snimace 1
+
+    #define Wifi_camera  0
+    #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
 
@@ -140,13 +137,6 @@
     	char Mode;
     	char Checksum[3];
     };
-
-    GPGGA_struct GPGGA;
-    GPGLL_struct GPGLL;
-    GPRMC_struct GPRMC;
-    GPGSA_struct GPGSA;
-    GPGSV_struct GPGSV;
-    GPVTG_struct GPVTG;
 
     void initRobot();
     void closeRobot();

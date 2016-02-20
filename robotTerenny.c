@@ -1,4 +1,18 @@
-#include "libRobot.h"
+#include "robotTerenny.h"
+
+int file;
+int lastAddr = 0x00;
+char *filename = "/dev/i2c-1";
+int serversock_snimace,serversock_camera;
+int clientsock_snimace,clientsock_camera;
+int portHandle;
+GPGGA_struct GPGGA;
+GPGLL_struct GPGLL;
+GPRMC_struct GPRMC;
+GPGSA_struct GPGSA;
+GPGSV_struct GPGSV;
+GPVTG_struct GPVTG;
+
 void initRobot(){
     if ((file = open(filename, O_RDWR)) < 0) {
         perror("Problem s otvorenim portu.\n");
@@ -59,7 +73,7 @@ void initRobot(){
         printf("Spojenie na porte %d ok.\n",PORT_camera);
     }
     if(Wifi_camera == 1 || Wifi_snimace == 1){
-        signal(SIGPIPE, sigpipe);
+        signal(SIGPIPE, sigpipe_fun);
     }
 }
 void closeRobot(){
@@ -196,12 +210,12 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                Led(1,'Z',0);
-                Led(1,'C',0);
+                led(1,'Z',0);
+                led(1,'C',0);
             }
             else{
-                Led(1,'Z',1);
-                Led(1,'C',1);
+                led(1,'Z',1);
+                led(1,'C',1);
             }
         }
     }
@@ -216,12 +230,12 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                Led(2,'Z',0);
-                Led(2,'C',0);
+                led(2,'Z',0);
+                led(2,'C',0);
             }
             else{
-                Led(2,'Z',1);
-                Led(2,'C',1);
+                led(2,'Z',1);
+                led(2,'C',1);
             }
         }
     }
@@ -236,12 +250,12 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                Led(3,'Z',0);
-                Led(3,'C',0);
+                led(3,'Z',0);
+                led(3,'C',0);
             }
             else{
-                Led(3,'Z',1);
-                Led(3,'C',1);
+                led(3,'Z',1);
+                led(3,'C',1);
             }
         }
     }

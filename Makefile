@@ -7,12 +7,12 @@ OFLAGS=`pkg-config --libs --cflags opencv`
 TARGET=robotTerenny
 
 robotTerenny:robotTerenny.c
-	$(CC) -c robotTerenny.c
+	$(CPP) -c robotTerenny.c -lgpio -lserial $(OFLAGS)
 
 install: $(TARGET)
 	$(CROSS_COMPILE)ar rcs lib$(TARGET).a robotTerenny.o
 	install lib$(TARGET).a /usr/lib/lib$(TARGET).a
-	install *.h /usr/include/
+	install $(TARGET).h /usr/include/
 	rm lib$(TARGET).a
 	rm robotTerenny.o
 
@@ -25,4 +25,4 @@ all: libsemafor.o main
 libsemafor.o:semafor.c semafor.h
 	$(C) -c semafor.c -o libsemafor.o
 main:main.cpp
-	$(CPP) main.cpp libsemafor.o -lrt -lpthread -lgpio -lserial -lrobotTerenny -o main $(OFLAGS)
+	$(CPP) main.cpp -lrobotTerenny libsemafor.o -lrt -lpthread -lgpio -lserial -o main $(OFLAGS)
