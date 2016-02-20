@@ -2,7 +2,6 @@
 
 int file;
 int lastAddr = 0x00;
-char *filename = "/dev/i2c-1";
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
@@ -14,11 +13,11 @@ GPGSV_struct GPGSV;
 GPVTG_struct GPVTG;
 
 void initRobot(){
-    if ((file = open(filename, O_RDWR)) < 0) {
+    if ((file = open(PORT_I2C, O_RDWR)) < 0) {
         perror("Problem s otvorenim portu.\n");
         exit(1);
     }
-    portHandle = SerialOpen("/dev/ttyAMA0",B9600);
+    portHandle = SerialOpen(PORT_GPS,B9600);
     gpio_open(17,0);
     gpio_open(27,0);
     gpio_open(22,0);
@@ -142,6 +141,7 @@ unsigned char tlacitka(char pozicia){
         case 1: return !gpio_read(27); break;
         case 2: return !gpio_read(17); break;
         case 3: return !gpio_read(22); break;
+	default: return 0;
     }
 }
 unsigned int rychlost(int poradie){
@@ -181,23 +181,33 @@ void servo(int pozicia){
     else if(pozicia+91 > 181) writeRegister(0x0A,84,181);
     else writeRegister(0x0A,84,pozicia+91);
 }
-unsigned int ultrazvuk(){
+unsigned int ultrazvukRaw(){
     return readRegister16(0x0A,6);
+}
+float ultrazvukMeter(){
+	return (float)readRegister16(0x0A,6)*(rychlostZvuku/2);
 }
 int napetieRaw(){
     return readRegister16(0x08,5);
 }
 float napetieVolt(){
-    float napHod = (float)napetieRaw()*(maxVolt/rozlisenieADC)*((R1+R2)/R2);
+    float napHod = (float)napetieRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
     return napHod;
 }
 float napetiePercent(){
     float napHod = (float)napetieVolt()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
     return napHod;
 }
-unsigned int prud(){
+int prudRaw(){
     return readRegister16(0x08,6);
 }
+float prudVolt(){
+    return (float)prudRaw()*(maxVoltADC/rozlisenieADC);
+}
+float prudAmp(){
+    return ((float)prudVolt()-maxVoltADC/2)/rozliseniePrud;
+}
+
 void led(int poradie,char nazov,bool stav){
     if(poradie == 3){
         if(nazov == 'Z'){

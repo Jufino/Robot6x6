@@ -28,7 +28,7 @@
         motor(5,0,255,false);
         motor(6,0,255,false);
 	while(1){
-		printf("%d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent());
+		printf("napetie:%d,%f,%f\nprud: %d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent(),prudRaw(),prudVolt(),prudAmp());
 		usleep(20000);
 	}
         closeRobot();

@@ -31,18 +31,22 @@
 	#include <gpio.h>
     }
 
+    #define PORT_I2C "/dev/i2c-1"
+    #define PORT_GPS "/dev/ttyAMA0"
+
     #define Wifi_camera  0
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
 
-    #define R2 5.3L
-    #define R1 31.4L
-    #define maxVolt 5L
-    #define rozlisenieADC 1023L
-    #define maxNapetie 25.2L
-    #define minNapetie 22.8L
-
+    #define R2 5.3f
+    #define R1 31.4f
+    #define maxVoltADC 5.0f
+    #define rozlisenieADC 1023.0f
+    #define maxNapetie 25.2f
+    #define minNapetie 22.8f
+    #define rychlostZvuku 340.0f
+    #define rozliseniePrud 0.185f // 185mV/A
     struct GPGGA_struct{
     	char UTCTime[9];
     	float Latitude;
@@ -154,11 +158,14 @@
     unsigned char tlacitka(char pozicia);
     void resetVzdialenost(int poradie);
     void servo(int pozicia);
-    unsigned int ultrazvuk();
+    unsigned int ultrazvukRaw();
+    float ultrazvukMeter();
     int napetieRaw();
     float napetieVolt();
     float napetiePercent();
-    unsigned int prud();
+    int prudRaw();
+    float prudVolt();
+    float prudAmp();
     void led(int poradie,char nazov,bool stav);
     void napajanie(bool stav);
 
