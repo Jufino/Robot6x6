@@ -34,7 +34,7 @@
     #define PORT_I2C "/dev/i2c-1"
     #define PORT_GPS "/dev/ttyAMA0"
 
-    #define Wifi_camera  0
+    #define Wifi_camera  1
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
@@ -151,7 +151,7 @@
     signed int readRegisters16(int addr,unsigned char reg);
     unsigned char readRegister8(int addr,unsigned char reg);
 
-    void odosliMat(int socket, Mat img,int kvalita);
+    void odosliMat(Mat img,int kvalita);
     void motor(int poradie,signed char smer,unsigned char rychlost,bool reg);
     unsigned int rychlost(int poradie);
     unsigned int vzdialenost(int poradie);
@@ -168,9 +168,10 @@
     float prudAmp();
     void led(int poradie,char nazov,bool stav);
     void napajanie(bool stav);
+    
+    int getSocketCamera();
+    int getSocketSnimace();
 
     int kbhit(void);
-    void sigctrl_fun(int param);
-    void sigpipe_fun(int param);
 #endif
 	

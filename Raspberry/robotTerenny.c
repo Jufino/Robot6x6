@@ -12,6 +12,13 @@ GPGSA_struct GPGSA;
 GPGSV_struct GPGSV;
 GPVTG_struct GPVTG;
 
+int getSocketCamera(){
+	return clientsock_camera;
+}
+int getSocketSnimace(){
+	return clientsock_snimace;
+}
+
 void initRobot(){
     if ((file = open(PORT_I2C, O_RDWR)) < 0) {
         perror("Problem s otvorenim portu.\n");
@@ -71,15 +78,20 @@ void initRobot(){
         }
         printf("Spojenie na porte %d ok.\n",PORT_camera);
     }
-    if(Wifi_camera == 1 || Wifi_snimace == 1){
-        signal(SIGPIPE, sigpipe_fun);
-    }
 }
 void closeRobot(){
     SerialClose(portHandle);
     gpio_close(17);
     gpio_close(27);
     gpio_close(22);
+    if(Wifi_camera == 1){
+    	close(serversock_camera);
+    	close(clientsock_camera);
+    }
+    if(Wifi_snimace == 1){
+    	close(serversock_snimace);
+    	close(clientsock_snimace);
+    }
 }
 
 void setDevice(int addr){
@@ -124,7 +136,7 @@ unsigned char readRegister8(int addr,unsigned char reg){
     return data[0];
 }
 
-void odosliMat(int socket, Mat img,int kvalita){
+void odosliMat(Mat img,int kvalita){
     vector<uchar> buff;
     vector<int> param = vector<int>(2);
     param[0] = CV_IMWRITE_JPEG_QUALITY;
@@ -132,8 +144,8 @@ void odosliMat(int socket, Mat img,int kvalita){
     imencode(".jpg", img, buff, param);
     char len[10];
     sprintf(len, "%.8d", buff.size());
-    send(socket, len, strlen(len), 0);
-    send(socket, &buff[0],buff.size(), 0);
+    send(clientsock_camera, len, strlen(len), 0);
+    send(clientsock_camera, &buff[0],buff.size(), 0);
     buff.clear();
 }
 unsigned char tlacitka(char pozicia){
@@ -588,32 +600,4 @@ void parseGPS(){
             }
         }
     }
-}
-
-void sigctrl_fun(int param){
-  printf("Server sa vypina\n");
-  sleep(2);
-  //semRem(sem_id);
-  if(Wifi_camera == 1){
-    close(serversock_camera);
-    close(clientsock_camera);
-  }
-  if(Wifi_snimace == 1){
-    close(serversock_snimace);
-    close(clientsock_snimace);
-  }
-  exit(0);
-}
-void sigpipe_fun(int param){
-  printf("Client sa odpojil\n");
-  //semRem(sem_id);
-  if(Wifi_camera == 1){
-    close(serversock_camera);
-    close(clientsock_camera);
-  }
-  if(Wifi_snimace == 1){
-    close(serversock_snimace);
-    close(clientsock_snimace);
-  }
-  exit(0);
 }
