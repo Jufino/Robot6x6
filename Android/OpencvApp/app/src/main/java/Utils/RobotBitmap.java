@@ -53,6 +53,7 @@ public class RobotBitmap{
             setFps(new BigDecimal(Double.toString(fps)).setScale(2, RoundingMode.HALF_UP).floatValue());
             /**/
             setSize(lengthInt/1024);
+            Thread.sleep(40);
             return bitmap;
         } catch (Exception x) {
             x.printStackTrace();

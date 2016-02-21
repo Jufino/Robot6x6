@@ -44,9 +44,8 @@ public class MainActivity extends Activity  {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        robotCommunicator = new RobotCommunicator("192.168.0.102",1212);
+        robotCommunicator = new RobotCommunicator("192.168.0.101",1212);
         robotBitmap = new RobotBitmap(robotCommunicator,"img");
-        robotBitmap1 = new RobotBitmap(robotCommunicator,"img1");
     }
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -77,7 +76,6 @@ public class MainActivity extends Activity  {
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0,this, mLoaderCallback);
     }
     RobotBitmap robotBitmap;
-    RobotBitmap robotBitmap1;
     public void helloworld() {
         try {
             Thread.sleep(2000);
@@ -87,8 +85,6 @@ public class MainActivity extends Activity  {
         while(robotCommunicator.isConnected()) {
             robotBitmap.receiveBitmap();
             handleBitmap.sendEmptyMessage(0);
-            robotBitmap1.receiveBitmap();
-            handleBitmap1.sendEmptyMessage(0);
         }
     }
     private android.os.Handler handleBitmap = new android.os.Handler() {
@@ -104,7 +100,7 @@ public class MainActivity extends Activity  {
         @Override
         public void handleMessage(Message msg) {
             ImageView iv1 = (ImageView) findViewById(R.id.imageView2);
-            iv1.setImageBitmap(robotBitmap1.getBitmap());
+            //iv1.setImageBitmap(robotBitmap1.getBitmap());
         }
     };
 }
