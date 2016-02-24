@@ -11,6 +11,7 @@ GPRMC_struct GPRMC;
 GPGSA_struct GPGSA;
 GPGSV_struct GPGSV;
 GPVTG_struct GPVTG;
+MPU6050_struct MPU6050;
 
 int getSocketCamera(){
 	return clientsock_camera;
@@ -118,7 +119,7 @@ unsigned int readRegister16(int addr,unsigned char reg){
     if (read(file, data, 2) != 2)   perror("read error");
     return (data[0]<<8)+data[1];
 }
-signed int readRegisters16(int addr,unsigned char reg){
+signed int readRegister16s(int addr,unsigned char reg){
     char wdata[2];
     wdata[0] = reg;
     setDevice(addr);
@@ -187,6 +188,97 @@ void resetVzdialenost(int poradie){
         case 5: writeRegister(0x09,99,0);   break;
         case 6: writeRegister(0x09,100,0);  break;
     }
+}
+void MPU6050WakeUp(){
+	writeRegister(0x6C,0);
+}
+void getMPU6050Raw(){
+	MPU6050.AccX = (float)readRegister16s(0x68,0x3B);
+        MPU6050.AccY = (float)readRegister16s(0x68,0x3D);
+        MPU6050.AccZ = (float)readRegister16s(0x68,0x3F);
+        MPU6050.Temp = (float)readRegister16s(0x68,0x41);
+        MPU6050.GyX  =  (float)readRegister16s(0x68,0x43);
+        MPU6050.GyY  =  (float)readRegister16s(0x68,0x45);
+        MPU6050.GyZ  = (float)readRegister16s(0x68,0x47);
+}
+void getMPU6050(){
+	MPU6050.AccX = (float)readRegister16s(0x68,0x3B)/MPU6050.ScaleAcc;
+        MPU6050.AccY = (float)readRegister16s(0x68,0x3D)/MPU6050.ScaleAcc;
+        MPU6050.AccZ = (float)readRegister16s(0x68,0x3F)/MPU6050.ScaleAcc;
+        MPU6050.Temp = (float)readRegister16s(0x68,0x41)/340+36.53;
+        MPU6050.GyX  = (float)readRegister16s(0x68,0x43)/MPU6050.ScaleGy;
+        MPU6050.GyY  = (float)readRegister16s(0x68,0x45)/MPU6050.ScaleGy;
+        MPU6050.GyZ  = (float)readRegister16s(0x68,0x47)/MPU6050.ScaleGy;
+}
+float distance(float a,float b){
+	return sqrt(a*a+b*b);
+}
+//komplementarny filter - http://www.pieter-jan.com/node/11
+//https://b94be14129454da9cf7f056f5f8b89a9b17da0be.googledrive.com/host/0B0ZbiLZrqVa6Y2d3UjFVWDhNZms/filter.pdf
+//http://husstechlabs.com/projects/atb1/using-the-accelerometer/
+void getMPU6050Full(float dt){
+	getMPU6050();
+	MPU6050.pitch	+=MPU6050.GyX*dt;
+	MPU6050.roll	-=MPU6050.GyY*dt;
+	MPU6050.yaw	+= MPU6050.GyZ*dt;
+	int forceMagnitudeApprox = abs(MPU6050.AccX)+abs(MPU6050.AccY)+abs(MPU6050.AccZ);
+	if(fourceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
+       	 	float pitchAcc = atan2f(MPU6050.AccY, distance(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;
+        	MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
+
+        	float rollAcc = atan2f(MPU6050.AccX, distance(MPU6050.AccZ,MPU6050.AccY) * 180 / M_PI;
+        	MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
+		
+		float yawAcc = atan2f(distance(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
+                MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
+	}
+
+} 
+
+void setMPU6050Sensitivity(int acc_sens,int gy_sens){
+	switch(acc_sens){
+		case 0: MPU6050.ScaleAcc = 16384;	break;		//2g
+		case 1:	MPU6050.ScaleAcc = 8192;	break;		//4g
+		case 2: MPU6050.ScaleAcc = 4096;	break;		//8g
+		case 3:	MPU6050.ScaleAcc = 2048;	break;		//16g
+	}
+	
+	switch(gy_sens){
+		case 0: MPU6050.ScaleGy = 131;      	break;          //250 stup/s
+                case 1: MPU6050.ScaleGy = 65.5;      	break;          //500 stup/s
+                case 2: MPU6050.ScaleGy = 32.75;      break;          //1000 stup/s
+                case 3: MPU6050.ScaleGy = 16.375;     break;          //2000 stup/s
+	}
+	
+	writeRegister(0x1B,(gy_sens<<3)|0xE0);
+        writeRegister(0x1C,(acc_sens<<3)|0xE0));
+}
+void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
+	switch(acc_dlpf){
+		case 0: MPU6050.DlpfAcc = 260; break;
+		case 1:	MPU6050.DlpfAcc = 184; break;
+		case 2:	MPU6050.DlpfAcc = 94; break;
+		case 3:	MPU6050.DlpfAcc = 44; break;
+		case 4:	MPU6050.DlpfAcc = 21; break;
+		case 5:	MPU6050.DlpfAcc = 10; break;
+		case 6: MPU6050.DlpfAcc = 5; break;
+	}
+	switch(gy_dlpg){
+		case 0: MPU6050.DlpfGy = 256;  break;
+                case 1: MPU6050.DlpfGy = 188;  break;
+                case 2: MPU6050.DlpfGy = 98;  break;
+                case 3: MPU6050.DlpfGy = 42;  break;
+                case 4: MPU6050.DlpfGy = 20;  break;
+                case 5: MPU6050.DlpfGy = 10;  break;
+                case 6: MPU6050.DlpfGy = 5;  break;
+	}
+	writeRegister(0x1A,gy_dlpf|(2<<3));
+        writeRegister(0x1A,gy_dlpf|(3<<3));
+        writeRegister(0x1A,gy_dlpf|(4<<3));
+
+	writeRegister(0x1A,acc_dlpf|(5<<3));
+        writeRegister(0x1A,acc_dlpf|(6<<3));
+        writeRegister(0x1A,acc_dlpf|(7<<3));
 }
 void servo(int pozicia){
     if(pozicia+91 < 1) writeRegister(0x0A,84,1);

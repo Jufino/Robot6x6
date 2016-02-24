@@ -34,7 +34,7 @@
     #define PORT_I2C "/dev/i2c-1"
     #define PORT_GPS "/dev/ttyAMA0"
 
-    #define Wifi_camera  1
+    #define Wifi_camera  0
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
@@ -47,6 +47,28 @@
     #define minNapetie 22.8f
     #define rychlostZvuku 340.0f
     #define rozliseniePrud 0.185f // 185mV/A
+    struct MPU6050_struct{
+        float AccX;
+        float AccY;
+        float AccZ;
+	float AccX_offset=0;
+	float AccY_offset=0;
+        float AccZ_offset=0;
+        int DlpfAcc;
+        int ScaleAcc;
+	float Temp;
+        float GyX;
+        float GyY;
+        float GyZ;
+	float GyX_offset=0;
+        float GyY_offset=0;
+        float GyZ_offset=0;
+	int DlpfGy;
+	int ScaleGy;
+	float Roll;
+	float Pitch;
+	float Yaw;
+    };
     struct GPGGA_struct{
     	char UTCTime[9];
     	float Latitude;
@@ -148,7 +170,7 @@
     void setDevice(int addr);
     void writeRegister(int addr,unsigned char reg, unsigned char value);
     unsigned int readRegister16(int addr,unsigned char reg);
-    signed int readRegisters16(int addr,unsigned char reg);
+    signed int readRegister16s(int addr,unsigned char reg);
     unsigned char readRegister8(int addr,unsigned char reg);
 
     void odosliMat(Mat img,int kvalita);

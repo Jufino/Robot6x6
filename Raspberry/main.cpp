@@ -60,7 +60,16 @@ int main(void){
         pthread_t vlaknoImgL;
         pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
 
+	writeRegister(0x68,0x6B,0);
 	while(1){
+		printf("AcX: %d\n",readRegister16s(0x68,0x3B));
+		printf("AcY: %d\n",readRegister16s(0x68,0x3D));
+		printf("AcZ: %d\n",readRegister16s(0x68,0x3F));
+		printf("TMP: %f\n",(float)readRegister16s(0x68,0x41)/360+36.53);
+		printf("GyX: %d\n",readRegister16s(0x68,0x43));
+		printf("GyY: %d\n",readRegister16s(0x68,0x45));
+		printf("GyZ: %d\n\n",readRegister16s(0x68,0x47));
+/*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;
                 semPost(sem_id,0);
@@ -75,12 +84,12 @@ int main(void){
 				cvarrToMat(img2L).copyTo(imgSendL);
 				semPost(sem_id,2);
 			}
-                        wifiCamera();
+                        if(Wifi_camera == 1) wifiCamera();
                 }
 
-
+*/
 		//printf("napetie:%d,%f,%f\nprud: %d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent(),prudRaw(),prudVolt(),prudAmp());
-		//usleep(20000);
+		usleep(333000);
 	}
         closeRobot();
 	return 0;
