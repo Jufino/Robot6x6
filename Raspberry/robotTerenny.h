@@ -16,6 +16,7 @@
     #include <termios.h>
     #include <inttypes.h>
     #include <unistd.h>
+    #include <math.h>
 
     #include <opencv2/opencv.hpp>
 	
@@ -33,6 +34,7 @@
 
     #define PORT_I2C "/dev/i2c-1"
     #define PORT_GPS "/dev/ttyAMA0"
+    #define MPU6050ADDR 0x68
 
     #define Wifi_camera  0
     #define Wifi_snimace 0
@@ -51,18 +53,18 @@
         float AccX;
         float AccY;
         float AccZ;
-	float AccX_offset=0;
-	float AccY_offset=0;
-        float AccZ_offset=0;
+	float AccX_offset;
+	float AccY_offset;
+        float AccZ_offset;
         int DlpfAcc;
         int ScaleAcc;
 	float Temp;
         float GyX;
         float GyY;
         float GyZ;
-	float GyX_offset=0;
-        float GyY_offset=0;
-        float GyZ_offset=0;
+	float GyX_offset;
+        float GyY_offset;
+        float GyZ_offset;
 	int DlpfGy;
 	int ScaleGy;
 	float Roll;
@@ -174,26 +176,35 @@
     unsigned char readRegister8(int addr,unsigned char reg);
 
     void odosliMat(Mat img,int kvalita);
-    void motor(int poradie,signed char smer,unsigned char rychlost,bool reg);
-    unsigned int rychlost(int poradie);
-    unsigned int vzdialenost(int poradie);
-    unsigned char tlacitka(char pozicia);
+    void setMotor(int poradie,signed char smer,unsigned char rychlost,bool reg);
+    unsigned int getRychlost(int poradie);
+    unsigned int getVzdialenost(int poradie);
+    unsigned char getTlacitka(char pozicia);
     void resetVzdialenost(int poradie);
-    void servo(int pozicia);
-    unsigned int ultrazvukRaw();
-    float ultrazvukMeter();
-    int napetieRaw();
-    float napetieVolt();
-    float napetiePercent();
-    int prudRaw();
-    float prudVolt();
-    float prudAmp();
-    void led(int poradie,char nazov,bool stav);
-    void napajanie(bool stav);
-    
+    void setServo(int uhol);
+    unsigned int getUltrazvukRaw();
+    float getUltrazvukMeter();
+    int getNapetieRaw();
+    float getNapetieVolt();
+    float getNapetiePercent();
+    int getPrudRaw();
+    float getPrudVolt();
+    float getPrudAmp();
+    void setLed(int poradie,char nazov,bool stav);
+    void setNapajanie(bool stav);
+   
+    void MPU6050WakeUp();
+    void MPU6050Sensitivity(int acc_sens,int gy_sens);
+    void MPU6050DLPF(int acc_dlpg,int gy_dlpf);
+    void MPU6050OCalibrateOffset(int pocet);
+    void getMPU6050Raw();
+    void getMPU6050();
+    void getMPU6050Full();
+ 
     int getSocketCamera();
     int getSocketSnimace();
 
-    int kbhit(void);
+    int getKbhit(void);
+    float distance(float a,float b);
 #endif
 	

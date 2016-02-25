@@ -14,7 +14,7 @@ main:main.cpp
 TARGET=robotTerenny
 
 robotTerenny:robotTerenny.c
-	$(CPP) -c robotTerenny.c -lgpio -lserial $(OFLAGS)
+	$(CPP) -c robotTerenny.c -lgpio -lserial -lm $(OFLAGS)
 
 install: $(TARGET)
 	$(CROSS_COMPILE)ar rcs lib$(TARGET).a robotTerenny.o

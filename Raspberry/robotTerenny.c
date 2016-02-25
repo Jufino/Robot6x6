@@ -149,7 +149,7 @@ void odosliMat(Mat img,int kvalita){
     send(clientsock_camera, &buff[0],buff.size(), 0);
     buff.clear();
 }
-unsigned char tlacitka(char pozicia){
+unsigned char getTlacitka(char pozicia){
     switch(pozicia){
         case 1: return !gpio_read(27); break;
         case 2: return !gpio_read(17); break;
@@ -157,7 +157,7 @@ unsigned char tlacitka(char pozicia){
 	default: return 0;
     }
 }
-unsigned int rychlost(int poradie){
+unsigned int getRychlost(int poradie){
     switch(poradie){
         case 1: return readRegister16(0x08,1); break;
         case 2: return readRegister16(0x0A,1); break;
@@ -168,7 +168,7 @@ unsigned int rychlost(int poradie){
         default: return 0;
     }
 }
-unsigned int vzdialenost(int poradie){
+unsigned int getVzdialenost(int poradie){
     switch(poradie){
         case 1: return readRegister16(0x08,3); break;
         case 2: return readRegister16(0x0A,3); break;
@@ -190,25 +190,45 @@ void resetVzdialenost(int poradie){
     }
 }
 void MPU6050WakeUp(){
-	writeRegister(0x6C,0);
+	writeRegister(MPU6050ADDR,0x6C,0);
 }
 void getMPU6050Raw(){
-	MPU6050.AccX = (float)readRegister16s(0x68,0x3B);
-        MPU6050.AccY = (float)readRegister16s(0x68,0x3D);
-        MPU6050.AccZ = (float)readRegister16s(0x68,0x3F);
-        MPU6050.Temp = (float)readRegister16s(0x68,0x41);
-        MPU6050.GyX  =  (float)readRegister16s(0x68,0x43);
-        MPU6050.GyY  =  (float)readRegister16s(0x68,0x45);
-        MPU6050.GyZ  = (float)readRegister16s(0x68,0x47);
+	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B);
+        MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D);
+        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F);
+        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41);
+        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43);
+        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45);
+        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47);
 }
 void getMPU6050(){
-	MPU6050.AccX = (float)readRegister16s(0x68,0x3B)/MPU6050.ScaleAcc;
-        MPU6050.AccY = (float)readRegister16s(0x68,0x3D)/MPU6050.ScaleAcc;
-        MPU6050.AccZ = (float)readRegister16s(0x68,0x3F)/MPU6050.ScaleAcc;
-        MPU6050.Temp = (float)readRegister16s(0x68,0x41)/340+36.53;
-        MPU6050.GyX  = (float)readRegister16s(0x68,0x43)/MPU6050.ScaleGy;
-        MPU6050.GyY  = (float)readRegister16s(0x68,0x45)/MPU6050.ScaleGy;
-        MPU6050.GyZ  = (float)readRegister16s(0x68,0x47)/MPU6050.ScaleGy;
+	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B)/MPU6050.ScaleAcc-MPU6050.AccX_offset;
+        MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D)/MPU6050.ScaleAcc-MPU6050.AccY_offset;
+        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F)/MPU6050.ScaleAcc-MPU6050.AccZ_offset;
+        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41)/340+36.53;
+        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43)/MPU6050.ScaleGy-MPU6050.GyX_offset;
+        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45)/MPU6050.ScaleGy-MPU6050.GyY_offset;
+        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47)/MPU6050.ScaleGy-MPU6050.GyZ_offset;
+}
+void MPU6050CalibrateOffset(int pocet){
+	float acc_x=0,acc_y=0,acc_z=0;
+	float gy_x=0,gy_y=0,gy_z=0;
+	for(int i=0;i<pocet;i++){
+		getMPU6050();
+		acc_x+=MPU6050.AccX;
+		acc_y+=MPU6050.AccY;
+		acc_z+=MPU6050.AccZ;
+		gy_x+=MPU6050.GyX;
+		gy_y+=MPU6050.GyY;
+		gy_z+=MPU6050.GyZ;
+	}
+	MPU6050.AccX_offset = acc_x/pocet;
+	MPU6050.AccY_offset = acc_y/pocet;
+	MPU6050.AccZ_offset = acc_z/pocet;
+	
+	MPU6050.GyX_offset = acc_x/pocet;
+	MPU6050.GyY_offset = acc_y/pocet;
+	MPU6050.GyZ_offset = acc_z/pocet;
 }
 float distance(float a,float b){
 	return sqrt(a*a+b*b);
@@ -217,19 +237,22 @@ float distance(float a,float b){
 //https://b94be14129454da9cf7f056f5f8b89a9b17da0be.googledrive.com/host/0B0ZbiLZrqVa6Y2d3UjFVWDhNZms/filter.pdf
 //http://husstechlabs.com/projects/atb1/using-the-accelerometer/
 void getMPU6050Full(float dt){
+	float pitchAcc;
+	float rollAcc;
+	float yawAcc;
 	getMPU6050();
-	MPU6050.pitch	+=MPU6050.GyX*dt;
-	MPU6050.roll	-=MPU6050.GyY*dt;
-	MPU6050.yaw	+= MPU6050.GyZ*dt;
+	MPU6050.Pitch	+=MPU6050.GyX*dt;
+	MPU6050.Roll	-=MPU6050.GyY*dt;
+	MPU6050.Yaw	+= MPU6050.GyZ*dt;
 	int forceMagnitudeApprox = abs(MPU6050.AccX)+abs(MPU6050.AccY)+abs(MPU6050.AccZ);
-	if(fourceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
-       	 	float pitchAcc = atan2f(MPU6050.AccY, distance(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;
+	if(forceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
+       	 	pitchAcc = atan2f(MPU6050.AccY, distance(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;
         	MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
 
-        	float rollAcc = atan2f(MPU6050.AccX, distance(MPU6050.AccZ,MPU6050.AccY) * 180 / M_PI;
+        	rollAcc = atan2f(MPU6050.AccX, distance(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
         	MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
 		
-		float yawAcc = atan2f(distance(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
+		yawAcc = atan2f(distance(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
                 MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
 	}
 
@@ -250,8 +273,8 @@ void setMPU6050Sensitivity(int acc_sens,int gy_sens){
                 case 3: MPU6050.ScaleGy = 16.375;     break;          //2000 stup/s
 	}
 	
-	writeRegister(0x1B,(gy_sens<<3)|0xE0);
-        writeRegister(0x1C,(acc_sens<<3)|0xE0));
+	writeRegister(MPU6050ADDR,0x1B,(gy_sens<<3)|0xE0);
+        writeRegister(MPU6050ADDR,0x1C,(acc_sens<<3)|0xE0);
 }
 void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
 	switch(acc_dlpf){
@@ -263,7 +286,7 @@ void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
 		case 5:	MPU6050.DlpfAcc = 10; break;
 		case 6: MPU6050.DlpfAcc = 5; break;
 	}
-	switch(gy_dlpg){
+	switch(gy_dlpf){
 		case 0: MPU6050.DlpfGy = 256;  break;
                 case 1: MPU6050.DlpfGy = 188;  break;
                 case 2: MPU6050.DlpfGy = 98;  break;
@@ -272,47 +295,47 @@ void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
                 case 5: MPU6050.DlpfGy = 10;  break;
                 case 6: MPU6050.DlpfGy = 5;  break;
 	}
-	writeRegister(0x1A,gy_dlpf|(2<<3));
-        writeRegister(0x1A,gy_dlpf|(3<<3));
-        writeRegister(0x1A,gy_dlpf|(4<<3));
+	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(2<<3));
+        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
+        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
 
-	writeRegister(0x1A,acc_dlpf|(5<<3));
-        writeRegister(0x1A,acc_dlpf|(6<<3));
-        writeRegister(0x1A,acc_dlpf|(7<<3));
+	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(5<<3));
+        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(6<<3));
+        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(7<<3));
 }
-void servo(int pozicia){
-    if(pozicia+91 < 1) writeRegister(0x0A,84,1);
-    else if(pozicia+91 > 181) writeRegister(0x0A,84,181);
-    else writeRegister(0x0A,84,pozicia+91);
+void setServo(int uhol){
+    if(uhol+91 < 1) writeRegister(0x0A,84,1);
+    else if(uhol+91 > 181) writeRegister(0x0A,84,181);
+    else writeRegister(0x0A,84,uhol+91);
 }
-unsigned int ultrazvukRaw(){
+unsigned int getUltrazvukRaw(){
     return readRegister16(0x0A,6);
 }
-float ultrazvukMeter(){
+float getUltrazvukMeter(){
 	return (float)readRegister16(0x0A,6)*(rychlostZvuku/2);
 }
-int napetieRaw(){
+int getNapetieRaw(){
     return readRegister16(0x08,5);
 }
-float napetieVolt(){
-    float napHod = (float)napetieRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
+float getNapetieVolt(){
+    float napHod = (float)getNapetieRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
     return napHod;
 }
-float napetiePercent(){
-    float napHod = (float)napetieVolt()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
+float getNapetiePercent(){
+    float napHod = (float)getNapetieVolt()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
     return napHod;
 }
-int prudRaw(){
+int getPrudRaw(){
     return readRegister16(0x08,6);
 }
-float prudVolt(){
-    return (float)prudRaw()*(maxVoltADC/rozlisenieADC);
+float getPrudVolt(){
+    return (float)getPrudRaw()*(maxVoltADC/rozlisenieADC);
 }
-float prudAmp(){
-    return ((float)prudVolt()-maxVoltADC/2)/rozliseniePrud;
+float getPrudAmp(){
+    return ((float)getPrudVolt()-maxVoltADC/2)/rozliseniePrud;
 }
 
-void led(int poradie,char nazov,bool stav){
+void setLed(int poradie,char nazov,bool stav){
     if(poradie == 3){
         if(nazov == 'Z'){
             if(stav == false) writeRegister(0x08,97,0);
@@ -324,12 +347,12 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                led(1,'Z',0);
-                led(1,'C',0);
+                setLed(1,'Z',0);
+                setLed(1,'C',0);
             }
             else{
-                led(1,'Z',1);
-                led(1,'C',1);
+                setLed(1,'Z',1);
+                setLed(1,'C',1);
             }
         }
     }
@@ -344,12 +367,12 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                led(2,'Z',0);
-                led(2,'C',0);
+                setLed(2,'Z',0);
+                setLed(2,'C',0);
             }
             else{
-                led(2,'Z',1);
-                led(2,'C',1);
+                setLed(2,'Z',1);
+                setLed(2,'C',1);
             }
         }
     }
@@ -364,21 +387,21 @@ void led(int poradie,char nazov,bool stav){
         }
         else{
             if(stav == false){
-                led(3,'Z',0);
-                led(3,'C',0);
+                setLed(3,'Z',0);
+                setLed(3,'C',0);
             }
             else{
-                led(3,'Z',1);
-                led(3,'C',1);
+                setLed(3,'Z',1);
+                setLed(3,'C',1);
             }
         }
     }
 }
-void napajanie(bool stav){
+void setNapajanie(bool stav){
     if(stav == false)   writeRegister(0x08,95,0);
     else                writeRegister(0x08,95,1);
 }
-void motor(int poradie,signed char smer,unsigned char rychlost,bool reg){
+void setMotor(int poradie,signed char smer,unsigned char rychlost,bool reg){
     if(reg == true){
         if(smer>=0){
             switch(poradie){
@@ -434,7 +457,7 @@ void motor(int poradie,signed char smer,unsigned char rychlost,bool reg){
         }
     }
 }
-int kbhit(void){
+int getKbhit(void){
   struct termios oldt, newt;
   int ch;
   int oldf;
@@ -454,7 +477,7 @@ int kbhit(void){
   }
   return 0;
 }
-void parseGPS(){
+void getGPS(){
     while(strcmp(SerialRead(portHandle,1),"$") != 0);
 	char *dataCMD = SerialRead(portHandle,5);
 	int i = 0;
