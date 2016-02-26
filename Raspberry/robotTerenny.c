@@ -181,131 +181,7 @@ void resetVzdialenost(int poradie){
         case 6: writeRegister(0x09,100,0);  break;
     }
 }
-float AccX_offset = 0;
-float AccY_offset = 0;
-float AccZ_offset = 0;
-float GyX_offset = 0;
-float GyY_offset = 0;
-float GyZ_offset = 0;
-float AccScale = 16384;
-float GyScale = 131;
-float Pitch=0;
-float Roll=0;
-float Yaw=0;
 
-void MPU6050ResetPRY(){
-	Pitch = 0;
-	Roll = 0;
-	Yaw = 0;
-}
-void MPU6050ResetOffset(){
-	AccX_offset = 0;
-	AccY_offset = 0;
-	AccZ_offset = 0;
-	GyX_offset = 0;
-	GyY_offset = 0;
-	GyZ_offset = 0;
-}
-void MPU6050WakeUp(){
-	writeRegister(MPU6050ADDR,0x6B,0);
-}
-MPU6050_struct getMPU6050Raw(){
-	MPU6050_struct MPU6050;
-	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B);
-	MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D);
-        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F);
-        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41);
-        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43);
-        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45);
-        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47);
-	return MPU6050;
-}
-MPU6050_struct getMPU6050(){
-	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B)/AccScale-AccX_offset;
-        MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D)/AccScale-AccY_offset;
-        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F)/AccScale-AccZ_offset;
-        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41)/340+36.53;
-        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43)/GyScale-GyX_offset;
-        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45)/GyScale-GyY_offset;
-        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47)/GyScale-GyZ_offset;
-}
-
-void MPU6050CalibrateOffset(int pocet){
-	float acc_x=0,acc_y=0,acc_z=0;
-	float gy_x=0,gy_y=0,gy_z=0;
-	MPU6050_struct MPU6050;
-	for(int i=0;i<pocet;i++){
-		MPU6050 = getMPU6050();
-		acc_x+=MPU6050.AccX;
-		acc_y+=MPU6050.AccY;
-		acc_z+=MPU6050.AccZ;
-		gy_x+=MPU6050.GyX;
-		gy_y+=MPU6050.GyY;
-		gy_z+=MPU6050.GyZ;
-	}
-	AccX_offset = acc_x/pocet;
-	AccY_offset = acc_y/pocet;
-	AccZ_offset = acc_z/pocet;
-	
-	GyX_offset = acc_x/pocet;
-	GyY_offset = acc_y/pocet;
-	GyZ_offset = acc_z/pocet;
-}
-float dist(float a,float b){
-	return sqrt(a*a+b*b);
-}
-//komplementarny filter - http://www.pieter-jan.com/node/11
-//https://b94be14129454da9cf7f056f5f8b89a9b17da0be.googledrive.com/host/0B0ZbiLZrqVa6Y2d3UjFVWDhNZms/filter.pdf
-//http://husstechlabs.com/projects/atb1/using-the-accelerometer/
-MPU6050_struct getMPU6050Full(float dt){
-	float pitchAcc;
-	float rollAcc;
-	float yawAcc;
-	MPU6050_struct MPU6050 = getMPU6050();
-	MPU6050.Pitch	+=MPU6050.GyX*dt+Pitch;
-	MPU6050.Roll	-=MPU6050.GyY*dt+Roll;
-	MPU6050.Yaw	+= MPU6050.GyZ*dt+Yaw;
-	int forceMagnitudeApprox = abs(MPU6050.AccX)+abs(MPU6050.AccY)+abs(MPU6050.AccZ);
-	if(forceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
-       	 	pitchAcc = atan2f(MPU6050.AccY, dist(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;	
-        	MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
-
-        	rollAcc = atan2f(MPU6050.AccX, dist(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
-        	MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
-		
-		yawAcc = atan2f(dist(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
-                MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
-	}
-	return MPU6050;
-} 
-
-void setMPU6050Sensitivity(int acc_sens,int gy_sens){
-	switch(acc_sens){
-		case 0: AccScale = 16384;	break;		//2g
-		case 1:	AccScale = 8192;	break;		//4g
-		case 2: AccScale = 4096;	break;		//8g
-		case 3:	AccScale = 2048;	break;		//16g
-	}
-	
-	switch(gy_sens){
-		case 0: GyScale = 131;      	break;          //250 stup/s
-                case 1: GyScale = 65.5;      	break;          //500 stup/s
-                case 2: GyScale = 32.75;      break;          //1000 stup/s
-                case 3: GyScale = 16.375;     break;          //2000 stup/s
-	}
-	
-	writeRegister(MPU6050ADDR,0x1B,(gy_sens<<3)|0xE0);
-        writeRegister(MPU6050ADDR,0x1C,(acc_sens<<3)|0xE0);
-}
-void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
-	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(2<<3));
-        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
-        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
-
-	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(5<<3));
-        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(6<<3));
-        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(7<<3));
-}
 void setServo(int uhol){
     if(uhol+91 < 1) writeRegister(0x0A,84,1);
     else if(uhol+91 > 181) writeRegister(0x0A,84,181);
@@ -720,4 +596,129 @@ GPS_struct getGPS(){
         }
     }
     return GPS;
+}
+float AccX_offset = 0;
+float AccY_offset = 0;
+float AccZ_offset = 0;
+float GyX_offset = 0;
+float GyY_offset = 0;
+float GyZ_offset = 0;
+float AccScale = 16384;
+float GyScale = 131;
+float Pitch=0;
+float Roll=0;
+float Yaw=0;
+
+void MPU6050ResetPRY(){
+	Pitch = 0;
+	Roll = 0;
+	Yaw = 0;
+}
+void MPU6050ResetOffset(){
+	AccX_offset = 0;
+	AccY_offset = 0;
+	AccZ_offset = 0;
+	GyX_offset = 0;
+	GyY_offset = 0;
+	GyZ_offset = 0;
+}
+void MPU6050WakeUp(){
+	writeRegister(MPU6050ADDR,0x6B,0);
+}
+MPU6050_struct getMPU6050Raw(){
+	MPU6050_struct MPU6050;
+	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B);
+	MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D);
+        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F);
+        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41);
+        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43);
+        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45);
+        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47);
+	return MPU6050;
+}
+MPU6050_struct getMPU6050(){
+	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B)/AccScale-AccX_offset;
+        MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D)/AccScale-AccY_offset;
+        MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F)/AccScale-AccZ_offset;
+        MPU6050.Temp = (float)readRegister16s(MPU6050ADDR,0x41)/340+36.53;
+        MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43)/GyScale-GyX_offset;
+        MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45)/GyScale-GyY_offset;
+        MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47)/GyScale-GyZ_offset;
+}
+
+void MPU6050CalibrateOffset(int pocet){
+	float acc_x=0,acc_y=0,acc_z=0;
+	float gy_x=0,gy_y=0,gy_z=0;
+	MPU6050_struct MPU6050;
+	for(int i=0;i<pocet;i++){
+		MPU6050 = getMPU6050();
+		acc_x+=MPU6050.AccX;
+		acc_y+=MPU6050.AccY;
+		acc_z+=MPU6050.AccZ;
+		gy_x+=MPU6050.GyX;
+		gy_y+=MPU6050.GyY;
+		gy_z+=MPU6050.GyZ;
+	}
+	AccX_offset = acc_x/pocet;
+	AccY_offset = acc_y/pocet;
+	AccZ_offset = acc_z/pocet;
+	
+	GyX_offset = acc_x/pocet;
+	GyY_offset = acc_y/pocet;
+	GyZ_offset = acc_z/pocet;
+}
+float dist(float a,float b){
+	return sqrt(a*a+b*b);
+}
+//komplementarny filter - http://www.pieter-jan.com/node/11
+//https://b94be14129454da9cf7f056f5f8b89a9b17da0be.googledrive.com/host/0B0ZbiLZrqVa6Y2d3UjFVWDhNZms/filter.pdf
+//http://husstechlabs.com/projects/atb1/using-the-accelerometer/
+MPU6050_struct getMPU6050Full(float dt){
+	float pitchAcc;
+	float rollAcc;
+	float yawAcc;
+	MPU6050_struct MPU6050 = getMPU6050();
+	MPU6050.Pitch	+=MPU6050.GyX*dt+Pitch;
+	MPU6050.Roll	-=MPU6050.GyY*dt+Roll;
+	MPU6050.Yaw	+= MPU6050.GyZ*dt+Yaw;
+	int forceMagnitudeApprox = abs(MPU6050.AccX)+abs(MPU6050.AccY)+abs(MPU6050.AccZ);
+	if(forceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
+       	 	pitchAcc = atan2f(MPU6050.AccY, dist(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;	
+        	MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
+
+        	rollAcc = atan2f(MPU6050.AccX, dist(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
+        	MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
+		
+		yawAcc = atan2f(dist(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
+                MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
+	}
+	return MPU6050;
+} 
+
+void setMPU6050Sensitivity(int acc_sens,int gy_sens){
+	switch(acc_sens){
+		case 0: AccScale = 16384;	break;		//2g
+		case 1:	AccScale = 8192;	break;		//4g
+		case 2: AccScale = 4096;	break;		//8g
+		case 3:	AccScale = 2048;	break;		//16g
+	}
+	
+	switch(gy_sens){
+		case 0: GyScale = 131;      	break;          //250 stup/s
+                case 1: GyScale = 65.5;      	break;          //500 stup/s
+                case 2: GyScale = 32.75;      break;          //1000 stup/s
+                case 3: GyScale = 16.375;     break;          //2000 stup/s
+	}
+	
+	writeRegister(MPU6050ADDR,0x1B,(gy_sens<<3)|0xE0);
+        writeRegister(MPU6050ADDR,0x1C,(acc_sens<<3)|0xE0);
+}
+void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
+	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(2<<3));
+        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
+        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
+
+	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(5<<3));
+        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(6<<3));
+        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(7<<3));
 }

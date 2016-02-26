@@ -156,12 +156,12 @@
     	char Checksum[3];
     };
     struct GPS_struct{
-	GPGGA_struct GPGGA;
-	GPGLL_struct GPGLL;
-	GPGSA_struct GPGSA;
-	GPGSV_struct GPGSV;
-	GPRMC_struct GPRMC;
-	GPVTG_struct GPVTG;
+    	GPGGA_struct GPGGA;
+    	GPGLL_struct GPGLL;
+    	GPGSA_struct GPGSA;
+    	GPGSV_struct GPGSV;
+    	GPRMC_struct GPRMC;
+    	GPVTG_struct GPVTG;
     };
 
     void initRobot();
@@ -190,14 +190,18 @@
     float getPrudAmp();
     void setLed(int poradie,char nazov,bool stav);
     void setNapajanie(bool stav);
+    GPS_struct getGPS();
    
+
+    void MPU6050ResetPRY();
+    void MPU6050ResetOffset();
     void MPU6050WakeUp();
-    void MPU6050Sensitivity(int acc_sens,int gy_sens);
-    void MPU6050DLPF(int acc_dlpg,int gy_dlpf);
-    void MPU6050OCalibrateOffset(int pocet);
     MPU6050_struct getMPU6050Raw();
-    void getMPU6050();
-    void getMPU6050Full();
+    MPU6050_struct getMPU6050(); 
+    void MPU6050CalibrateOffset(int pocet);
+    MPU6050_struct getMPU6050Full(float dt);
+    void setMPU6050Sensitivity(int acc_sens,int gy_sens);
+    void setMPU6050DLPF(int acc_dlpf,int gy_dlpf);
  
     int getSocketCamera();
     int getSocketSnimace();
