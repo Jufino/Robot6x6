@@ -38,14 +38,13 @@ int main(void){
 	int imageChooseMainL = 0;
 
     	initRobot();
-	napajanie(true);
-	motor(1,0,255,false);
-        motor(2,0,255,false);
-        motor(3,0,255,false);
-        motor(4,0,255,false);
-        motor(5,0,255,false);
-        motor(6,0,255,false);
-	
+	setNapajanie(true);
+	setMotor(1,0,255,false);
+        setMotor(2,0,255,false);
+        setMotor(3,0,255,false);
+        setMotor(4,0,255,false);
+        setMotor(5,0,255,false);
+        setMotor(6,0,255,false);	
         cameraL = cvCaptureFromCAM(0);
 
         cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_WIDTH, sirka);
@@ -59,16 +58,16 @@ int main(void){
 	
         pthread_t vlaknoImgL;
         pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
-
-	writeRegister(0x68,0x6B,0);
+	MPU6050WakeUp();
 	while(1){
-		printf("AcX: %d\n",readRegister16s(0x68,0x3B));
-		printf("AcY: %d\n",readRegister16s(0x68,0x3D));
-		printf("AcZ: %d\n",readRegister16s(0x68,0x3F));
-		printf("TMP: %f\n",(float)readRegister16s(0x68,0x41)/360+36.53);
-		printf("GyX: %d\n",readRegister16s(0x68,0x43));
-		printf("GyY: %d\n",readRegister16s(0x68,0x45));
-		printf("GyZ: %d\n\n",readRegister16s(0x68,0x47));
+		MPU6050_struct test = getMPU6050Raw();
+		printf("AcX: %f\n",test.AccX);
+		printf("AcY: %f\n",test.AccY);
+		printf("AcZ: %f\n",test.AccZ);
+		printf("TMP: %f\n",test.Temp);
+		printf("GyX: %f\n",test.GyX);
+		printf("GyY: %f\n",test.GyY);
+		printf("GyZ: %f\n\n",test.GyZ);
 /*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;

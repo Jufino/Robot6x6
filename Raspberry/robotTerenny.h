@@ -53,20 +53,10 @@
         float AccX;
         float AccY;
         float AccZ;
-	float AccX_offset;
-	float AccY_offset;
-        float AccZ_offset;
-        int DlpfAcc;
-        int ScaleAcc;
 	float Temp;
         float GyX;
         float GyY;
         float GyZ;
-	float GyX_offset;
-        float GyY_offset;
-        float GyZ_offset;
-	int DlpfGy;
-	int ScaleGy;
 	float Roll;
 	float Pitch;
 	float Yaw;
@@ -197,7 +187,7 @@
     void MPU6050Sensitivity(int acc_sens,int gy_sens);
     void MPU6050DLPF(int acc_dlpg,int gy_dlpf);
     void MPU6050OCalibrateOffset(int pocet);
-    void getMPU6050Raw();
+    MPU6050_struct getMPU6050Raw();
     void getMPU6050();
     void getMPU6050Full();
  
@@ -205,6 +195,6 @@
     int getSocketSnimace();
 
     int getKbhit(void);
-    float distance(float a,float b);
+    float dist(float a,float b);
 #endif
 	
