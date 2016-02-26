@@ -155,6 +155,14 @@
     	char Mode;
     	char Checksum[3];
     };
+    struct GPS_struct{
+	GPGGA_struct GPGGA;
+	GPGLL_struct GPGLL;
+	GPGSA_struct GPGSA;
+	GPGSV_struct GPGSV;
+	GPRMC_struct GPRMC;
+	GPVTG_struct GPVTG;
+    };
 
     void initRobot();
     void closeRobot();

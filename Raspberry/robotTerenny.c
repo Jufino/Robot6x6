@@ -5,13 +5,6 @@ int lastAddr = 0x00;
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
-GPGGA_struct GPGGA;
-GPGLL_struct GPGLL;
-GPRMC_struct GPRMC;
-GPGSA_struct GPGSA;
-GPGSV_struct GPGSV;
-GPVTG_struct GPVTG;
-
 int getSocketCamera(){
 	return clientsock_camera;
 }
@@ -487,7 +480,8 @@ int getKbhit(void){
   }
   return 0;
 }
-void getGPS(){
+GPS_struct getGPS(){
+    GPS_struct GPS;
     while(strcmp(SerialRead(portHandle,1),"$") != 0);
 	char *dataCMD = SerialRead(portHandle,5);
 	int i = 0;
@@ -501,10 +495,10 @@ void getGPS(){
             if(data[0] == ','){
                 buffer[x]='\0';
                 switch(i++){
-                    case 1:  GPVTG.CourseTrue = atof(buffer);       break;
-                    case 3:  GPVTG.CourseMagnetic = atof(buffer);   break;
-                    case 5:  GPVTG.SpeedKnots = atoi(buffer);       break;
-                    case 7:  GPVTG.SpeedKmh = atof(buffer);          break;
+                    case 1:  GPS.GPVTG.CourseTrue = atof(buffer);       break;
+                    case 3:  GPS.GPVTG.CourseMagnetic = atof(buffer);   break;
+                    case 5:  GPS.GPVTG.SpeedKnots = atoi(buffer);       break;
+                    case 7:  GPS.GPVTG.SpeedKmh = atof(buffer);          break;
                 }
                 x = 0;
             }
@@ -514,12 +508,12 @@ void getGPS(){
 					case 3:
 					case 5:
 					case 7:  buffer[x++] = data[0];                 break;
-                    case 2:  GPVTG.ReferenceTrue = data[0];         break;
-                    case 4:  GPVTG.ReferenceMagnetic = data[0];     break;
-                    case 6:  GPVTG.UnitsKnots = data[0];           	break;
-                    case 8:  GPVTG.UnitsKmh = data[0];           	break;
-                    case 9:  GPVTG.Mode = data[0];   		break;
-                    case 10: GPVTG.Checksum[x++] = data[0];         break;
+                    case 2:  GPS.GPVTG.ReferenceTrue = data[0];         break;
+                    case 4:  GPS.GPVTG.ReferenceMagnetic = data[0];     break;
+                    case 6:  GPS.GPVTG.UnitsKnots = data[0];           	break;
+                    case 8:  GPS.GPVTG.UnitsKmh = data[0];           	break;
+                    case 9:  GPS.GPVTG.Mode = data[0];   		break;
+                    case 10: GPS.GPVTG.Checksum[x++] = data[0];         break;
                 }
             }
         }
@@ -532,30 +526,30 @@ void getGPS(){
 			if(data[0] == ','){
 			    buffer[x]='\0';
 				switch(i++){
-                    case 2:  GPGGA.Latitude = atof(buffer);			break;
-                    case 4:  GPGGA.Longitude = atof(buffer);  		break;
-                    case 7:  GPGGA.SatellitesUsed = atoi(buffer); 	break;
-					case 8:  GPGGA.HDOP = atof(buffer); 			break;
-                    case 9:  GPGGA.MSLAltitude = atof(buffer); 		break;
-                    case 10: GPGGA.GeoidSeparation = atoi(buffer); 		break;
-                    case 12: GPGGA.AgeofDifferentialCorrections = atoi(buffer);break;
+                    case 2:  GPS.GPGGA.Latitude = atof(buffer);			break;
+                    case 4:  GPS.GPGGA.Longitude = atof(buffer);  		break;
+                    case 7:  GPS.GPGGA.SatellitesUsed = atoi(buffer); 	break;
+		    case 8:  GPS.GPGGA.HDOP = atof(buffer); 			break;
+                    case 9:  GPS.GPGGA.MSLAltitude = atof(buffer); 		break;
+                    case 10: GPS.GPGGA.GeoidSeparation = atoi(buffer); 		break;
+                    case 12: GPS.GPGGA.AgeofDifferentialCorrections = atoi(buffer);break;
                 }
                 x = 0;
             }
             else{
                 switch(i){
-                    case 1:  GPGGA.UTCTime[x++] = data[0];         break;
+                    case 1:  GPS.GPGGA.UTCTime[x++] = data[0];         break;
                     case 2:
                     case 7:
                     case 8:
                     case 9:
 					case 4:  buffer[x++] = data[0];                 break;
-					case 10: GPGGA.Units1 = data[0];		break;
-					case 12: GPGGA.Units2 = data[0];		break;
-                    case 3:  GPGGA.NSIndicator = data[0];          	break;
-                    case 5:  GPGGA.EWindicator = data[0];           break;
-                    case 6:  GPGGA.PositionFixIndictor = data[0];  	break;
-					case 13: GPGGA.Checksum[x++] = data[0];		break;
+					case 10: GPS.GPGGA.Units1 = data[0];		break;
+					case 12: GPS.GPGGA.Units2 = data[0];		break;
+                    case 3:  GPS.GPGGA.NSIndicator = data[0];          	break;
+                    case 5:  GPS.GPGGA.EWindicator = data[0];           break;
+                    case 6:  GPS.GPGGA.PositionFixIndictor = data[0];  	break;
+					case 13: GPS.GPGGA.Checksum[x++] = data[0];		break;
                 }
             }
         }
@@ -568,28 +562,28 @@ void getGPS(){
             if(data[0] == ','){
                 buffer[x]='\0';
                 switch(i++){
-                    case 3:  GPGSA.SatellitesUsedCH1 = atoi(buffer); break;
-					case 4:  GPGSA.SatellitesUsedCH2 = atoi(buffer); break;
-					case 5:  GPGSA.SatellitesUsedCH3 = atoi(buffer); break;
-					case 6:  GPGSA.SatellitesUsedCH4 = atoi(buffer); break;
-					case 7:  GPGSA.SatellitesUsedCH5 = atoi(buffer); break;
-					case 8:  GPGSA.SatellitesUsedCH6 = atoi(buffer); break;
-					case 9:  GPGSA.SatellitesUsedCH7 = atoi(buffer); break;
-					case 10:  GPGSA.SatellitesUsedCH8 = atoi(buffer); break;
-					case 11:  GPGSA.SatellitesUsedCH9 = atoi(buffer); break;
-					case 12:  GPGSA.SatellitesUsedCH10 = atoi(buffer); break;
-					case 13:  GPGSA.SatellitesUsedCH11 = atoi(buffer); break;
-					case 14:  GPGSA.SatellitesUsedCH12 = atoi(buffer); break;
-					case 15:  GPGSA.PDOP = atof(buffer); break;
-					case 16:  GPGSA.HDOP = atof(buffer); break;
-					case 17:  GPGSA.VDOP = atof(buffer); break;
+                    case 3:  GPS.GPGSA.SatellitesUsedCH1 = atoi(buffer); break;
+					case 4:  GPS.GPGSA.SatellitesUsedCH2 = atoi(buffer); break;
+					case 5:  GPS.GPGSA.SatellitesUsedCH3 = atoi(buffer); break;
+					case 6:  GPS.GPGSA.SatellitesUsedCH4 = atoi(buffer); break;
+					case 7:  GPS.GPGSA.SatellitesUsedCH5 = atoi(buffer); break;
+					case 8:  GPS.GPGSA.SatellitesUsedCH6 = atoi(buffer); break;
+					case 9:  GPS.GPGSA.SatellitesUsedCH7 = atoi(buffer); break;
+					case 10:  GPS.GPGSA.SatellitesUsedCH8 = atoi(buffer); break;
+					case 11:  GPS.GPGSA.SatellitesUsedCH9 = atoi(buffer); break;
+					case 12:  GPS.GPGSA.SatellitesUsedCH10 = atoi(buffer); break;
+					case 13:  GPS.GPGSA.SatellitesUsedCH11 = atoi(buffer); break;
+					case 14:  GPS.GPGSA.SatellitesUsedCH12 = atoi(buffer); break;
+					case 15:  GPS.GPGSA.PDOP = atof(buffer); break;
+					case 16:  GPS.GPGSA.HDOP = atof(buffer); break;
+					case 17:  GPS.GPGSA.VDOP = atof(buffer); break;
                 }
                 x = 0;
             }
             else{
                 switch(i){
-                    case 1:	 GPGSA.ModeChar = data[0];	break;
-                    case 2:  GPGSA.ModeInt = data[0];      	break;
+                    case 1:	 GPS.GPGSA.ModeChar = data[0];	break;
+                    case 2:  GPS.GPGSA.ModeInt = data[0];      	break;
                     case 3:
                     case 4:
 					case 5:
@@ -605,7 +599,7 @@ void getGPS(){
 					case 15:
 					case 16:
 					case 17:  buffer[x++] = data[0];         break;
-                    case 18:  GPGSA.Checksum[x++] = data[0]; break;
+                    case 18:  GPS.GPGSA.Checksum[x++] = data[0]; break;
                 }
             }
         }
@@ -618,8 +612,8 @@ void getGPS(){
             if(data[0] == ','){
                 buffer[x]='\0';
                 switch(i++){
-                    case 1:  GPGLL.Latitude = atof(buffer);                 break;
-                    case 3:  GPGLL.Longitude = atof(buffer);                break;
+                    case 1:  GPS.GPGLL.Latitude = atof(buffer);                 break;
+                    case 3:  GPS.GPGLL.Longitude = atof(buffer);                break;
                 }
                 x = 0;
             }
@@ -627,12 +621,12 @@ void getGPS(){
                 switch(i){
                     case 1:
 					case 3:	 buffer[x++] = data[0];         break;
-                    case 2:  GPGLL.NSIndicator = data[0];	break;
-					case 4:  GPGLL.EWIndicator = data[0];   break;
-					case 5:  GPGLL.UTCTime[x++] = data[0];  break;
-					case 6:  GPGLL.Status = data[0];  	break;
-					case 7:  GPGLL.ModeIndicator = data[0]; break;
-					case 8:  GPGLL.Checksum[x++] = data[0]; break;
+                    case 2:  GPS.GPGLL.NSIndicator = data[0];	break;
+					case 4:  GPS.GPGLL.EWIndicator = data[0];   break;
+					case 5:  GPS.GPGLL.UTCTime[x++] = data[0];  break;
+					case 6:  GPS.GPGLL.Status = data[0];  	break;
+					case 7:  GPS.GPGLL.ModeIndicator = data[0]; break;
+					case 8:  GPS.GPGLL.Checksum[x++] = data[0]; break;
                 }
             }
         }
@@ -645,26 +639,26 @@ void getGPS(){
             if(data[0] == ','){
                 buffer[x]='\0';
                 switch(i++){
-                    case 3:  GPRMC.Latitude = atof(buffer); break;
-					case 5:  GPRMC.Longitude = atof(buffer); break;
-					case 7:  GPRMC.SpeedOverGround = atof(buffer); break;
-					case 8:  GPRMC.CourseOverGround = atof(buffer); break;
+                    case 3:  GPS.GPRMC.Latitude = atof(buffer); break;
+					case 5:  GPS.GPRMC.Longitude = atof(buffer); break;
+					case 7:  GPS.GPRMC.SpeedOverGround = atof(buffer); break;
+					case 8:  GPS.GPRMC.CourseOverGround = atof(buffer); break;
                 }
                 x = 0;
             }
             else{
                 switch(i){
-                    case 1:  GPRMC.UTCTime[x++] = data[0];  break;
-					case 2:  GPRMC.Status = data[0];        break;
-					case 9:  GPRMC.Date[x++] = data[0];	break;
+                    case 1:  GPS.GPRMC.UTCTime[x++] = data[0];  break;
+					case 2:  GPS.GPRMC.Status = data[0];        break;
+					case 9:  GPS.GPRMC.Date[x++] = data[0];	break;
 					case 5:
 					case 7:
 					case 8:
 					case 3:  buffer[x++] = data[0];         break;
-					case 10: GPRMC.Mode = data[0];		break;
-					case 4:  GPRMC.NSIndicator = data[0];   break;
-					case 6:  GPRMC.EWIndicator = data[0];   break;
-					case 11: GPRMC.Checksum[x++] = data[0]; break;
+					case 10: GPS.GPRMC.Mode = data[0];		break;
+					case 4:  GPS.GPRMC.NSIndicator = data[0];   break;
+					case 6:  GPS.GPRMC.EWIndicator = data[0];   break;
+					case 11: GPS.GPRMC.Checksum[x++] = data[0]; break;
                 }
             }
         }
@@ -677,25 +671,25 @@ void getGPS(){
             if(data[0] == ','){
                 buffer[x]='\0';
                 switch(i++){
-                    case 1:  GPGSV.NumberOfMessages = atoi(buffer);	break;
-                    case 2:  GPGSV.MessageNumber = atoi(buffer);    break;
-					case 3:  GPGSV.SatellitesInView = atoi(buffer); break;
-					case 4:  GPGSV.SatelliteId1 = atoi(buffer);     break;
-					case 5:  GPGSV.Elevation1 = atoi(buffer);    	break;
-					case 6:  GPGSV.Azimuth1 = atoi(buffer);    	break;
-					case 7:  GPGSV.SNR1 = atoi(buffer);    		break;
-					case 8:  GPGSV.SatelliteId2 = atoi(buffer);    	break;
-                    case 9:  GPGSV.Elevation2 = atoi(buffer);    	break;
-                    case 10: GPGSV.Azimuth2 = atoi(buffer);    	break;
-                    case 11: GPGSV.SNR2 = atoi(buffer);    		break;
-					case 12: GPGSV.SatelliteId3 = atoi(buffer);    	break;
-                    case 13: GPGSV.Elevation3 = atoi(buffer);    	break;
-                    case 14: GPGSV.Azimuth3 = atoi(buffer);    	break;
-                    case 15: GPGSV.SNR3 = atoi(buffer);    		break;
-					case 16: GPGSV.SatelliteId4 = atoi(buffer);    	break;
-                    case 17: GPGSV.Elevation4 = atoi(buffer);    	break;
-                    case 18: GPGSV.Azimuth4 = atoi(buffer);    	break;
-                    case 19: GPGSV.SNR4 = atoi(buffer);    		break;
+                    case 1:  GPS.GPGSV.NumberOfMessages = atoi(buffer);	break;
+                    case 2:  GPS.GPGSV.MessageNumber = atoi(buffer);    break;
+					case 3:  GPS.GPGSV.SatellitesInView = atoi(buffer); break;
+					case 4:  GPS.GPGSV.SatelliteId1 = atoi(buffer);     break;
+					case 5:  GPS.GPGSV.Elevation1 = atoi(buffer);    	break;
+					case 6:  GPS.GPGSV.Azimuth1 = atoi(buffer);    	break;
+					case 7:  GPS.GPGSV.SNR1 = atoi(buffer);    		break;
+					case 8:  GPS.GPGSV.SatelliteId2 = atoi(buffer);    	break;
+                    case 9:  GPS.GPGSV.Elevation2 = atoi(buffer);    	break;
+                    case 10: GPS.GPGSV.Azimuth2 = atoi(buffer);    	break;
+                    case 11: GPS.GPGSV.SNR2 = atoi(buffer);    		break;
+					case 12: GPS.GPGSV.SatelliteId3 = atoi(buffer);    	break;
+                    case 13: GPS.GPGSV.Elevation3 = atoi(buffer);    	break;
+                    case 14: GPS.GPGSV.Azimuth3 = atoi(buffer);    	break;
+                    case 15: GPS.GPGSV.SNR3 = atoi(buffer);    		break;
+					case 16: GPS.GPGSV.SatelliteId4 = atoi(buffer);    	break;
+                    case 17: GPS.GPGSV.Elevation4 = atoi(buffer);    	break;
+                    case 18: GPS.GPGSV.Azimuth4 = atoi(buffer);    	break;
+                    case 19: GPS.GPGSV.SNR4 = atoi(buffer);    		break;
                 }
                 x = 0;
             }
@@ -720,9 +714,10 @@ void getGPS(){
 					case 17:
 					case 18:
 					case 19:  buffer[x++] = data[0];         break;
-                    case 20:  GPGSV.Checksum[x++] = data[0]; break;
+                    case 20:  GPS.GPGSV.Checksum[x++] = data[0]; break;
                 }
             }
         }
     }
+    return GPS;
 }
