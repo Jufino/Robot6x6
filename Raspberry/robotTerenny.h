@@ -163,7 +163,49 @@
     	GPRMC_struct GPRMC;
     	GPVTG_struct GPVTG;
     };
-
+    struct Motor_struct{
+	int distance;
+	signed char direction;
+	unsigned char actSpeed;
+	unsigned char setSpeed;
+	bool onRegulator;
+    };
+    struct Motors_struct{
+	Motor_struct motor1;
+	Motor_struct motor2;
+	Motor_struct motor3;
+	Motor_struct motor4;
+	Motor_struct motor5;
+	Motor_struct motor6;
+    }
+    struct Buttons_struct{
+	char button1;
+	char button2;
+	char button3;
+    }
+    struct Led_struct{
+	char Led1;
+	char Led2;
+	char Led3;
+    }
+    struct RobotPosition_struct{
+	float x;
+	float y;
+	float angle;
+    }
+    struct RobotVariables{
+	GPS_struct gps;
+	MPU6050_struct MPU6050;
+	Motors_struct motors;
+	Buttons_struct buttons;
+	RobotPosition_struct robotPosition;
+	float ultrasonic;
+	int servoAngle;
+	float voltage;
+	float voltagePercent;
+	float amper;
+    }
+   
     void initRobot();
     void closeRobot();
 
@@ -173,26 +215,26 @@
     signed int readRegister16s(int addr,unsigned char reg);
     unsigned char readRegister8(int addr,unsigned char reg);
 
-    void odosliMat(Mat img,int kvalita);
-    void setMotor(int poradie,signed char smer,unsigned char rychlost,bool reg);
-    unsigned int getRychlost(int poradie);
-    unsigned int getVzdialenost(int poradie);
-    unsigned char getTlacitka(char pozicia);
-    void resetVzdialenost(int poradie);
+    void sendMatImage(Mat img,int quality);
+    void setMotor(int pos,signed char dir,unsigned char speed,bool onReg);
+    unsigned int getSpeed(int pos);
+    unsigned int getDistance(int pos);
+    unsigned char getButton();
+    void resetDistance(int poradie);
     void setServo(int uhol);
-    unsigned int getUltrazvukRaw();
-    float getUltrazvukMeter();
-    int getNapetieRaw();
-    float getNapetieVolt();
-    float getNapetiePercent();
-    int getPrudRaw();
-    float getPrudVolt();
-    float getPrudAmp();
-    void setLed(int poradie,char nazov,bool stav);
-    void setNapajanie(bool stav);
+    unsigned int getUltrasonicRaw();
+    float getUltrasonicMeter();
+    int getVoltageRaw();
+    float getVoltage();
+    float getVoltagePercent();
+    int getAmpRaw();
+    float getAmpVolt();
+    float getAmp();
+    void setLed(int pos,char color,bool state);
+    void setMotorPowerSupply(bool state);
     GPS_struct getGPS();
-   
-
+    RobotVariables syncModule();  
+ 
     void MPU6050ResetPRY();
     void MPU6050ResetOffset();
     void MPU6050WakeUp();
@@ -200,8 +242,8 @@
     MPU6050_struct getMPU6050(); 
     void MPU6050CalibrateOffset(int pocet);
     MPU6050_struct getMPU6050Full(float dt);
-    void setMPU6050Sensitivity(int acc_sens,int gy_sens);
-    void setMPU6050DLPF(int acc_dlpf,int gy_dlpf);
+    void setMPU6050Sensitivity(unsigned char acc_sens,unsigned char gy_sens);
+    void setMPU6050DLPF(unsigned char acc_dlpf,unsigned char gy_dlpf);
  
     int getSocketCamera();
     int getSocketSnimace();
