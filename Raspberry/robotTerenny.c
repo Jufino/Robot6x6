@@ -5,6 +5,11 @@ int lastAddr = 0x00;
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
+RobotVariables robotVariables;
+
+RobotVariables getRobotVariables(){
+	return robotVariables;
+}
 int getSocketCamera(){
 	return clientsock_camera;
 }
@@ -71,6 +76,25 @@ void initRobot(){
         }
         printf("Spojenie na porte %d ok.\n",PORT_camera);
     }
+    struct sigevent CasovacSignalEvent;
+    CasovacSignalEvent.sigev_notify=SIGEV_SIGNAL;
+    CasovacSignalEvent.sigev_signo=SIGUSR1;
+
+    timer_t casovac;
+    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
+    struct itimerspec cas;
+    cas.it_value.tv_sec=0;
+    cas.it_value.tv_nsec=refreshModule;
+    cas.it_interval.tv_sec=0;
+    cas.it_interval.tv_nsec=refreshModule;
+    timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
+    sigset_t signalSet;
+    struct sigaction CasovacSignalAction;
+    sigemptyset(&signalSet);
+    CasovacSignalAction.sa_sigaction=syncModules;
+    CasovacSignalAction.sa_flags=SA_SIGINFO;
+    CasovacSignalAction.sa_mask=signalSet;
+    sigaction(CasovacSignalEvent.sigev_signo,&CasovacSignalAction,NULL);
 }
 void closeRobot(){
     SerialClose(portHandle);
@@ -129,11 +153,11 @@ unsigned char readRegister8(int addr,unsigned char reg){
     return data[0];
 }
 
-void odosliMat(Mat img,int kvalita){
+void sendMatImage(Mat img,int quality){
     vector<uchar> buff;
     vector<int> param = vector<int>(2);
     param[0] = CV_IMWRITE_JPEG_QUALITY;
-    param[1] = kvalita;
+    param[1] = quality;
     imencode(".jpg", img, buff, param);
     char len[10];
     sprintf(len, "%.8d", buff.size());
@@ -141,16 +165,16 @@ void odosliMat(Mat img,int kvalita){
     send(clientsock_camera, &buff[0],buff.size(), 0);
     buff.clear();
 }
-unsigned char getTlacitka(char pozicia){
-    switch(pozicia){
+unsigned char getButton(char pos){
+    switch(pos){
         case 1: return !gpio_read(27); break;
         case 2: return !gpio_read(17); break;
         case 3: return !gpio_read(22); break;
 	default: return 0;
     }
 }
-unsigned int getRychlost(int poradie){
-    switch(poradie){
+unsigned int getSpeed(int pos){
+    switch(pos){
         case 1: return readRegister16(0x08,1); break;
         case 2: return readRegister16(0x0A,1); break;
         case 3: return readRegister16(0x0A,2); break;
@@ -160,8 +184,8 @@ unsigned int getRychlost(int poradie){
         default: return 0;
     }
 }
-unsigned int getVzdialenost(int poradie){
-    switch(poradie){
+unsigned int getDistance(int pos){
+    switch(pos){
         case 1: return readRegister16(0x08,3); break;
         case 2: return readRegister16(0x0A,3); break;
         case 3: return readRegister16(0x0A,4); break;
@@ -171,8 +195,8 @@ unsigned int getVzdialenost(int poradie){
         default: return 0;
     }
 }
-void resetVzdialenost(int poradie){
-    switch(poradie){
+void resetDistance(int pos){
+    switch(pos){
         case 1: writeRegister(0x08,100,0);  break;
         case 2: writeRegister(0x0A,100,0);  break;
         case 3: writeRegister(0x0A,99,0);   break;
@@ -182,156 +206,150 @@ void resetVzdialenost(int poradie){
     }
 }
 
-void setServo(int uhol){
-    if(uhol+91 < 1) writeRegister(0x0A,84,1);
-    else if(uhol+91 > 181) writeRegister(0x0A,84,181);
-    else writeRegister(0x0A,84,uhol+91);
+void setServo(int angle){
+    if(angle+91 < 1) writeRegister(0x0A,84,1);
+    else if(angle+91 > 181) writeRegister(0x0A,84,181);
+    else writeRegister(0x0A,84,angle+91);
 }
-unsigned int getUltrazvukRaw(){
+unsigned int getUltrasonicRaw(){
     return readRegister16(0x0A,6);
 }
-float getUltrazvukMeter(){
-	return (float)readRegister16(0x0A,6)*(rychlostZvuku/2);
+float getUltrasonic(){
+	return (float)readRegister16(0x0A,6)/UltrasonicConstant;
 }
-int getNapetieRaw(){
+int getVoltageRaw(){
     return readRegister16(0x08,5);
 }
-float getNapetieVolt(){
-    float napHod = (float)getNapetieRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
+float getVoltage(){
+    float napHod = (float)getVoltageRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
     return napHod;
 }
-float getNapetiePercent(){
-    float napHod = (float)getNapetieVolt()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
+float getVoltagePercent(){
+    float napHod = (float)getVoltage()*(100/(maxNapetie-minNapetie))-(100/(maxNapetie-minNapetie))*minNapetie;
     return napHod;
 }
-int getPrudRaw(){
+int getAmpRaw(){
     return readRegister16(0x08,6);
 }
-float getPrudVolt(){
-    return (float)getPrudRaw()*(maxVoltADC/rozlisenieADC);
+float getAmpVolt(){
+    return (float)getAmpRaw()*(maxVoltADC/rozlisenieADC);
 }
-float getPrudAmp(){
-    return ((float)getPrudVolt()-maxVoltADC/2)/rozliseniePrud;
+float getAmp(){
+    return ((float)getAmpVolt()-maxVoltADC/2)/rozliseniePrud;
 }
 
-void setLed(int poradie,char nazov,bool stav){
-    if(poradie == 3){
-        if(nazov == 'Z'){
-            if(stav == false) writeRegister(0x08,97,0);
-            else writeRegister(0x08,97,1);
+void setLed(int pos,char color,bool state){
+    if(pos == 3){
+        if(color == 'G'){
+            writeRegister(0x08,96,0);
+            writeRegister(0x08,97,1);
         }
-        else if(nazov == 'C'){
-            if(stav == false)       writeRegister(0x08,96,0);
-            else    writeRegister(0x08,96,1);
+        else if(color == 'R'){
+	    writeRegister(0x08,97,0);
+            writeRegister(0x08,96,1);
         }
-        else{
-            if(stav == false){
-                setLed(1,'Z',0);
-                setLed(1,'C',0);
-            }
-            else{
-                setLed(1,'Z',1);
-                setLed(1,'C',1);
-            }
+        else if(color == 'O'){
+            writeRegister(0x08,97,1);
+            writeRegister(0x08,96,1);
         }
+	else{
+	    writeRegister(0x08,97,0);
+            writeRegister(0x08,96,0);
+	}
     }
-    else if(poradie == 1){
-        if(nazov == 'Z'){
-            if(stav == false)   writeRegister(0x09,97,0);
-            else                writeRegister(0x09,97,1);
+    else if(pos == 1){
+        if(color == 'G'){
+            writeRegister(0x09,96,0);
+            writeRegister(0x09,97,1);
         }
-        else if(nazov == 'C'){
-            if(stav == false)   writeRegister(0x09,96,0);
-            else                writeRegister(0x09,96,1);
+        else if(color == 'R'){
+            writeRegister(0x09,97,0);
+	    writeRegister(0x09,96,1);
         }
-        else{
-            if(stav == false){
-                setLed(2,'Z',0);
-                setLed(2,'C',0);
-            }
-            else{
-                setLed(2,'Z',1);
-                setLed(2,'C',1);
-            }
+        else if(color == 'O'){
+            writeRegister(0x09,97,1);
+            writeRegister(0x09,96,1);
         }
+	else{
+	    writeRegister(0x09,97,0);
+	    writeRegister(0x09,96,0);
+	}
     }
     else{
-        if(nazov == 'Z'){
-            if(stav == false)   writeRegister(0x0A,97,0);
-            else                writeRegister(0x0A,97,1);
+        if(color == 'G'){
+            writeRegister(0x0A,96,0);
+            writeRegister(0x0A,97,1);
         }
-        else if(nazov == 'C'){
-            if(stav == false)   writeRegister(0x0A,96,0);
-            else                writeRegister(0x0A,96,1);
+        else if(color == 'R'){
+            writeRegister(0x0A,97,0);
+            writeRegister(0x0A,96,1);
         }
-        else{
-            if(stav == false){
-                setLed(3,'Z',0);
-                setLed(3,'C',0);
-            }
-            else{
-                setLed(3,'Z',1);
-                setLed(3,'C',1);
-            }
+        else if(color == 'O'){
+       	    writeRegister(0x0A,97,1);
+            writeRegister(0x0A,96,1);    
         }
+	else{
+	    writeRegister(0x0A,97,0);
+            writeRegister(0x0A,96,0);
+	}
     }
 }
-void setNapajanie(bool stav){
-    if(stav == false)   writeRegister(0x08,95,0);
+void setMotorPowerSupply(bool state){
+    if(state == false)   writeRegister(0x08,95,0);
     else                writeRegister(0x08,95,1);
 }
-void setMotor(int poradie,signed char smer,unsigned char rychlost,bool reg){
-    if(reg == true){
-        if(smer>=0){
-            switch(poradie){
-                case 1: writeRegister(0x08,94,rychlost); break;
-                case 2: writeRegister(0x0A,89,rychlost); break;
-                case 3: writeRegister(0x0A,94,rychlost); break;
-                case 4: writeRegister(0x08,89,rychlost); break;
-                case 5: writeRegister(0x09,89,rychlost); break;
-                case 6: writeRegister(0x09,94,rychlost); break;
+void setMotor(int pos,signed char dir,unsigned char speed,bool onReg){
+    if(onReg == true){
+        if(dir>=0){
+            switch(pos){
+                case 1: writeRegister(0x08,94,speed); break;
+                case 2: writeRegister(0x0A,89,speed); break;
+                case 3: writeRegister(0x0A,94,speed); break;
+                case 4: writeRegister(0x08,89,speed); break;
+                case 5: writeRegister(0x09,89,speed); break;
+                case 6: writeRegister(0x09,94,speed); break;
             }
         }
         else{
-            switch(poradie){
-                case 1: writeRegister(0x08,93,rychlost); break;
-                case 2: writeRegister(0x0A,88,rychlost); break;
-                case 3: writeRegister(0x0A,93,rychlost); break;
-                case 4: writeRegister(0x08,88,rychlost); break;
-                case 5: writeRegister(0x09,88,rychlost); break;
-                case 6: writeRegister(0x09,93,rychlost); break;
+            switch(pos){
+                case 1: writeRegister(0x08,93,speed); break;
+                case 2: writeRegister(0x0A,88,speed); break;
+                case 3: writeRegister(0x0A,93,speed); break;
+                case 4: writeRegister(0x08,88,speed); break;
+                case 5: writeRegister(0x09,88,speed); break;
+                case 6: writeRegister(0x09,93,speed); break;
             }
         }
     }
     else{
-        if(smer>0){
-            switch(poradie){
-                case 1: writeRegister(0x08,92,rychlost); break;
-                case 2: writeRegister(0x0A,87,rychlost); break;
-                case 3: writeRegister(0x0A,92,rychlost); break;
-                case 4: writeRegister(0x08,87,rychlost); break;
-                case 5: writeRegister(0x09,87,rychlost); break;
-                case 6: writeRegister(0x09,92,rychlost); break;
+        if(dir>0){
+            switch(pos){
+                case 1: writeRegister(0x08,92,speed); break;
+                case 2: writeRegister(0x0A,87,speed); break;
+                case 3: writeRegister(0x0A,92,speed); break;
+                case 4: writeRegister(0x08,87,speed); break;
+                case 5: writeRegister(0x09,87,speed); break;
+                case 6: writeRegister(0x09,92,speed); break;
             }
         }
-        else if(smer==0){
-            switch(poradie){
-                case 1: writeRegister(0x08,91,rychlost); break;
-                case 2: writeRegister(0x0A,86,rychlost); break;
-                case 3: writeRegister(0x0A,91,rychlost); break;
-                case 4: writeRegister(0x08,86,rychlost); break;
-                case 5: writeRegister(0x09,86,rychlost); break;
-                case 6: writeRegister(0x09,91,rychlost); break;
+        else if(dir==0){
+            switch(pos){
+                case 1: writeRegister(0x08,91,speed); break;
+                case 2: writeRegister(0x0A,86,speed); break;
+                case 3: writeRegister(0x0A,91,speed); break;
+                case 4: writeRegister(0x08,86,speed); break;
+                case 5: writeRegister(0x09,86,speed); break;
+                case 6: writeRegister(0x09,91,speed); break;
             }
         }
         else{
-            switch(poradie){
-                case 1: writeRegister(0x08,90,rychlost); break;
-                case 2: writeRegister(0x0A,85,rychlost); break;
-                case 3: writeRegister(0x0A,90,rychlost); break;
-                case 4: writeRegister(0x08,85,rychlost); break;
-                case 5: writeRegister(0x09,85,rychlost); break;
-                case 6: writeRegister(0x09,90,rychlost); break;
+            switch(pos){
+                case 1: writeRegister(0x08,90,speed); break;
+                case 2: writeRegister(0x0A,85,speed); break;
+                case 3: writeRegister(0x0A,90,speed); break;
+                case 4: writeRegister(0x08,85,speed); break;
+                case 5: writeRegister(0x09,85,speed); break;
+                case 6: writeRegister(0x09,90,speed); break;
             }
         }
     }
@@ -637,6 +655,7 @@ MPU6050_struct getMPU6050Raw(){
 	return MPU6050;
 }
 MPU6050_struct getMPU6050(){
+	MPU6050_struct MPU6050;
 	MPU6050.AccX = (float)readRegister16s(MPU6050ADDR,0x3B)/AccScale-AccX_offset;
         MPU6050.AccY = (float)readRegister16s(MPU6050ADDR,0x3D)/AccScale-AccY_offset;
         MPU6050.AccZ = (float)readRegister16s(MPU6050ADDR,0x3F)/AccScale-AccZ_offset;
@@ -644,6 +663,13 @@ MPU6050_struct getMPU6050(){
         MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR,0x43)/GyScale-GyX_offset;
         MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR,0x45)/GyScale-GyY_offset;
         MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR,0x47)/GyScale-GyZ_offset;
+/*	if(MPU6050.AccX <0.01 && MPU6050.AccX > -0.01) MPU6050.AccX = 0;
+	if(MPU6050.AccY <0.01 && MPU6050.AccY > -0.01) MPU6050.AccY = 0;
+	if(MPU6050.AccZ <0.01 && MPU6050.AccZ > -0.01) MPU6050.AccZ = 0;
+	if(MPU6050.GyX <0.1 && MPU6050.GyX > -0.1) MPU6050.GyX = 0;
+	if(MPU6050.GyY <0.1 && MPU6050.GyY > -0.1) MPU6050.GyY = 0; 
+	if(MPU6050.GyZ <0.1 && MPU6050.GyZ > -0.1) MPU6050.GyZ = 0;
+*/	return MPU6050;
 }
 
 void MPU6050CalibrateOffset(int pocet){
@@ -661,11 +687,11 @@ void MPU6050CalibrateOffset(int pocet){
 	}
 	AccX_offset = acc_x/pocet;
 	AccY_offset = acc_y/pocet;
-	AccZ_offset = acc_z/pocet;
+	AccZ_offset = acc_z/pocet+1;
 	
-	GyX_offset = acc_x/pocet;
-	GyY_offset = acc_y/pocet;
-	GyZ_offset = acc_z/pocet;
+	GyX_offset = gy_x/pocet;
+	GyY_offset = gy_y/pocet;
+	GyZ_offset = gy_z/pocet;
 }
 float dist(float a,float b){
 	return sqrt(a*a+b*b);
@@ -682,20 +708,25 @@ MPU6050_struct getMPU6050Full(float dt){
 	MPU6050.Roll	-=MPU6050.GyY*dt+Roll;
 	MPU6050.Yaw	+= MPU6050.GyZ*dt+Yaw;
 	int forceMagnitudeApprox = abs(MPU6050.AccX)+abs(MPU6050.AccY)+abs(MPU6050.AccZ);
-	if(forceMagnitudeApprox >8192 && forceMagnitudeApprox < 32768){
-       	 	pitchAcc = atan2f(MPU6050.AccY, dist(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;	
-        	MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
-
-        	rollAcc = atan2f(MPU6050.AccX, dist(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
-        	MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
+	if(forceMagnitudeApprox >AccScale && forceMagnitudeApprox < 32768){
+       	 	//pitchAcc = atan2f(MPU6050.AccY, dist(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;	
+        	pitchAcc = atan2f(MPU6050.AccY,MPU6050.AccX*MPU6050.AccX+MPU6050.AccZ*MPU6050.AccZ) * 180 / M_PI;
+		MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
+		Pitch=MPU6050.Pitch;
+        	
+		//rollAcc = atan2f(MPU6050.AccX, dist(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
+        	rollAcc = atan2f(MPU6050.AccX, MPU6050.AccY*MPU6050.AccY+MPU6050.AccZ*MPU6050.AccZ) * 180 / M_PI;
+		MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
+		Roll=MPU6050.Roll;
 		
 		yawAcc = atan2f(dist(MPU6050.AccX,MPU6050.AccY),MPU6050.AccZ) * 180 / M_PI;
                 MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
+		Yaw=MPU6050.Yaw;
 	}
 	return MPU6050;
 } 
 
-void setMPU6050Sensitivity(int acc_sens,int gy_sens){
+void setMPU6050Sensitivity(unsigned char acc_sens,unsigned char gy_sens){
 	switch(acc_sens){
 		case 0: AccScale = 16384;	break;		//2g
 		case 1:	AccScale = 8192;	break;		//4g
@@ -709,16 +740,49 @@ void setMPU6050Sensitivity(int acc_sens,int gy_sens){
                 case 2: GyScale = 32.75;      break;          //1000 stup/s
                 case 3: GyScale = 16.375;     break;          //2000 stup/s
 	}
-	
+	printf("Gy sens,%d\n",(gy_sens<<3)|0xE0);
+	printf("Acc sens,%d\n",(acc_sens<<3)|0xE0);	
 	writeRegister(MPU6050ADDR,0x1B,(gy_sens<<3)|0xE0);
         writeRegister(MPU6050ADDR,0x1C,(acc_sens<<3)|0xE0);
 }
-void setMPU6050DLPF(int acc_dlpf,int gy_dlpf){
-	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(2<<3));
-        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
-        writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
-
+void setMPU6050DLPF(unsigned char acc_dlpf,unsigned char gy_dlpf){
 	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(5<<3));
-        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(6<<3));
-        writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(7<<3));
+	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(6<<3));
+	writeRegister(MPU6050ADDR,0x1A,acc_dlpf|(7<<3));
+	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(2<<3));
+	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
+ 	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
+}
+void syncModules(int signal , siginfo_t * siginfo, void * ptr){
+	switch (signal)
+  	{
+		case SIGUSR1:
+		robotVariables.MPU6050 = getMPU6050Full(0.01);
+		robotVariables.motors.motor1.distance = getDistance(1);
+		robotVariables.motors.motor1.actSpeed = getSpeed(1);
+		setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
+		robotVariables.motors.motor4.distance = getDistance(4);
+     	  	robotVariables.motors.motor4.actSpeed = getSpeed(4);
+		setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
+		robotVariables.motors.motor2.distance = getDistance(2);
+        	robotVariables.motors.motor2.actSpeed = getSpeed(2);
+		setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
+		robotVariables.motors.motor3.distance = getDistance(3);
+        	robotVariables.motors.motor3.actSpeed = getSpeed(3);
+		setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
+		robotVariables.motors.motor5.distance = getDistance(5);
+        	robotVariables.motors.motor5.actSpeed = getSpeed(5);
+		setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
+		robotVariables.motors.motor6.distance = getDistance(6);
+        	robotVariables.motors.motor6.actSpeed = getSpeed(6);
+		setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
+		robotVariables.buttons.button1 = getButton(1);
+		robotVariables.buttons.button2 = getButton(2);
+		robotVariables.buttons.button3 = getButton(3);
+		robotVariables.voltage = getVoltage();
+		robotVariables.voltagePercent = getVoltagePercent();
+		robotVariables.amper = getAmp();
+		robotVariables.ultrasonic = getUltrasonic();
+		break;
+	}
 }

@@ -19,6 +19,9 @@
     #include <math.h>
 
     #include <opencv2/opencv.hpp>
+
+    #include <signal.h>
+    #include <time.h>
 	
     using namespace std;
     using namespace cv;
@@ -40,6 +43,10 @@
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
+   
+    #define ms	1000		//1ms=1000us
+    #define us 1000		//1us=1000ns
+    #define refreshModule 100*ms*us //v nanosekundach
 
     #define R2 5.3f
     #define R1 31.4f
@@ -47,7 +54,7 @@
     #define rozlisenieADC 1023.0f
     #define maxNapetie 25.2f
     #define minNapetie 22.8f
-    #define rychlostZvuku 340.0f
+    #define UltrasonicConstant 58.0f
     #define rozliseniePrud 0.185f // 185mV/A
     struct MPU6050_struct{
         float AccX;
@@ -177,22 +184,22 @@
 	Motor_struct motor4;
 	Motor_struct motor5;
 	Motor_struct motor6;
-    }
+    };
     struct Buttons_struct{
 	char button1;
 	char button2;
 	char button3;
-    }
+    };
     struct Led_struct{
 	char Led1;
 	char Led2;
 	char Led3;
-    }
+    };
     struct RobotPosition_struct{
 	float x;
 	float y;
 	float angle;
-    }
+    };
     struct RobotVariables{
 	GPS_struct gps;
 	MPU6050_struct MPU6050;
@@ -204,7 +211,7 @@
 	float voltage;
 	float voltagePercent;
 	float amper;
-    }
+    };
    
     void initRobot();
     void closeRobot();
@@ -223,7 +230,7 @@
     void resetDistance(int poradie);
     void setServo(int uhol);
     unsigned int getUltrasonicRaw();
-    float getUltrasonicMeter();
+    float getUltrasonic();
     int getVoltageRaw();
     float getVoltage();
     float getVoltagePercent();
@@ -233,7 +240,7 @@
     void setLed(int pos,char color,bool state);
     void setMotorPowerSupply(bool state);
     GPS_struct getGPS();
-    RobotVariables syncModule();  
+    void syncModules(int signal , siginfo_t * siginfo, void * ptr);  
  
     void MPU6050ResetPRY();
     void MPU6050ResetOffset();
@@ -247,6 +254,7 @@
  
     int getSocketCamera();
     int getSocketSnimace();
+    RobotVariables getRobotVariables();
 
     int getKbhit(void);
     float dist(float a,float b);
