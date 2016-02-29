@@ -63,7 +63,7 @@ int main(void){
 	setMPU6050DLPF(6,6);
 	MPU6050CalibrateOffset(20);
 	while(1){
-		RobotVariables robot = syncModules();
+		RobotVariables robot = getRobotVariables();
 		printf("AcX: %f\n",robot.MPU6050.AccX);
 		printf("AcY: %f\n",robot.MPU6050.AccY);
 		printf("AcZ: %f\n",robot.MPU6050.AccZ);

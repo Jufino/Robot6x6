@@ -19,6 +19,9 @@
     #include <math.h>
 
     #include <opencv2/opencv.hpp>
+
+    #include <signal.h>
+    #include <time.h>
 	
     using namespace std;
     using namespace cv;
@@ -40,6 +43,10 @@
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
+   
+    #define ms	1000		//1ms=1000us
+    #define us 1000		//1us=1000ns
+    #define refreshModule 100*ms*us //v nanosekundach
 
     #define R2 5.3f
     #define R1 31.4f
@@ -233,7 +240,7 @@
     void setLed(int pos,char color,bool state);
     void setMotorPowerSupply(bool state);
     GPS_struct getGPS();
-    RobotVariables syncModules();  
+    void syncModules(int signal , siginfo_t * siginfo, void * ptr);  
  
     void MPU6050ResetPRY();
     void MPU6050ResetOffset();
@@ -247,6 +254,7 @@
  
     int getSocketCamera();
     int getSocketSnimace();
+    RobotVariables getRobotVariables();
 
     int getKbhit(void);
     float dist(float a,float b);

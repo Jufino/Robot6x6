@@ -5,6 +5,11 @@ int lastAddr = 0x00;
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
+RobotVariables robotVariables;
+
+RobotVariables getRobotVariables(){
+	return robotVariables;
+}
 int getSocketCamera(){
 	return clientsock_camera;
 }
@@ -71,6 +76,25 @@ void initRobot(){
         }
         printf("Spojenie na porte %d ok.\n",PORT_camera);
     }
+    struct sigevent CasovacSignalEvent;
+    CasovacSignalEvent.sigev_notify=SIGEV_SIGNAL;
+    CasovacSignalEvent.sigev_signo=SIGUSR1;
+
+    timer_t casovac;
+    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
+    struct itimerspec cas;
+    cas.it_value.tv_sec=0;
+    cas.it_value.tv_nsec=refreshModule;
+    cas.it_interval.tv_sec=0;
+    cas.it_interval.tv_nsec=refreshModule;
+    timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
+    sigset_t signalSet;
+    struct sigaction CasovacSignalAction;
+    sigemptyset(&signalSet);
+    CasovacSignalAction.sa_sigaction=syncModules;
+    CasovacSignalAction.sa_flags=SA_SIGINFO;
+    CasovacSignalAction.sa_mask=signalSet;
+    sigaction(CasovacSignalEvent.sigev_signo,&CasovacSignalAction,NULL);
 }
 void closeRobot(){
     SerialClose(portHandle);
@@ -729,33 +753,36 @@ void setMPU6050DLPF(unsigned char acc_dlpf,unsigned char gy_dlpf){
 	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
  	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
 }
-RobotVariables syncModules(){
-	RobotVariables robotVariables;
-	robotVariables.MPU6050 = getMPU6050Full(0.01);
-	robotVariables.motors.motor1.distance = getDistance(1);
-	robotVariables.motors.motor1.actSpeed = getSpeed(1);
-	setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
-	robotVariables.motors.motor4.distance = getDistance(4);
-        robotVariables.motors.motor4.actSpeed = getSpeed(4);
-	setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
-	robotVariables.motors.motor2.distance = getDistance(2);
-        robotVariables.motors.motor2.actSpeed = getSpeed(2);
-	setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
-	robotVariables.motors.motor3.distance = getDistance(3);
-        robotVariables.motors.motor3.actSpeed = getSpeed(3);
-	setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
-	robotVariables.motors.motor5.distance = getDistance(5);
-        robotVariables.motors.motor5.actSpeed = getSpeed(5);
-	setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
-	robotVariables.motors.motor6.distance = getDistance(6);
-        robotVariables.motors.motor6.actSpeed = getSpeed(6);
-	setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
-	robotVariables.buttons.button1 = getButton(1);
-	robotVariables.buttons.button2 = getButton(2);
-	robotVariables.buttons.button3 = getButton(3);
-	robotVariables.voltage = getVoltage();
-	robotVariables.voltagePercent = getVoltagePercent();
-	robotVariables.amper = getAmp();
-	robotVariables.ultrasonic = getUltrasonic();
-	return robotVariables;
+void syncModules(int signal , siginfo_t * siginfo, void * ptr){
+	switch (signal)
+  	{
+		case SIGUSR1:
+		robotVariables.MPU6050 = getMPU6050Full(0.01);
+		robotVariables.motors.motor1.distance = getDistance(1);
+		robotVariables.motors.motor1.actSpeed = getSpeed(1);
+		setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
+		robotVariables.motors.motor4.distance = getDistance(4);
+     	  	robotVariables.motors.motor4.actSpeed = getSpeed(4);
+		setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
+		robotVariables.motors.motor2.distance = getDistance(2);
+        	robotVariables.motors.motor2.actSpeed = getSpeed(2);
+		setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
+		robotVariables.motors.motor3.distance = getDistance(3);
+        	robotVariables.motors.motor3.actSpeed = getSpeed(3);
+		setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
+		robotVariables.motors.motor5.distance = getDistance(5);
+        	robotVariables.motors.motor5.actSpeed = getSpeed(5);
+		setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
+		robotVariables.motors.motor6.distance = getDistance(6);
+        	robotVariables.motors.motor6.actSpeed = getSpeed(6);
+		setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
+		robotVariables.buttons.button1 = getButton(1);
+		robotVariables.buttons.button2 = getButton(2);
+		robotVariables.buttons.button3 = getButton(3);
+		robotVariables.voltage = getVoltage();
+		robotVariables.voltagePercent = getVoltagePercent();
+		robotVariables.amper = getAmp();
+		robotVariables.ultrasonic = getUltrasonic();
+		break;
+	}
 }
