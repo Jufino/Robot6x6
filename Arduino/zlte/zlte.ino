@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <avr/wdt.h>
-volatile boolean stopUprava = false;
 volatile unsigned int pocetTikov5 = 0;
 volatile unsigned int pocetTikov6 = 0;
 volatile char c = -1;
@@ -84,7 +83,7 @@ void setup() {
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
   if(serialPortStatus)  Serial.begin(9600);
-  if(watchdogStatus) wdt_enable(WDTO_500MS);
+  if(watchdogStatus) wdt_enable(WDTO_1S);
 }
 
 void otackomerMotor6() {
@@ -98,14 +97,11 @@ void otackomerMotor5() {
 }
 
 void loop() {
-  while (stopUprava == true);
-  stopUprava = true;
   digitalWrite(LModra, LOW);
     lastRychlost5 = pocetTikov5;
     lastRychlost6 = pocetTikov6;
     lastVzdialenost5 += pocetTikov5;
     lastVzdialenost6 += pocetTikov6;
-  stopUprava = false;
   pocetTikov5 = 0;
   pocetTikov6 = 0;
   delay(100);
@@ -122,23 +118,14 @@ void receiveEvent(int howMany) {
   d = Wire.read();
   switch (c) {
     case 100:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost6 = 0;
-      stopUprava = false;
       break;
     case 99:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost5 = 0;
-      stopUprava = false;
       break;
     case 98:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost5 = 0;
       lastVzdialenost6 = 0;
-      stopUprava = false;
       break;
     case 97:
       if (d == 0)       digitalWrite(LZelena, LOW);
@@ -194,35 +181,23 @@ void requestEvent() {
   byte data[2];
   switch (c) {
     case 1:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastRychlost6 & 0xFF);
       data[0] = (lastRychlost6 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 2:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastRychlost5 & 0xFF);
       data[0] = (lastRychlost5 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 3:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastVzdialenost6 & 0xFF);
       data[0] = (lastVzdialenost6 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 4:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastVzdialenost5 & 0xFF);
       data[0] = (lastVzdialenost5 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
   }
