@@ -38,7 +38,7 @@ int main(void){
 	int imageChooseMainL = 0;
 
     	initRobot();
-	setNapajanie(true);
+	setMotorPowerSupply(true);
 	setMotor(1,0,255,false);
         setMotor(2,0,255,false);
         setMotor(3,0,255,false);
@@ -59,15 +59,23 @@ int main(void){
         pthread_t vlaknoImgL;
         pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
 	MPU6050WakeUp();
+	setMPU6050Sensitivity(1,1);
+	setMPU6050DLPF(6,6);
+	MPU6050CalibrateOffset(20);
 	while(1){
-		MPU6050_struct test = getMPU6050Raw();
-		printf("AcX: %f\n",test.AccX);
-		printf("AcY: %f\n",test.AccY);
-		printf("AcZ: %f\n",test.AccZ);
-		printf("TMP: %f\n",test.Temp);
-		printf("GyX: %f\n",test.GyX);
-		printf("GyY: %f\n",test.GyY);
-		printf("GyZ: %f\n\n",test.GyZ);
+		RobotVariables robot = syncModules();
+		printf("AcX: %f\n",robot.MPU6050.AccX);
+		printf("AcY: %f\n",robot.MPU6050.AccY);
+		printf("AcZ: %f\n",robot.MPU6050.AccZ);
+		printf("TMP: %f\n",robot.MPU6050.Temp);
+		printf("GyX: %f\n",robot.MPU6050.GyX);
+		printf("GyY: %f\n",robot.MPU6050.GyY);
+		printf("GyZ: %f\n\n",robot.MPU6050.GyZ);
+		printf("Roll: %f\n",robot.MPU6050.Roll);
+                printf("Pitch: %f\n",robot.MPU6050.Pitch);
+                printf("Yaw: %f\n",robot.MPU6050.Yaw);
+		printf("Voltage: %f\n",robot.voltage);
+		printf("Ultrasonic: %f\n\n",robot.ultrasonic);
 /*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;
@@ -88,7 +96,7 @@ int main(void){
 
 */
 		//printf("napetie:%d,%f,%f\nprud: %d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent(),prudRaw(),prudVolt(),prudAmp());
-		usleep(333000);
+		usleep(10000);
 	}
         closeRobot();
 	return 0;
@@ -117,7 +125,7 @@ void wifiCamera(){
 		sigctrl(0);
         }
         if (strcmp(recvdata, "img\n") == 0){ //&& imgSendL.empty() != true){
-		odosliMat(imgSendL,80);
+		sendMatImage(imgSendL,80);
         }
 }
 void sigctrl(int param){
