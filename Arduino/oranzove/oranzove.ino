@@ -4,19 +4,18 @@
 volatile unsigned int pocetTikov2 = 0;
 volatile unsigned int pocetTikov3 = 0;
 volatile int c = -1;
-int lastRychlost2 = 0;
-int lastRychlost3 = 0;
-int lastVzdialenost2 = 0;
-int lastVzdialenost3 = 0;
+volatile int lastRychlost2 = 0;
+volatile int lastRychlost3 = 0;
+volatile int lastVzdialenost2 = 0;
+volatile int lastVzdialenost3 = 0;
 char smer2 = 1;
 char smer3 = 1;
-long duration;
-int distance;
+volatile long ultrasonic;
 int poziciaServo;
-volatile boolean onReg2 = true;
-volatile boolean onReg3 = true;
-volatile int setRychlost2=0;
-volatile int setRychlost3=0;
+boolean onReg2 = true;
+boolean onReg3 = true;
+volatile int setRychlost2 = 0;
+volatile int setRychlost3 = 0;
 
 //pin 2 - // otackomer motor 3
 //pin 3 - // otackomer motor 2
@@ -87,42 +86,52 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(2), otackomerMotor2, CHANGE);
   motor(2, 0, 255);
   motor(3, 0, 255);
-  Wire.begin(10);            
+  Wire.begin(10);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
   servo1.attach(servoPin);
   servo1.write(90);
-  if(serialPortStatus)  Serial.begin(9600);
-  if(watchdogStatus) wdt_enable(WDTO_1S);
+  if (serialPortStatus)  Serial.begin(9600);
+  if (watchdogStatus) wdt_enable(WDTO_1S);
 }
 
 void otackomerMotor3() {
-  if (smer3 > 0) pocetTikov3++;
-  else if(smer3 < 0) pocetTikov3--;
+  if (smer3 > 0){
+    pocetTikov3++;
+    lastVzdialenost3++;
+    
+  }
+  else if (smer3 < 0){
+    pocetTikov3--;
+    lastVzdialenost3--;
+  }
 }
 
 void otackomerMotor2() {
-  if (smer2 > 0) pocetTikov2++;
-  else if (smer2 < 0) pocetTikov2--;
+  if (smer2 > 0){
+    pocetTikov2++;
+    lastVzdialenost2++;
+  }
+  else if (smer2 < 0){
+    pocetTikov2--;
+    lastVzdialenost2--;
+  }
 }
-int v=10;
+int v = 10;
 void loop() {
+  digitalWrite(LModra, LOW);
   digitalWrite(trigPin, LOW);  // Added this line
   delayMicroseconds(2); // Added this line
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10); // Added this line
   digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-    digitalWrite(LModra, LOW);
-    distance = (duration/2) / 29.1;
-    lastRychlost2 = pocetTikov2;
-    lastRychlost3 = pocetTikov3;
-    lastVzdialenost2 += pocetTikov2;
-    lastVzdialenost3 += pocetTikov3;
+  ultrasonic = pulseIn(echoPin, HIGH);
+  lastRychlost2 = pocetTikov2;
+  lastRychlost3 = pocetTikov3;
   pocetTikov2 = 0;
   pocetTikov3 = 0;
   delay(88);
-  if(watchdogStatus) wdt_reset();
+  if (watchdogStatus) wdt_reset();
 }
 
 void receiveEvent(int howMany) {
@@ -133,13 +142,6 @@ void receiveEvent(int howMany) {
   }
   c = Wire.read();
   d = Wire.read();
-/*  if(c != -1){
-          Serial.print("d: ");
-          Serial.print(c);
-        Serial.print("\nc: ");
-                  Serial.print(d);
-        Serial.print("\n");
-  }*/
   switch (c) {
     case 100:
       lastVzdialenost3 = 0;
@@ -169,15 +171,15 @@ void receiveEvent(int howMany) {
       break;
     case 92:
       onReg3 = false;
-      motor(3,1,d);
+      motor(3, 1, d);
       break;
     case 91:
       onReg3 = false;
-      motor(3,0,d);
+      motor(3, 0, d);
       break;
     case 90:
       onReg3 = false;
-      motor(3,-1,d);
+      motor(3, -1, d);
       break;
     case 89:
       onReg2 = true;
@@ -189,26 +191,26 @@ void receiveEvent(int howMany) {
       break;
     case 87:
       onReg2 = false;
-      motor(2,1,d);
+      motor(2, 1, d);
       break;
     case 86:
       onReg2 = false;
-      motor(2,0,d);
+      motor(2, 0, d);
       break;
     case 85:
       onReg2 = false;
-      motor(2,-1,d);
+      motor(2, -1, d);
       break;
     case 84:
-      if(d <= 181 && d >= 1){
-        poziciaServo=d;
+      if (d <= 181 && d >= 1) {
+        poziciaServo = d;
         servo1.write(poziciaServo);
         //Serial.print(poziciaServo);
         //Serial.print("\n");
       }
       break;
   }
-  
+
 }
 void requestEvent() {
   byte data[2];
@@ -238,9 +240,21 @@ void requestEvent() {
       Wire.write(data, 1);
       break;
     case 6:
-      data[1] = (distance & 0xFF);
-      data[0] = (distance >> 8) & 0xFF;
+      data[1] = (ultrasonic & 0xFF);
+      data[0] = (ultrasonic >> 8) & 0xFF;
       Wire.write(data, 2);
+      break;
+    case 7:
+      data[1] = (lastVzdialenost2 & 0xFF);
+      data[0] = (lastVzdialenost2 >> 8) & 0xFF;
+      Wire.write(data, 2);
+      lastVzdialenost2 = 0;
+      break;
+    case 8:
+      data[1] = (lastVzdialenost3 & 0xFF);
+      data[0] = (lastVzdialenost3 >> 8) & 0xFF;
+      Wire.write(data, 2);
+      lastVzdialenost3 = 0;
       break;
   }
   c = -1;

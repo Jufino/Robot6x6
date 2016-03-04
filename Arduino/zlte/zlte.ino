@@ -3,16 +3,16 @@
 volatile unsigned int pocetTikov5 = 0;
 volatile unsigned int pocetTikov6 = 0;
 volatile char c = -1;
-int lastRychlost5 = 0;
-int lastRychlost6 = 0;
-int lastVzdialenost5 = 0;
-int lastVzdialenost6 = 0;
+volatile int lastRychlost5 = 0;
+volatile int lastRychlost6 = 0;
+volatile int lastVzdialenost5 = 0;
+volatile int lastVzdialenost6 = 0;
 char smer5 = 1;
 char smer6 = 1;
-volatile boolean onReg5 = true;
-volatile boolean onReg6 = true;
-volatile int setRychlost5=0;
-volatile int setRychlost6=0;
+boolean onReg5 = true;
+boolean onReg6 = true;
+volatile int setRychlost5 = 0;
+volatile int setRychlost6 = 0;
 
 //pin 2 - // otackomer motor 6
 //pin 3 - // otackomer motor 5
@@ -79,33 +79,43 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(3), otackomerMotor5, CHANGE);
   motor(5, 0, 255);
   motor(6, 0, 255);
-  Wire.begin(9);                // nastavenie komunikacnej adresy na 0x08
+  Wire.begin(9);                // nastavenie komunikacnej adresy na 0x09
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
-  if(serialPortStatus)  Serial.begin(9600);
-  if(watchdogStatus) wdt_enable(WDTO_1S);
+  if (serialPortStatus)  Serial.begin(9600);
+  if (watchdogStatus) wdt_enable(WDTO_1S);
 }
 
 void otackomerMotor6() {
-  if (smer6 > 0) pocetTikov6++;
-  else if(smer6 < 0) pocetTikov6--;
+  if (smer6 > 0){ 
+    pocetTikov6++;
+    lastVzdialenost6++;
+  }
+  else if (smer6 < 0){
+    pocetTikov6--;
+    lastVzdialenost6--;
+  }
 }
 
 void otackomerMotor5() {
-  if (smer5 > 0) pocetTikov5++;
-  else if (smer5 < 0) pocetTikov5--;
+  if (smer5 > 0){
+    pocetTikov5++;
+    lastVzdialenost5++;
+  }
+  else if (smer5 < 0){
+    pocetTikov5--;
+    lastVzdialenost5--;
+  }
 }
 
 void loop() {
   digitalWrite(LModra, LOW);
-    lastRychlost5 = pocetTikov5;
-    lastRychlost6 = pocetTikov6;
-    lastVzdialenost5 += pocetTikov5;
-    lastVzdialenost6 += pocetTikov6;
+  lastRychlost5 = pocetTikov5;
+  lastRychlost6 = pocetTikov6;
   pocetTikov5 = 0;
   pocetTikov6 = 0;
   delay(100);
-  if(watchdogStatus) wdt_reset();
+  if (watchdogStatus) wdt_reset();
 }
 
 void receiveEvent(int howMany) {
@@ -145,15 +155,15 @@ void receiveEvent(int howMany) {
       break;
     case 92:
       onReg6 = false;
-      motor(6,1,d);
+      motor(6, 1, d);
       break;
     case 91:
       onReg6 = false;
-      motor(6,0,d);
+      motor(6, 0, d);
       break;
     case 90:
       onReg6 = false;
-      motor(6,-1,d);
+      motor(6, -1, d);
       break;
     case 89:
       onReg5 = true;
@@ -165,15 +175,15 @@ void receiveEvent(int howMany) {
       break;
     case 87:
       onReg5 = false;
-      motor(5,1,d);
+      motor(5, 1, d);
       break;
     case 86:
       onReg5 = false;
-      motor(5,0,d);
+      motor(5, 0, d);
       break;
     case 85:
       onReg5 = false;
-      motor(5,-1,d);
+      motor(5, -1, d);
       break;
   }
 }
@@ -199,6 +209,18 @@ void requestEvent() {
       data[1] = (lastVzdialenost5 & 0xFF);
       data[0] = (lastVzdialenost5 >> 8) & 0xFF;
       Wire.write(data, 2);
+      break;
+    case 5:
+      data[1] = (lastVzdialenost6 & 0xFF);
+      data[0] = (lastVzdialenost6 >> 8) & 0xFF;
+      Wire.write(data, 2);
+      lastVzdialenost6 = 0;
+      break;
+    case 6:
+      data[1] = (lastVzdialenost5 & 0xFF);
+      data[0] = (lastVzdialenost5 >> 8) & 0xFF;
+      Wire.write(data, 2);
+      lastVzdialenost5  = 0;
       break;
   }
   c = -1;
