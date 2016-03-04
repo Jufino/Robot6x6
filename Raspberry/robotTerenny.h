@@ -43,10 +43,8 @@
     #define Wifi_snimace 0
     #define PORT_snimace 1213
     #define PORT_camera  1212
-   
-    #define ms	1000		//1ms=1000us
-    #define us 1000		//1us=1000ns
-    #define refreshModule 100*ms*us //v nanosekundach
+ 
+    #define refreshModule 100 //v ms
 
     #define R2 5.3f
     #define R1 31.4f
@@ -56,6 +54,9 @@
     #define minNapetie 22.8f
     #define UltrasonicConstant 58.0f
     #define rozliseniePrud 0.185f // 185mV/A
+    #define OtackomerConstant 180.0f
+    #define OtackomerPriemer 48.0f
+    #define vzdialenostKolies 2000.0f	//vzdialenost kolies
     struct MPU6050_struct{
         float AccX;
         float AccY;
@@ -173,8 +174,8 @@
     struct Motor_struct{
 	int distance;
 	signed char direction;
-	unsigned char actSpeed;
-	unsigned char setSpeed;
+	float actSpeed;
+	float setSpeed;
 	bool onRegulator;
     };
     struct Motors_struct{
@@ -224,8 +225,19 @@
 
     void sendMatImage(Mat img,int quality);
     void setMotor(int pos,signed char dir,unsigned char speed,bool onReg);
-    unsigned int getSpeed(int pos);
-    unsigned int getDistance(int pos);
+    int getSpeedRaw(int pos);
+    int getDistanceRaw(int pos);
+    int getDeltaDistanceRaw(int pos);
+    float getSpeed(int pos);
+    int getDistance(int pos);
+    int getDeltaDistance(int pos);
+    int getDistanceL();
+    int getDistanceR();
+    float getSpeedFromDistanceL(float dt);
+    float getSpeedFromDistanceR(float dt);
+    //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
+    void calcRobotPosition(float dt);
+
     unsigned char getButton();
     void resetDistance(int poradie);
     void setServo(int uhol);

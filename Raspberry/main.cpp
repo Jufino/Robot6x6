@@ -43,7 +43,7 @@ int main(void){
         setMotor(2,0,255,false);
         setMotor(3,0,255,false);
         setMotor(4,0,255,false);
-        setMotor(5,0,255,false);
+        setMotor(5,1,255,true);
         setMotor(6,0,255,false);	
         cameraL = cvCaptureFromCAM(0);
 
@@ -64,7 +64,7 @@ int main(void){
 	MPU6050CalibrateOffset(20);
 	while(1){
 		RobotVariables robot = getRobotVariables();
-		printf("AcX: %f\n",robot.MPU6050.AccX);
+		/*printf("AcX: %f\n",robot.MPU6050.AccX);
 		printf("AcY: %f\n",robot.MPU6050.AccY);
 		printf("AcZ: %f\n",robot.MPU6050.AccZ);
 		printf("TMP: %f\n",robot.MPU6050.Temp);
@@ -75,7 +75,12 @@ int main(void){
                 printf("Pitch: %f\n",robot.MPU6050.Pitch);
                 printf("Yaw: %f\n",robot.MPU6050.Yaw);
 		printf("Voltage: %f\n",robot.voltage);
-		printf("Ultrasonic: %f\n\n",robot.ultrasonic);
+		printf("Ultrasonic: %f\n\n",robot.ultrasonic);*/
+		printf("x: %f\n",robot.robotPosition.x);
+		printf("y: %f\n",robot.robotPosition.y);
+		printf("uhol: %f\n\n",robot.robotPosition.angle);
+		//printf("dist5: %d\n",robot.motors.motor5.distance);
+
 /*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;
