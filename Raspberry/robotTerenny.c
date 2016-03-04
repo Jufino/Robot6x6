@@ -84,9 +84,9 @@ void initRobot(){
     timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
     struct itimerspec cas;
     cas.it_value.tv_sec=0;
-    cas.it_value.tv_nsec=refreshModule;
+    cas.it_value.tv_nsec=refreshModule*1000*1000;
     cas.it_interval.tv_sec=0;
-    cas.it_interval.tv_nsec=refreshModule;
+    cas.it_interval.tv_nsec=refreshModule*1000*1000;
     timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
     sigset_t signalSet;
     struct sigaction CasovacSignalAction;
@@ -125,31 +125,31 @@ void writeRegister(int addr,unsigned char reg, unsigned char value){
     data[0] = reg;
     data[1] = value;
     setDevice(addr);
-    if (write(file, data, 2) != 2) perror("write register");
+    if (write(file, data, 2) != 2) printf("addr:%d, write register %d,val %d",addr,reg,value);
 }
 unsigned int readRegister16(int addr,unsigned char reg){
     char data[3];
     data[0] = reg;
     setDevice(addr);
-    if (write(file, data, 1) != 1)  perror("write error");
-    if (read(file, data, 2) != 2)   perror("read error");
+    if (write(file, data, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
+    if (read(file, data, 2) != 2)   printf("addr:%d, read register %d,val %d",addr,reg);
     return (data[0]<<8)+data[1];
 }
 signed int readRegister16s(int addr,unsigned char reg){
     char wdata[2];
     wdata[0] = reg;
     setDevice(addr);
-    if (write(file, wdata, 1) != 1)  perror("write error");
+    if (write(file, wdata, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
     signed char data[3];
-    if (read(file, data, 2) != 2)   perror("read error");
+    if (read(file, data, 2) != 2)   printf("addr:%d, read register %d,val %d",addr,reg);
     return (data[0]<<8)+data[1];
 }
 unsigned char readRegister8(int addr,unsigned char reg){
     char data[2];
     data[0] = reg;
     setDevice(addr);
-    if (write(file, data, 1) != 1)  perror("write register");
-    if (read(file, data, 1) != 1)   perror("read error");
+    if (write(file, data, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
+    if (read(file, data, 1) != 1)   printf("addr:%d, read register %d,val %d",addr,reg);
     return data[0];
 }
 
@@ -173,28 +173,50 @@ unsigned char getButton(char pos){
 	default: return 0;
     }
 }
-unsigned int getSpeed(int pos){
+int getSpeedRaw(int pos){
     switch(pos){
-        case 1: return readRegister16(0x08,1); break;
-        case 2: return readRegister16(0x0A,1); break;
-        case 3: return readRegister16(0x0A,2); break;
-        case 4: return readRegister16(0x08,2); break;
-        case 5: return readRegister16(0x09,2); break;
-        case 6: return readRegister16(0x09,1); break;
+        case 1: return readRegister16s(0x08,1); break;
+        case 2: return readRegister16s(0x0A,1); break;
+        case 3: return readRegister16s(0x0A,2); break;
+        case 4: return readRegister16s(0x08,2); break;
+        case 5: return readRegister16s(0x09,2); break;
+        case 6: return readRegister16s(0x09,1); break;
         default: return 0;
     }
 }
-unsigned int getDistance(int pos){
+float getSpeed(int pos){
+	return (float)getSpeedRaw(pos)*((M_PI*OtackomerPriemer)/OtackomerConstant); //??? totoo este nie je dobre ????
+}
+
+int getDistanceRaw(int pos){
     switch(pos){
-        case 1: return readRegister16(0x08,3); break;
-        case 2: return readRegister16(0x0A,3); break;
-        case 3: return readRegister16(0x0A,4); break;
-        case 4: return readRegister16(0x08,4); break;
-        case 5: return readRegister16(0x09,4); break;
-        case 6: return readRegister16(0x09,3); break;
+        case 1: return readRegister16s(0x08,3); break;
+        case 2: return readRegister16s(0x0A,3); break;
+        case 3: return readRegister16s(0x0A,4); break;
+        case 4: return readRegister16s(0x08,4); break;
+        case 5: return readRegister16s(0x09,4); break;
+        case 6: return readRegister16s(0x09,3); break;
         default: return 0;
     }
 }
+int getDistance(int pos){
+	return (int)((float)getDistanceRaw(pos)*((M_PI*OtackomerPriemer)/OtackomerConstant));
+}
+int getDeltaDistanceRaw(int pos){
+    switch(pos){
+        case 1: return readRegister16s(0x08,7); break;
+        case 2: return readRegister16s(0x0A,7); break;
+        case 3: return readRegister16s(0x0A,8); break;
+        case 4: return readRegister16s(0x08,8); break;
+        case 5: return readRegister16s(0x09,6); break;
+        case 6: return readRegister16s(0x09,5); break;
+        default: return 0;
+    }
+}
+int getDeltaDistance(int pos){
+        return (int)((float)getDeltaDistanceRaw(pos)*((M_PI*OtackomerPriemer)/OtackomerConstant));
+}
+
 void resetDistance(int pos){
     switch(pos){
         case 1: writeRegister(0x08,100,0);  break;
@@ -753,29 +775,49 @@ void setMPU6050DLPF(unsigned char acc_dlpf,unsigned char gy_dlpf){
 	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(3<<3));
  	writeRegister(MPU6050ADDR,0x1A,gy_dlpf|(4<<3));
 }
+int getDistanceL(){
+        return ((float)(robotVariables.motors.motor4.distance+robotVariables.motors.motor5.distance+robotVariables.motors.motor6.distance)/3);
+}
+int getDistanceR(){
+        return ((float)(robotVariables.motors.motor1.distance+robotVariables.motors.motor2.distance+robotVariables.motors.motor3.distance)/3);
+}
+
+float getSpeedFromDistanceL(float dt){
+	return (float)getDistanceL()/dt;
+}
+float getSpeedFromDistanceR(float dt){
+	return (float)getDistanceR()/dt;
+}
+//http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
+void calcRobotPosition(float dt){
+	robotVariables.robotPosition.angle += (getDistanceR()-getDistanceL())/vzdialenostKolies;
+	robotVariables.robotPosition.x =  ((getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2)*cos(robotVariables.robotPosition.angle);
+	robotVariables.robotPosition.y = ((getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2)*sin(robotVariables.robotPosition.angle);
+}
 void syncModules(int signal , siginfo_t * siginfo, void * ptr){
 	switch (signal)
   	{
 		case SIGUSR1:
-		robotVariables.MPU6050 = getMPU6050Full(0.01);
-		robotVariables.motors.motor1.distance = getDistance(1);
+		robotVariables.MPU6050 = getMPU6050Full((float)refreshModule/1000);
+		robotVariables.motors.motor1.distance += getDeltaDistance(1);
 		robotVariables.motors.motor1.actSpeed = getSpeed(1);
 		setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
-		robotVariables.motors.motor4.distance = getDistance(4);
+		robotVariables.motors.motor4.distance += getDeltaDistance(4);
      	  	robotVariables.motors.motor4.actSpeed = getSpeed(4);
 		setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
-		robotVariables.motors.motor2.distance = getDistance(2);
+		robotVariables.motors.motor2.distance += getDeltaDistance(2);
         	robotVariables.motors.motor2.actSpeed = getSpeed(2);
 		setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
-		robotVariables.motors.motor3.distance = getDistance(3);
+		robotVariables.motors.motor3.distance += getDeltaDistance(3);
         	robotVariables.motors.motor3.actSpeed = getSpeed(3);
 		setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
-		robotVariables.motors.motor5.distance = getDistance(5);
+		robotVariables.motors.motor5.distance += getDeltaDistance(5);
         	robotVariables.motors.motor5.actSpeed = getSpeed(5);
 		setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
-		robotVariables.motors.motor6.distance = getDistance(6);
+		robotVariables.motors.motor6.distance += getDeltaDistance(6);
         	robotVariables.motors.motor6.actSpeed = getSpeed(6);
 		setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
+		calcRobotPosition((float)refreshModule/1000);
 		robotVariables.buttons.button1 = getButton(1);
 		robotVariables.buttons.button2 = getButton(2);
 		robotVariables.buttons.button3 = getButton(3);
