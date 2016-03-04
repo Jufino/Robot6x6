@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <avr/wdt.h>
-volatile boolean stopUprava = false;
 volatile unsigned int pocetTikov2 = 0;
 volatile unsigned int pocetTikov3 = 0;
 volatile int c = -1;
@@ -34,7 +33,6 @@ volatile int setRychlost3=0;
 #define serialPortStatus 0
 
 void motor(int motor, char smer, int rychlost) {
-    Serial.print(floatTempC,DEC);
   if (motor == 3) {
     if (smer < 0) {
       digitalWrite(4, HIGH);
@@ -95,7 +93,7 @@ void setup() {
   servo1.attach(servoPin);
   servo1.write(90);
   if(serialPortStatus)  Serial.begin(9600);
-  if(watchdogStatus) wdt_enable(WDTO_500MS);
+  if(watchdogStatus) wdt_enable(WDTO_1S);
 }
 
 void otackomerMotor3() {
@@ -115,15 +113,12 @@ void loop() {
   delayMicroseconds(10); // Added this line
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
-  while (stopUprava == true);
-  stopUprava = true;
     digitalWrite(LModra, LOW);
     distance = (duration/2) / 29.1;
     lastRychlost2 = pocetTikov2;
     lastRychlost3 = pocetTikov3;
     lastVzdialenost2 += pocetTikov2;
     lastVzdialenost3 += pocetTikov3;
-  stopUprava = false;
   pocetTikov2 = 0;
   pocetTikov3 = 0;
   delay(88);
@@ -138,32 +133,23 @@ void receiveEvent(int howMany) {
   }
   c = Wire.read();
   d = Wire.read();
-  if(c != -1){
+/*  if(c != -1){
           Serial.print("d: ");
           Serial.print(c);
         Serial.print("\nc: ");
                   Serial.print(d);
         Serial.print("\n");
-  }
+  }*/
   switch (c) {
     case 100:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost3 = 0;
-      stopUprava = false;
       break;
     case 99:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost2 = 0;
-      stopUprava = false;
       break;
     case 98:
-      while (stopUprava == true);
-      stopUprava = true;
       lastVzdialenost2 = 0;
       lastVzdialenost3 = 0;
-      stopUprava = false;
       break;
     case 97:
       if (d == 0)       digitalWrite(LZelena, LOW);
@@ -217,8 +203,8 @@ void receiveEvent(int howMany) {
       if(d <= 181 && d >= 1){
         poziciaServo=d;
         servo1.write(poziciaServo);
-        Serial.print(poziciaServo);
-        Serial.print("\n");
+        //Serial.print(poziciaServo);
+        //Serial.print("\n");
       }
       break;
   }
@@ -228,50 +214,32 @@ void requestEvent() {
   byte data[2];
   switch (c) {
     case 1:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastRychlost3 & 0xFF);
       data[0] = (lastRychlost3 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 2:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastRychlost2 & 0xFF);
       data[0] = (lastRychlost2 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 3:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastVzdialenost3 & 0xFF);
       data[0] = (lastVzdialenost3 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 4:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (lastVzdialenost2 & 0xFF);
       data[0] = (lastVzdialenost2 >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
     case 5:
-      while (stopUprava == true);
-      stopUprava = true;
       data[0] = (poziciaServo & 0xFF);
-      stopUprava = false;
       Wire.write(data, 1);
       break;
     case 6:
-      while (stopUprava == true);
-      stopUprava = true;
       data[1] = (distance & 0xFF);
       data[0] = (distance >> 8) & 0xFF;
-      stopUprava = false;
       Wire.write(data, 2);
       break;
   }
