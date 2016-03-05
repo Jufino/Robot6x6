@@ -32,18 +32,8 @@ volatile int setRychlost4 = 0;
 #define Prud A1
 #define watchdogStatus 1
 #define serialPortStatus 0
+#define test 300
 
-void napajanie12V(boolean stav) {
-  if (stav == true) {
-    digitalWrite(10, LOW);
-    digitalWrite(11, LOW);
-  }
-  else {
-    digitalWrite(10, HIGH);
-    digitalWrite(11, HIGH);
-  }
-
-}
 void motor(int motor, char smer, int rychlost) {
   if (motor == 1) {
     if (smer < 0) {
@@ -98,7 +88,6 @@ void setup() {
   pinMode(3, INPUT);
   attachInterrupt(digitalPinToInterrupt(2), otackomerMotor1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(3), otackomerMotor4, CHANGE);
-  napajanie12V(false);
   motor(1, 0, 255);
   motor(4, 0, 255);
   Wire.begin(8);                // nastavenie komunikacnej adresy na 0x08
@@ -168,10 +157,6 @@ void receiveEvent(int howMany) {
     case 96:
       if (d == 0)       digitalWrite(LCervena, LOW);
       else if (d == 1)  digitalWrite(LCervena, HIGH);
-      break;
-    case 95:
-      if (d == 0)       napajanie12V(false);
-      else if (d == 1)  napajanie12V(true);
       break;
     case 94:
       onReg1 = true;
@@ -259,6 +244,11 @@ void requestEvent() {
       data[0] = (lastVzdialenost4 >> 8) & 0xFF;
       Wire.write(data, 2);
       lastVzdialenost4 = 0;
+      break;
+    case 127:
+      data[1] = (test & 0xFF);
+      data[0] = (test >> 8) & 0xFF;
+      Wire.write(data, 2);
       break;
   }
   c = -1;

@@ -24,6 +24,7 @@ volatile int setRychlost6 = 0;
 #define LModra 13
 #define watchdogStatus 1
 #define serialPortStatus 0
+#define test 300
 
 void motor(int motor, char smer, int rychlost) {
   if (motor == 6) {
@@ -221,6 +222,11 @@ void requestEvent() {
       data[0] = (lastVzdialenost5 >> 8) & 0xFF;
       Wire.write(data, 2);
       lastVzdialenost5  = 0;
+      break;
+    case 127:
+      data[1] = (test & 0xFF);
+      data[0] = (test >> 8) & 0xFF;
+      Wire.write(data, 2);
       break;
   }
   c = -1;
