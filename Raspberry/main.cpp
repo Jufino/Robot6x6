@@ -58,7 +58,7 @@ int main(void){
 	setMPU6050DLPF(6,6);
 	MPU6050CalibrateOffset(20);
 	while(1){
-		RobotVariables robot = getRobotVariables();
+		RobotAcculators robot = getRobotAcculators();
 		/*printf("AcX: %f\n",robot.MPU6050.AccX);
 		printf("AcY: %f\n",robot.MPU6050.AccY);
 		printf("AcZ: %f\n",robot.MPU6050.AccZ);
@@ -78,10 +78,10 @@ int main(void){
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
 
-		robot.motors.motor1.setSpeed = 255;
+		robot.motors.motor1.speed = 255;
 		robot.motors.motor1.direction = 1;
 		robot.motors.motor1.onRegulator = false;
-		setRobotVariables(robot);
+		setRobotAcculators(robot);
 /*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;

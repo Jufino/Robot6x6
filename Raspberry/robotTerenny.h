@@ -234,9 +234,9 @@ struct RobotSensors {
   float amper;
 };
 struct RobotAcculators {
-  Motors_struct motors;
+  MotorsAcculator_struct motors;
   Buttons_struct buttons;
-  Led_struct leds;
+  Leds_struct leds;
   int servoAngle;
 };
 
@@ -296,11 +296,13 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf);
 
 int getSocketCamera();
 int getSocketSnimace();
-RobotVariables getRobotVariables();
-void setRobotVariables(RobotVariables temp);
+RobotSensors getRobotSensors();
+void setRobotAcculators(RobotAcculators temp);
+RobotAcculators getRobotAcculators();
+
 
 int getKbhit(void);
 float dist(float a, float b);
-bool compareMotors(Motors_struct motor, Motors_struct lastMotor);
+bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
 #endif
 

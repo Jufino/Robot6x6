@@ -11,7 +11,7 @@ RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
 timer_t casovac;
 
-RobotAcculators getRobotAcculator() {
+RobotAcculators getRobotAcculators() {
   RobotAcculators temp;
   semWait(sem_id, 1);
   memcpy(&robotAcculators, &temp, sizeof(robotAcculators));
@@ -852,10 +852,10 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
   writeRegister(MPU6050ADDR, 0x1A, gy_dlpf | (4 << 3));
 }
 int getDistanceL() {
-  return ((float)(robotVariables.motors.motor4.distance + robotVariables.motors.motor5.distance + robotVariables.motors.motor6.distance) / 3);
+  return ((float)(robotSensors.motors.motor4.distance + robotSensors.motors.motor5.distance + robotSensors.motors.motor6.distance) / 3);
 }
 int getDistanceR() {
-  return ((float)(robotVariables.motors.motor1.distance + robotVariables.motors.motor2.distance + robotVariables.motors.motor3.distance) / 3);
+  return ((float)(robotSensors.motors.motor1.distance + robotSensors.motors.motor2.distance + robotSensors.motors.motor3.distance) / 3);
 }
 
 float getSpeedFromDistanceL(float dt) {
@@ -866,9 +866,9 @@ float getSpeedFromDistanceR(float dt) {
 }
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 void calcRobotPosition(float dt) {
-  robotVariables.robotPosition.angle += (getDistanceR() - getDistanceL()) / vzdialenostKolies;
-  robotVariables.robotPosition.x =  ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * cos(robotVariables.robotPosition.angle);
-  robotVariables.robotPosition.y = ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * sin(robotVariables.robotPosition.angle);
+  robotSensors.robotPosition.angle += (getDistanceR() - getDistanceL()) / vzdialenostKolies;
+  robotSensors.robotPosition.x =  ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * cos(robotSensors.robotPosition.angle);
+  robotSensors.robotPosition.y = ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * sin(robotSensors.robotPosition.angle);
 }
 int pocetPosition = 100;
 int pocetMotors = 100;
@@ -878,8 +878,8 @@ int pocetLeds = 100;
 int pocetAmp = 100;
 int pocetUltrasonic = 100;
 
-bool compareMotors(Motor_struct motor, Motor_struct lastMotor) {
-  return motor.direction != lastMotor.direction || motor.setSpeed != lastMotor.setSpeed || motor.onRegulator != lastMotor.onRegulator;
+bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
+  return motor.direction != lastMotor.direction || motor.speed != lastMotor.speed || motor.onRegulator != lastMotor.onRegulator;
 }
 void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
@@ -908,7 +908,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor1, lastRobotAcculators.motors.motor1)) {
         semWait(sem_id, 1);
-        setMotor(1, robotAcculators.motors.motor1.direction, robotAcculators.motors.motor1.setSpeed, robotAcculators.motors.motor1.onRegulator);
+        setMotor(1, robotAcculators.motors.motor1.direction, robotAcculators.motors.motor1.speed, robotAcculators.motors.motor1.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
@@ -921,7 +921,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor4, lastRobotAcculators.motors.motor4)) {
         semWait(sem_id, 1);
-        setMotor(4, robotAcculators.motors.motor4.direction, robotAcculators.motors.motor4.setSpeed, robotAcculators.motors.motor4.onRegulator);
+        setMotor(4, robotAcculators.motors.motor4.direction, robotAcculators.motors.motor4.speed, robotAcculators.motors.motor4.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
@@ -934,7 +934,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor2, lastRobotAcculators.motors.motor2)) {
         semWait(sem_id, 1);
-        setMotor(2, robotAcculators.motors.motor2.direction, robotAcculators.motors.motor2.setSpeed, robotAcculators.motors.motor2.onRegulator);
+        setMotor(2, robotAcculators.motors.motor2.direction, robotAcculators.motors.motor2.speed, robotAcculators.motors.motor2.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
@@ -947,7 +947,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor3, lastRobotAcculators.motors.motor3)) {
         semWait(sem_id, 1);
-        setMotor(3, robotAcculators.motors.motor3.direction, robotAcculators.motors.motor4.setSpeed, robotAcculators.motors.motor3.onRegulator);
+        setMotor(3, robotAcculators.motors.motor3.direction, robotAcculators.motors.motor4.speed, robotAcculators.motors.motor3.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
@@ -960,7 +960,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor5, lastRobotAcculators.motors.motor5)) {
         semWait(sem_id, 1);
-        setMotor(5, robotAcculators.motors.motor5.direction, robotAcculators.motors.motor5.setSpeed, robotAcculators.motors.motor5.onRegulator);
+        setMotor(5, robotAcculators.motors.motor5.direction, robotAcculators.motors.motor5.speed, robotAcculators.motors.motor5.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
@@ -973,15 +973,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor6, lastRobotAcculators.motors.motor6)) {
         semWait(sem_id, 1);
-        setMotor(6, robotAcculators.motors.motor6.direction, robotAcculators.motors.motor6.setSpeed, robotAcculators.motors.motor6.onRegulator);
+        setMotor(6, robotAcculators.motors.motor6.direction, robotAcculators.motors.motor6.speed, robotAcculators.motors.motor6.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
       if (refreshLedsCheck) {
         semWait(sem_id, 1);
-        setLed(1, robotVariables.leds.Led1);
-        setLed(2, robotVariables.leds.Led2);
-        if (!BatteryLed3Indicate) setLed(3, robotVariables.leds.Led3);
+        setLed(1, robotAcculators.leds.Led1);
+        setLed(2, robotAcculators.leds.Led2);
+        if (!BatteryLed3Indicate) setLed(3, robotAcculators.leds.Led3);
         semPost(sem_id, 1);
       }
 
