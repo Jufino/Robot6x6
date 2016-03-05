@@ -202,7 +202,7 @@
 	char button2;
 	char button3;
     };
-    struct Led_struct{
+    struct Leds_struct{
 	char Led1;
 	char Led2;
 	char Led3;
@@ -218,6 +218,7 @@
 	Motors_struct motors;
 	Buttons_struct buttons;
 	RobotPosition_struct robotPosition;
+	Led_struct leds;
 	float ultrasonic;
 	int servoAngle;
 	float voltage;
@@ -232,12 +233,11 @@
     int testOranzovy();
     int test();
 
-
-    void setDevice(int addr);
-    void writeRegister(int addr,unsigned char reg, unsigned char value);
-    unsigned int readRegister16(int addr,unsigned char reg);
-    signed int readRegister16s(int addr,unsigned char reg);
-    unsigned char readRegister8(int addr,unsigned char reg);
+    void setDevice(unsigned char addr);
+    void writeRegister(unsigned char addr,unsigned char reg, unsigned char value);
+    unsigned int readRegister16(unsigned char addr,unsigned char reg);
+    signed int readRegister16s(unsigned char addr,unsigned char reg);
+    unsigned char readRegister8(unsigned char addr,unsigned char reg);
 
     void sendMatImage(Mat img,int quality);
     void setMotor(int pos,signed char dir,unsigned char speed,bool onReg);

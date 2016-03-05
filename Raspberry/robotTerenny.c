@@ -1,13 +1,14 @@
 #include "robotTerenny.h"
 
 int file;
-int lastAddr = 0x00;
+unsigned char lastAddr = 0x00;
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
 int sem_id;
 RobotVariables robotVariables;
 RobotVariables lastRobotVariables;
+timer_t casovac;
 
 RobotVariables getRobotVariables(){
 	RobotVariables temp;
@@ -57,7 +58,7 @@ void initRobot(){
         semInit(sem_id,0,1);
 
         gpio_open(26,1);
-        setMotorPowerSupply(true);//potom zmenit na true
+        setMotorPowerSupply(false);//potom zmenit na true
 
 	setLed(1,'R');
         setLed(2,'R');
@@ -74,11 +75,10 @@ void initRobot(){
         setLed(1,'V');
         setLed(2,'V');
         setLed(3,'V');
-	    struct sigevent CasovacSignalEvent;
+	struct sigevent CasovacSignalEvent;
     CasovacSignalEvent.sigev_notify=SIGEV_SIGNAL;
     CasovacSignalEvent.sigev_signo=SIGUSR1;
 
-    timer_t casovac;
     timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
     struct itimerspec cas;
     cas.it_value.tv_sec=0;
@@ -93,6 +93,7 @@ void initRobot(){
     CasovacSignalAction.sa_flags=SA_SIGINFO;
     CasovacSignalAction.sa_mask=signalSet;
     sigaction(CasovacSignalEvent.sigev_signo,&CasovacSignalAction,NULL);
+    
     if(Wifi_snimace == 1){
         struct sockaddr_in server;
         if ((serversock_snimace = socket(AF_INET, SOCK_STREAM, 0)) == -1){
@@ -163,9 +164,22 @@ void closeRobot(){
     	close(serversock_snimace);
     	close(clientsock_snimace);
     }
+    struct itimerspec cas;
+    cas.it_value.tv_sec=0;
+    cas.it_value.tv_nsec=0;
+    cas.it_interval.tv_sec=0;
+    cas.it_interval.tv_nsec=0;
+    timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
+    setMotor(1,0,255,false);
+    setMotor(2,0,255,false);
+    setMotor(3,0,255,false);
+    setMotor(4,0,255,false);
+    setMotor(5,0,255,false);
+    setMotor(6,0,255,false);
+
 }
 
-void setDevice(int addr){
+void setDevice(unsigned char addr){
     if(addr != lastAddr){
         if (ioctl(file, I2C_SLAVE, addr) < 0) {
             printf("Problem s vytvorenim spojenia so zariadenim s adresou:%d\n",addr);
@@ -174,36 +188,36 @@ void setDevice(int addr){
         lastAddr = addr;
     }
 }
-void writeRegister(int addr,unsigned char reg, unsigned char value){
+void writeRegister(unsigned char addr,unsigned char reg, unsigned char value){
     unsigned char data[3];
     data[0] = reg;
     data[1] = value;
     setDevice(addr);
-    if (write(file, data, 2) != 2) printf("addr:%d, write register %d,val %d",addr,reg,value);
+    if (write(file, data, 2) != 2) printf("addr:%i, write register %i,val %i",(int)addr,(int)reg,(int)value);
 }
-unsigned int readRegister16(int addr,unsigned char reg){
+unsigned int readRegister16(unsigned char addr,unsigned char reg){
     char data[3];
     data[0] = reg;
     setDevice(addr);
-    if (write(file, data, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
-    if (read(file, data, 2) != 2)   printf("addr:%d, read register %d,val %d",addr,reg);
+    if (write(file, data, 1) != 1)  printf("addr:%i, write register %i",(int)addr,(int)reg);
+    if (read(file, data, 2) != 2)   printf("addr:%i, read register %i",(int)addr,(int)reg);
     return (data[0]<<8)+data[1];
 }
-signed int readRegister16s(int addr,unsigned char reg){
+signed int readRegister16s(unsigned char addr,unsigned char reg){
     char wdata[2];
     wdata[0] = reg;
     setDevice(addr);
-    if (write(file, wdata, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
+    if (write(file, wdata, 1) != 1)  printf("addr:%i, write register %i",(int)addr,(int)reg);
     signed char data[3];
-    if (read(file, data, 2) != 2)   printf("addr:%d, read register %d,val %d",addr,reg);
+    if (read(file, data, 2) != 2)   printf("addr:%i, read register %i",(int)addr,(int)reg);
     return (data[0]<<8)+data[1];
 }
-unsigned char readRegister8(int addr,unsigned char reg){
+unsigned char readRegister8(unsigned char addr,unsigned char reg){
     char data[2];
     data[0] = reg;
     setDevice(addr);
-    if (write(file, data, 1) != 1)  printf("addr:%d, write register %d,val %d",addr,reg);
-    if (read(file, data, 1) != 1)   printf("addr:%d, read register %d,val %d",addr,reg);
+    if (write(file, data, 1) != 1)  printf("addr:%i, write register %i",(int)addr,(int)reg);
+    if (read(file, data, 1) != 1)   printf("addr:%i, read register %i",(int)addr,(int)reg);
     return data[0];
 }
 
@@ -853,6 +867,7 @@ int pocetMPU6050 = 100;
 int pocetLeds = 100;
 int pocetAmp = 100;
 int pocetUltrasonic = 100;
+
 bool compareMotors(Motor_struct motor,Motor_struct lastMotor){
 	return motor.direction!=lastMotor.direction || motor.setSpeed!=lastMotor.setSpeed || motor.onRegulator!=lastMotor.onRegulator;
 }
@@ -925,6 +940,11 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr){
 		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor6,lastRobotVariables.motors.motor6)){
 			setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
 			pocetMotors = 0;
+		}
+		if(refreshLedsCheck){
+			setLed(1,robotVariables.leds.Led1);
+			setLed(2,robotVariables.leds.Led2);
+			if(!BatteryLed3Indicate) setLed(3,robotVariables.leds.Led3);
 		}
 		if(refreshPositionCheck) calcRobotPosition((float)refreshPosition/1000);
 		robotVariables.buttons.button1 = getButton(1);

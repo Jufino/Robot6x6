@@ -13,7 +13,7 @@ main:main.cpp
 
 TARGET=robotTerenny
 
-robotTerenny:robotTerenny.c
+robotTerenny:libsemafor.o robotTerenny.c
 	$(CPP) -c robotTerenny.c -lgpio -lserial libsemafor.o -lm $(OFLAGS)
 
 install: $(TARGET)
