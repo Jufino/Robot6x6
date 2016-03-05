@@ -11,48 +11,6 @@ RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
 timer_t casovac;
 
-RobotAcculators getRobotAcculators() {
-  RobotAcculators temp;
-  semWait(sem_id, 1);
-  memcpy(&robotAcculators, &temp, sizeof(robotAcculators));
-  semPost(sem_id, 1);
-  return temp;
-}
-void setRobotAcculators(RobotAcculators temp) {
-  semWait(sem_id, 1);
-  memcpy(&temp, &robotAcculators, sizeof(temp));
-  semPost(sem_id, 1);
-}
-RobotSensors getRobotSensors() {
-  RobotSensors temp;
-  semWait(sem_id, 0);
-  memcpy(&robotSensors, &temp, sizeof(robotSensors));
-  semPost(sem_id, 0);
-  return temp;
-}
-
-int getSocketCamera() {
-  return clientsock_camera;
-}
-int getSocketSnimace() {
-  return clientsock_snimace;
-}
-int testModry() {
-  if (300 == readRegister16(MODRYADDR, 127)) return 1;
-  else           return 0;
-}
-int testZlty() {
-  if (300 == readRegister16(ZLTYADDR, 127)) return 1;
-  else          return 0;
-}
-int testOranzovy() {
-  if (300 == readRegister16(ORANZOVYADDR, 127)) return 1;
-  else              return 0;
-}
-int test() {
-  if (testZlty() && testOranzovy() && testModry()) return 1;
-  else            return 0;
-}
 void initRobot() {
   if ((file = open(PORT_I2C, O_RDWR)) < 0) {
     perror("Problem s otvorenim portu.\n");
@@ -251,6 +209,50 @@ unsigned char getButton(char pos) {
     default: return 0;
   }
 }
+
+RobotAcculators getRobotAcculators() {
+  RobotAcculators temp;
+  semWait(sem_id, 1);
+  memcpy(&robotAcculators, &temp, sizeof(robotAcculators));
+  semPost(sem_id, 1);
+  return temp;
+}
+void setRobotAcculators(RobotAcculators temp) {
+  semWait(sem_id, 1);
+  memcpy(&temp, &robotAcculators, sizeof(temp));
+  semPost(sem_id, 1);
+}
+RobotSensors getRobotSensors() {
+  RobotSensors temp;
+  semWait(sem_id, 0);
+  memcpy(&robotSensors, &temp, sizeof(robotSensors));
+  semPost(sem_id, 0);
+  return temp;
+}
+
+int getSocketCamera() {
+  return clientsock_camera;
+}
+int getSocketSnimace() {
+  return clientsock_snimace;
+}
+int testModry() {
+  if (300 == readRegister16(MODRYADDR, 127)) return 1;
+  else           return 0;
+}
+int testZlty() {
+  if (300 == readRegister16(ZLTYADDR, 127)) return 1;
+  else          return 0;
+}
+int testOranzovy() {
+  if (300 == readRegister16(ORANZOVYADDR, 127)) return 1;
+  else              return 0;
+}
+int test() {
+  if (testZlty() && testOranzovy() && testModry()) return 1;
+  else            return 0;
+}
+
 int getSpeedRaw(int pos) {
   switch (pos) {
     case 1: return readRegister16s(MODRYADDR, 1); break;
@@ -453,6 +455,90 @@ void setMotor(int pos, signed char dir, unsigned char speed, bool onReg) {
       }
     }
   }
+}
+void setMove(char direction,unsigned char speed,bool onReg){
+  semWait(sem_id, 1);
+  if(direction == 'F'){
+    robotAcculators.motors.motor1.direction = 1;
+    robotAcculators.motors.motor2.direction = 1;
+    robotAcculators.motors.motor3.direction = 1;
+    robotAcculators.motors.motor4.direction = 1;
+    robotAcculators.motors.motor5.direction = 1;
+    robotAcculators.motors.motor6.direction = 1;
+    robotAcculators.motors.motor1.speed = speed;
+    robotAcculators.motors.motor2.speed = speed;
+    robotAcculators.motors.motor3.speed = speed;
+    robotAcculators.motors.motor4.speed = speed;
+    robotAcculators.motors.motor5.speed = speed;
+    robotAcculators.motors.motor6.speed = speed;
+    robotAcculators.motors.motor1.onRegulator = onReg;
+    robotAcculators.motors.motor2.onRegulator = onReg;
+    robotAcculators.motors.motor3.onRegulator = onReg;
+    robotAcculators.motors.motor4.onRegulator = onReg;
+    robotAcculators.motors.motor5.onRegulator = onReg;
+    robotAcculators.motors.motor6.onRegulator = onReg;
+  }
+  else if(direction == 'B'){
+    robotAcculators.motors.motor1.direction = -1;
+    robotAcculators.motors.motor2.direction = -1;
+    robotAcculators.motors.motor3.direction = -1;
+    robotAcculators.motors.motor4.direction = -1;
+    robotAcculators.motors.motor5.direction = -1;
+    robotAcculators.motors.motor6.direction = -1;
+    robotAcculators.motors.motor1.speed = speed;
+    robotAcculators.motors.motor2.speed = speed;
+    robotAcculators.motors.motor3.speed = speed;
+    robotAcculators.motors.motor4.speed = speed;
+    robotAcculators.motors.motor5.speed = speed;
+    robotAcculators.motors.motor6.speed = speed;
+    robotAcculators.motors.motor1.onRegulator = onReg;
+    robotAcculators.motors.motor2.onRegulator = onReg;
+    robotAcculators.motors.motor3.onRegulator = onReg;
+    robotAcculators.motors.motor4.onRegulator = onReg;
+    robotAcculators.motors.motor5.onRegulator = onReg;
+    robotAcculators.motors.motor6.onRegulator = onReg;
+  }
+  else if(direction == 'R'){
+    robotAcculators.motors.motor1.direction = -1;
+    robotAcculators.motors.motor2.direction = -1;
+    robotAcculators.motors.motor3.direction = -1;
+    robotAcculators.motors.motor4.direction = 1;
+    robotAcculators.motors.motor5.direction = 1;
+    robotAcculators.motors.motor6.direction = 1;
+    robotAcculators.motors.motor1.speed = speed;
+    robotAcculators.motors.motor2.speed = speed;
+    robotAcculators.motors.motor3.speed = speed;
+    robotAcculators.motors.motor4.speed = speed;
+    robotAcculators.motors.motor5.speed = speed;
+    robotAcculators.motors.motor6.speed = speed;
+    robotAcculators.motors.motor1.onRegulator = onReg;
+    robotAcculators.motors.motor2.onRegulator = onReg;
+    robotAcculators.motors.motor3.onRegulator = onReg;
+    robotAcculators.motors.motor4.onRegulator = onReg;
+    robotAcculators.motors.motor5.onRegulator = onReg;
+    robotAcculators.motors.motor6.onRegulator = onReg;
+  }
+  else if(direction == 'L'){
+    robotAcculators.motors.motor1.direction = 1;
+    robotAcculators.motors.motor2.direction = 1;
+    robotAcculators.motors.motor3.direction = 1;
+    robotAcculators.motors.motor4.direction = -1;
+    robotAcculators.motors.motor5.direction = -1;
+    robotAcculators.motors.motor6.direction = -1;
+    robotAcculators.motors.motor1.speed = speed;
+    robotAcculators.motors.motor2.speed = speed;
+    robotAcculators.motors.motor3.speed = speed;
+    robotAcculators.motors.motor4.speed = speed;
+    robotAcculators.motors.motor5.speed = speed;
+    robotAcculators.motors.motor6.speed = speed;
+    robotAcculators.motors.motor1.onRegulator = onReg;
+    robotAcculators.motors.motor2.onRegulator = onReg;
+    robotAcculators.motors.motor3.onRegulator = onReg;
+    robotAcculators.motors.motor4.onRegulator = onReg;
+    robotAcculators.motors.motor5.onRegulator = onReg;
+    robotAcculators.motors.motor6.onRegulator = onReg;
+  }
+  semPost(sem_id, 1);
 }
 int getKbhit(void) {
   struct termios oldt, newt;
