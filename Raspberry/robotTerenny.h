@@ -49,6 +49,13 @@
     #define PORT_camera  1212
  
     #define refreshModule 100 //v ms
+    #define refreshBattery refreshModule*20
+    #define refreshMotors refreshModule*10
+    #define refreshMPU6050 refreshModule*1
+    #define refreshLeds refreshModule*1 
+    #define refreshPosition refreshModule*1
+    #define refreshAmp refreshModule*20
+    #define refreshUltrasonic refreshModule*1
 
     #define R2 5.3f
     #define R1 31.4f
@@ -178,8 +185,8 @@
     struct Motor_struct{
 	int distance;
 	signed char direction;
-	float actSpeed;
-	float setSpeed;
+	int actSpeed;
+	int setSpeed;
 	bool onRegulator;
     };
     struct Motors_struct{
@@ -276,8 +283,10 @@
     int getSocketCamera();
     int getSocketSnimace();
     RobotVariables getRobotVariables();
+    void setRobotVariables(RobotVariables temp);
 
     int getKbhit(void);
     float dist(float a,float b);
+    bool compareMotors(Motors_struct motor,Motors_struct lastMotor);
 #endif
 	

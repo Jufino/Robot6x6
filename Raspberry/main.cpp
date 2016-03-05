@@ -28,7 +28,7 @@ IplImage *img2L;
 Mat imgSendL;
 void *getImgL(void *arg);
 
-int sem_id=0;
+int sem_id1=0;
 char zap = true;
 
 void sigctrl(int param);
@@ -44,10 +44,10 @@ int main(void){
 
         cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_WIDTH, sirka);
         cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_HEIGHT, vyska);
-	sem_id = semCreate(getpid(),3);   //vytvor semafor
-        semInit(sem_id,0,1);
-        semInit(sem_id,1,1);
-	semInit(sem_id,2,1);
+	sem_id1 = semCreate(getpid(),3);   //vytvor semafor
+        semInit(sem_id1,0,1);
+        semInit(sem_id1,1,1);
+	semInit(sem_id1,2,1);
         signal(SIGINT, sigctrl);
 	signal(SIGPIPE, sigpipe);
 	
@@ -78,6 +78,10 @@ int main(void){
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
 
+		robot.motors.motor1.setSpeed = 255;
+		robot.motors.motor1.direction = 1;
+		robot.motors.motor1.onRegulator = false;
+		setRobotVariables(robot);
 /*
                 semWait(sem_id,0);
                 imageChooseMainL = imageChooseL;
@@ -105,19 +109,19 @@ int main(void){
 }
 void *getImgL(void *arg){
         while(zap){
-		semWait(sem_id,1);
+		semWait(sem_id1,1);
                 img1L = cvQueryFrame(cameraL);
-		semWait(sem_id,0);
+		semWait(sem_id1,0);
                 imageChooseL = 1;
-                semPost(sem_id,0);
-		semPost(sem_id,1);
+                semPost(sem_id1,0);
+		semPost(sem_id1,1);
 
-		semWait(sem_id,2);	
+		semWait(sem_id1,2);	
                 img2L = cvQueryFrame(cameraL);
-		semWait(sem_id,0);
+		semWait(sem_id1,0);
                 imageChooseL = 2;
-                semPost(sem_id,0);
-                semPost(sem_id,2);
+                semPost(sem_id1,0);
+                semPost(sem_id1,2);
         }
 }
 void wifiCamera(){
@@ -132,12 +136,12 @@ void wifiCamera(){
 }
 void sigctrl(int param){
 	closeRobot();
-  	semRem(sem_id);
+  	semRem(sem_id1);
   	exit(param);
 }
 void sigpipe(int param){
   	closeRobot();
-  	semRem(sem_id);
+  	semRem(sem_id1);
   	exit(param);
 }
 

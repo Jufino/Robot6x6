@@ -5,10 +5,21 @@ int lastAddr = 0x00;
 int serversock_snimace,serversock_camera;
 int clientsock_snimace,clientsock_camera;
 int portHandle;
+int sem_id;
 RobotVariables robotVariables;
+RobotVariables lastRobotVariables;
 
 RobotVariables getRobotVariables(){
-	return robotVariables;
+	RobotVariables temp;
+	semWait(sem_id,0);
+	memcpy(&robotVariables, &temp, sizeof(robotVariables));
+	semPost(sem_id,0);
+	return temp;
+}
+void setRobotVariables(RobotVariables temp){
+	semWait(sem_id,0);
+	memcpy(&temp, &robotVariables, sizeof(temp));
+	semPost(sem_id,0);
 }
 int getSocketCamera(){
 	return clientsock_camera;
@@ -42,8 +53,11 @@ void initRobot(){
     gpio_open(27,0);
     gpio_open(22,0);
     if(test() == 1){
+	sem_id = semCreate(getpid()+1,1);   //vytvor semafor
+        semInit(sem_id,0,1);
+
         gpio_open(26,1);
-        setMotorPowerSupply(false);//potom zmenit na true
+        setMotorPowerSupply(true);//potom zmenit na true
 
 	setLed(1,'R');
         setLed(2,'R');
@@ -136,6 +150,7 @@ void initRobot(){
 }
 void closeRobot(){
     SerialClose(portHandle);
+    semRem(sem_id);
     gpio_close(17);
     gpio_close(27);
     gpio_close(22);
@@ -831,42 +846,103 @@ void calcRobotPosition(float dt){
 	robotVariables.robotPosition.x =  ((getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2)*cos(robotVariables.robotPosition.angle);
 	robotVariables.robotPosition.y = ((getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2)*sin(robotVariables.robotPosition.angle);
 }
+int pocetPosition = 100;
+int pocetMotors = 100;
+int pocetBattery = 100;
+int pocetMPU6050 = 100;
+int pocetLeds = 100;
+int pocetAmp = 100;
+int pocetUltrasonic = 100;
+bool compareMotors(Motor_struct motor,Motor_struct lastMotor){
+	return motor.direction!=lastMotor.direction || motor.setSpeed!=lastMotor.setSpeed || motor.onRegulator!=lastMotor.onRegulator;
+}
 void syncModules(int signal , siginfo_t * siginfo, void * ptr){
 	switch (signal)
   	{
 		case SIGUSR1:
-		robotVariables.MPU6050 = getMPU6050Full((float)refreshModule/1000);
-		robotVariables.motors.motor1.distance += getDeltaDistance(1);
-		robotVariables.motors.motor1.actSpeed = getSpeed(1);
-		setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
-		robotVariables.motors.motor4.distance += getDeltaDistance(4);
-     	  	robotVariables.motors.motor4.actSpeed = getSpeed(4);
-		setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
-		robotVariables.motors.motor2.distance += getDeltaDistance(2);
-        	robotVariables.motors.motor2.actSpeed = getSpeed(2);
-		setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
-		robotVariables.motors.motor3.distance += getDeltaDistance(3);
-        	robotVariables.motors.motor3.actSpeed = getSpeed(3);
-		setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
-		robotVariables.motors.motor5.distance += getDeltaDistance(5);
-        	robotVariables.motors.motor5.actSpeed = getSpeed(5);
-		setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
-		robotVariables.motors.motor6.distance += getDeltaDistance(6);
-        	robotVariables.motors.motor6.actSpeed = getSpeed(6);
-		setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
-		calcRobotPosition((float)refreshModule/1000);
+		bool refreshPositionCheck = refreshPosition/refreshModule >= pocetPosition;
+		bool refreshMotorsCheck = refreshMotors/refreshModule >= pocetMotors;
+		bool refreshBatteryCheck = refreshBattery/refreshModule >= pocetBattery;
+		bool refreshMPU6050Check = refreshMPU6050/refreshModule >= pocetMPU6050;
+		bool refreshLedsCheck = refreshLeds/refreshModule >= pocetLeds;
+		bool refreshAmpCheck = refreshAmp/refreshModule >= pocetAmp;
+		bool refreshUltrasonicCheck = refreshUltrasonic/refreshModule >= pocetUltrasonic;
+		semWait(sem_id,0);
+		if(refreshMPU6050Check){
+			robotVariables.MPU6050 = getMPU6050Full((float)refreshMPU6050/1000);
+			pocetMPU6050 = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor1.distance += getDeltaDistance(1);
+			robotVariables.motors.motor1.actSpeed = getSpeed(1);
+			pocetPosition = 0;
+		}
+		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor1,lastRobotVariables.motors.motor1)){
+			setMotor(1,robotVariables.motors.motor1.direction,robotVariables.motors.motor1.setSpeed,robotVariables.motors.motor1.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor4.distance += getDeltaDistance(4);
+     	  		robotVariables.motors.motor4.actSpeed = getSpeed(4);
+			pocetPosition = 0;
+		}
+		if(refreshMotorsCheck|| compareMotors(robotVariables.motors.motor4,lastRobotVariables.motors.motor4)){			
+			setMotor(4,robotVariables.motors.motor4.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor4.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor2.distance += getDeltaDistance(2);
+        		robotVariables.motors.motor2.actSpeed = getSpeed(2);
+			pocetPosition = 0;
+		}
+		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor2,lastRobotVariables.motors.motor2)){
+		 	setMotor(2,robotVariables.motors.motor2.direction,robotVariables.motors.motor2.setSpeed,robotVariables.motors.motor2.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor3.distance += getDeltaDistance(3);
+	        	robotVariables.motors.motor3.actSpeed = getSpeed(3);
+			pocetPosition = 0;
+		}
+		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor3,lastRobotVariables.motors.motor3)){
+			setMotor(3,robotVariables.motors.motor3.direction,robotVariables.motors.motor4.setSpeed,robotVariables.motors.motor3.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor5.distance += getDeltaDistance(5);
+        		robotVariables.motors.motor5.actSpeed = getSpeed(5);
+			pocetPosition = 0;
+		}
+		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor5,lastRobotVariables.motors.motor5)){
+			setMotor(5,robotVariables.motors.motor5.direction,robotVariables.motors.motor5.setSpeed,robotVariables.motors.motor5.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck){
+			robotVariables.motors.motor6.distance += getDeltaDistance(6);
+        		robotVariables.motors.motor6.actSpeed = getSpeed(6);
+			pocetPosition = 0;
+		}		
+		if(refreshMotorsCheck || compareMotors(robotVariables.motors.motor6,lastRobotVariables.motors.motor6)){
+			setMotor(6,robotVariables.motors.motor6.direction,robotVariables.motors.motor6.setSpeed,robotVariables.motors.motor6.onRegulator);
+			pocetMotors = 0;
+		}
+		if(refreshPositionCheck) calcRobotPosition((float)refreshPosition/1000);
 		robotVariables.buttons.button1 = getButton(1);
 		robotVariables.buttons.button2 = getButton(2);
 		robotVariables.buttons.button3 = getButton(3);
-		robotVariables.voltage = getVoltage();
-		robotVariables.voltagePercent = getVoltagePercent();
-		robotVariables.amper = getAmp();
-		robotVariables.ultrasonic = getUltrasonic();
-		if(BatteryLed3Indicate == 1){
-			if(robotVariables.voltagePercent > 60) 		 setLed(3,'G');
-			else if(robotVariables.voltagePercent > 20) 	 setLed(3,'O');
-			else						 setLed(3,'R');
+		if(refreshBatteryCheck){
+			robotVariables.voltage = getVoltage();
+			robotVariables.voltagePercent = getVoltagePercent();
+			if(BatteryLed3Indicate == 1){
+                        	if(robotVariables.voltagePercent > 60)           setLed(3,'G');
+                        	else if(robotVariables.voltagePercent > 20)      setLed(3,'O');
+                        	else                                             setLed(3,'R');
+                	}
 		}
+		if(refreshAmpCheck)	   robotVariables.amper = getAmp();
+		if(refreshUltrasonicCheck) robotVariables.ultrasonic = getUltrasonic();
+		memcpy(&robotVariables, &lastRobotVariables, sizeof(robotVariables));
+		semPost(sem_id,0);
 		break;
 	}
 }
