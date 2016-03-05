@@ -16,7 +16,22 @@ int getSocketCamera(){
 int getSocketSnimace(){
 	return clientsock_snimace;
 }
-
+int testModry(){
+	if(300 == readRegister16(MODRYADDR,127)) return 1;
+	else					 return 0;
+}
+int testZlty(){
+	if(300 == readRegister16(ZLTYADDR,127)) return 1;
+	else					return 0;
+}
+int testOranzovy(){
+	if(300 == readRegister16(ORANZOVYADDR,127)) return 1;
+	else					    return 0;
+}
+int test(){
+	if(testZlty() && testOranzovy() && testModry()) return 1;
+	else						return 0;
+}
 void initRobot(){
     if ((file = open(PORT_I2C, O_RDWR)) < 0) {
         perror("Problem s otvorenim portu.\n");
@@ -26,6 +41,44 @@ void initRobot(){
     gpio_open(17,0);
     gpio_open(27,0);
     gpio_open(22,0);
+    if(test() == 1){
+        gpio_open(26,1);
+        setMotorPowerSupply(false);//potom zmenit na true
+
+	setLed(1,'R');
+        setLed(2,'R');
+        setLed(3,'R');
+        usleep(500000);
+        setLed(1,'G');
+        setLed(2,'G');
+        setLed(3,'G');
+        usleep(500000);
+        setLed(1,'O');
+        setLed(2,'O');
+        setLed(3,'O');
+        usleep(500000);
+        setLed(1,'V');
+        setLed(2,'V');
+        setLed(3,'V');
+	    struct sigevent CasovacSignalEvent;
+    CasovacSignalEvent.sigev_notify=SIGEV_SIGNAL;
+    CasovacSignalEvent.sigev_signo=SIGUSR1;
+
+    timer_t casovac;
+    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
+    struct itimerspec cas;
+    cas.it_value.tv_sec=0;
+    cas.it_value.tv_nsec=refreshModule*1000*1000;
+    cas.it_interval.tv_sec=0;
+    cas.it_interval.tv_nsec=refreshModule*1000*1000;
+    timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
+    sigset_t signalSet;
+    struct sigaction CasovacSignalAction;
+    sigemptyset(&signalSet);
+    CasovacSignalAction.sa_sigaction=syncModules;
+    CasovacSignalAction.sa_flags=SA_SIGINFO;
+    CasovacSignalAction.sa_mask=signalSet;
+    sigaction(CasovacSignalEvent.sigev_signo,&CasovacSignalAction,NULL);
     if(Wifi_snimace == 1){
         struct sockaddr_in server;
         if ((serversock_snimace = socket(AF_INET, SOCK_STREAM, 0)) == -1){
@@ -76,31 +129,17 @@ void initRobot(){
         }
         printf("Spojenie na porte %d ok.\n",PORT_camera);
     }
-    struct sigevent CasovacSignalEvent;
-    CasovacSignalEvent.sigev_notify=SIGEV_SIGNAL;
-    CasovacSignalEvent.sigev_signo=SIGUSR1;
-
-    timer_t casovac;
-    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
-    struct itimerspec cas;
-    cas.it_value.tv_sec=0;
-    cas.it_value.tv_nsec=refreshModule*1000*1000;
-    cas.it_interval.tv_sec=0;
-    cas.it_interval.tv_nsec=refreshModule*1000*1000;
-    timer_settime(casovac,CLOCK_REALTIME,&cas,NULL);
-    sigset_t signalSet;
-    struct sigaction CasovacSignalAction;
-    sigemptyset(&signalSet);
-    CasovacSignalAction.sa_sigaction=syncModules;
-    CasovacSignalAction.sa_flags=SA_SIGINFO;
-    CasovacSignalAction.sa_mask=signalSet;
-    sigaction(CasovacSignalEvent.sigev_signo,&CasovacSignalAction,NULL);
+	}
+	else{
+		exit(0);
+	}
 }
 void closeRobot(){
     SerialClose(portHandle);
     gpio_close(17);
     gpio_close(27);
     gpio_close(22);
+    gpio_close(26);
     if(Wifi_camera == 1){
     	close(serversock_camera);
     	close(clientsock_camera);
@@ -175,12 +214,12 @@ unsigned char getButton(char pos){
 }
 int getSpeedRaw(int pos){
     switch(pos){
-        case 1: return readRegister16s(0x08,1); break;
-        case 2: return readRegister16s(0x0A,1); break;
-        case 3: return readRegister16s(0x0A,2); break;
-        case 4: return readRegister16s(0x08,2); break;
-        case 5: return readRegister16s(0x09,2); break;
-        case 6: return readRegister16s(0x09,1); break;
+        case 1: return readRegister16s(MODRYADDR,1); break;
+        case 2: return readRegister16s(ORANZOVYADDR,1); break;
+        case 3: return readRegister16s(ORANZOVYADDR,2); break;
+        case 4: return readRegister16s(MODRYADDR,2); break;
+        case 5: return readRegister16s(ZLTYADDR,2); break;
+        case 6: return readRegister16s(ZLTYADDR,1); break;
         default: return 0;
     }
 }
@@ -190,12 +229,12 @@ float getSpeed(int pos){
 
 int getDistanceRaw(int pos){
     switch(pos){
-        case 1: return readRegister16s(0x08,3); break;
-        case 2: return readRegister16s(0x0A,3); break;
-        case 3: return readRegister16s(0x0A,4); break;
-        case 4: return readRegister16s(0x08,4); break;
-        case 5: return readRegister16s(0x09,4); break;
-        case 6: return readRegister16s(0x09,3); break;
+        case 1: return readRegister16s(MODRYADDR,3); break;
+        case 2: return readRegister16s(ORANZOVYADDR,3); break;
+        case 3: return readRegister16s(ORANZOVYADDR,4); break;
+        case 4: return readRegister16s(MODRYADDR,4); break;
+        case 5: return readRegister16s(ZLTYADDR,4); break;
+        case 6: return readRegister16s(ZLTYADDR,3); break;
         default: return 0;
     }
 }
@@ -204,12 +243,12 @@ int getDistance(int pos){
 }
 int getDeltaDistanceRaw(int pos){
     switch(pos){
-        case 1: return readRegister16s(0x08,7); break;
-        case 2: return readRegister16s(0x0A,7); break;
-        case 3: return readRegister16s(0x0A,8); break;
-        case 4: return readRegister16s(0x08,8); break;
-        case 5: return readRegister16s(0x09,6); break;
-        case 6: return readRegister16s(0x09,5); break;
+        case 1: return readRegister16s(MODRYADDR,7); break;
+        case 2: return readRegister16s(ORANZOVYADDR,7); break;
+        case 3: return readRegister16s(ORANZOVYADDR,8); break;
+        case 4: return readRegister16s(MODRYADDR,8); break;
+        case 5: return readRegister16s(ZLTYADDR,6); break;
+        case 6: return readRegister16s(ZLTYADDR,5); break;
         default: return 0;
     }
 }
@@ -219,28 +258,28 @@ int getDeltaDistance(int pos){
 
 void resetDistance(int pos){
     switch(pos){
-        case 1: writeRegister(0x08,100,0);  break;
-        case 2: writeRegister(0x0A,100,0);  break;
-        case 3: writeRegister(0x0A,99,0);   break;
-        case 4: writeRegister(0x08,99,0);   break;
-        case 5: writeRegister(0x09,99,0);   break;
-        case 6: writeRegister(0x09,100,0);  break;
+        case 1: writeRegister(MODRYADDR,100,0);  break;
+        case 2: writeRegister(ORANZOVYADDR,100,0);  break;
+        case 3: writeRegister(ORANZOVYADDR,99,0);   break;
+        case 4: writeRegister(MODRYADDR,99,0);   break;
+        case 5: writeRegister(ZLTYADDR,99,0);   break;
+        case 6: writeRegister(ZLTYADDR,100,0);  break;
     }
 }
 
 void setServo(int angle){
-    if(angle+91 < 1) writeRegister(0x0A,84,1);
-    else if(angle+91 > 181) writeRegister(0x0A,84,181);
+    if(angle+91 < 1) writeRegister(ORANZOVYADDR,84,1);
+    else if(angle+91 > 181) writeRegister(ORANZOVYADDR,84,181);
     else writeRegister(0x0A,84,angle+91);
 }
 unsigned int getUltrasonicRaw(){
-    return readRegister16(0x0A,6);
+    return readRegister16(ORANZOVYADDR,6);
 }
 float getUltrasonic(){
-	return (float)readRegister16(0x0A,6)/UltrasonicConstant;
+	return (float)readRegister16(ORANZOVYADDR,6)/UltrasonicConstant;
 }
 int getVoltageRaw(){
-    return readRegister16(0x08,5);
+    return readRegister16(MODRYADDR,5);
 }
 float getVoltage(){
     float napHod = (float)getVoltageRaw()*(maxVoltADC/rozlisenieADC)*((R1+R2)/R2);
@@ -251,7 +290,7 @@ float getVoltagePercent(){
     return napHod;
 }
 int getAmpRaw(){
-    return readRegister16(0x08,6);
+    return readRegister16(MODRYADDR,6);
 }
 float getAmpVolt(){
     return (float)getAmpRaw()*(maxVoltADC/rozlisenieADC);
@@ -260,118 +299,118 @@ float getAmp(){
     return ((float)getAmpVolt()-maxVoltADC/2)/rozliseniePrud;
 }
 
-void setLed(int pos,char color,bool state){
+void setLed(int pos,char color){
     if(pos == 3){
         if(color == 'G'){
-            writeRegister(0x08,96,0);
-            writeRegister(0x08,97,1);
+            writeRegister(MODRYADDR,96,0);
+            writeRegister(MODRYADDR,97,1);
         }
         else if(color == 'R'){
-	    writeRegister(0x08,97,0);
-            writeRegister(0x08,96,1);
+	    writeRegister(MODRYADDR,97,0);
+            writeRegister(MODRYADDR,96,1);
         }
         else if(color == 'O'){
-            writeRegister(0x08,97,1);
-            writeRegister(0x08,96,1);
+            writeRegister(MODRYADDR,97,1);
+            writeRegister(MODRYADDR,96,1);
         }
 	else{
-	    writeRegister(0x08,97,0);
-            writeRegister(0x08,96,0);
+	    writeRegister(MODRYADDR,97,0);
+            writeRegister(MODRYADDR,96,0);
 	}
     }
     else if(pos == 1){
         if(color == 'G'){
-            writeRegister(0x09,96,0);
-            writeRegister(0x09,97,1);
+            writeRegister(ZLTYADDR,96,0);
+            writeRegister(ZLTYADDR,97,1);
         }
         else if(color == 'R'){
-            writeRegister(0x09,97,0);
-	    writeRegister(0x09,96,1);
+            writeRegister(ZLTYADDR,97,0);
+	    writeRegister(ZLTYADDR,96,1);
         }
         else if(color == 'O'){
-            writeRegister(0x09,97,1);
-            writeRegister(0x09,96,1);
+            writeRegister(ZLTYADDR,97,1);
+            writeRegister(ZLTYADDR,96,1);
         }
 	else{
-	    writeRegister(0x09,97,0);
-	    writeRegister(0x09,96,0);
+	    writeRegister(ZLTYADDR,97,0);
+	    writeRegister(ZLTYADDR,96,0);
 	}
     }
     else{
         if(color == 'G'){
-            writeRegister(0x0A,96,0);
-            writeRegister(0x0A,97,1);
+            writeRegister(ORANZOVYADDR,96,0);
+            writeRegister(ORANZOVYADDR,97,1);
         }
         else if(color == 'R'){
-            writeRegister(0x0A,97,0);
-            writeRegister(0x0A,96,1);
+            writeRegister(ORANZOVYADDR,97,0);
+            writeRegister(ORANZOVYADDR,96,1);
         }
         else if(color == 'O'){
-       	    writeRegister(0x0A,97,1);
-            writeRegister(0x0A,96,1);    
+       	    writeRegister(ORANZOVYADDR,97,1);
+            writeRegister(ORANZOVYADDR,96,1);    
         }
 	else{
-	    writeRegister(0x0A,97,0);
-            writeRegister(0x0A,96,0);
+	    writeRegister(ORANZOVYADDR,97,0);
+            writeRegister(ORANZOVYADDR,96,0);
 	}
     }
 }
 void setMotorPowerSupply(bool state){
-    if(state == false)   writeRegister(0x08,95,0);
-    else                writeRegister(0x08,95,1);
+    if(state == false)   gpio_write(26,1);
+    else                 gpio_write(26,0);
 }
 void setMotor(int pos,signed char dir,unsigned char speed,bool onReg){
     if(onReg == true){
         if(dir>=0){
             switch(pos){
-                case 1: writeRegister(0x08,94,speed); break;
-                case 2: writeRegister(0x0A,89,speed); break;
-                case 3: writeRegister(0x0A,94,speed); break;
-                case 4: writeRegister(0x08,89,speed); break;
-                case 5: writeRegister(0x09,89,speed); break;
-                case 6: writeRegister(0x09,94,speed); break;
+                case 1: writeRegister(MODRYADDR,94,speed); break;
+                case 2: writeRegister(ORANZOVYADDR,89,speed); break;
+                case 3: writeRegister(ORANZOVYADDR,94,speed); break;
+                case 4: writeRegister(MODRYADDR,89,speed); break;
+                case 5: writeRegister(ZLTYADDR,89,speed); break;
+                case 6: writeRegister(ZLTYADDR,94,speed); break;
             }
         }
         else{
             switch(pos){
-                case 1: writeRegister(0x08,93,speed); break;
-                case 2: writeRegister(0x0A,88,speed); break;
-                case 3: writeRegister(0x0A,93,speed); break;
-                case 4: writeRegister(0x08,88,speed); break;
-                case 5: writeRegister(0x09,88,speed); break;
-                case 6: writeRegister(0x09,93,speed); break;
+                case 1: writeRegister(MODRYADDR,93,speed); break;
+                case 2: writeRegister(ORANZOVYADDR,88,speed); break;
+                case 3: writeRegister(ORANZOVYADDR,93,speed); break;
+                case 4: writeRegister(MODRYADDR,88,speed); break;
+                case 5: writeRegister(ZLTYADDR,88,speed); break;
+                case 6: writeRegister(ZLTYADDR,93,speed); break;
             }
         }
     }
     else{
         if(dir>0){
             switch(pos){
-                case 1: writeRegister(0x08,92,speed); break;
-                case 2: writeRegister(0x0A,87,speed); break;
-                case 3: writeRegister(0x0A,92,speed); break;
-                case 4: writeRegister(0x08,87,speed); break;
-                case 5: writeRegister(0x09,87,speed); break;
-                case 6: writeRegister(0x09,92,speed); break;
+                case 1: writeRegister(MODRYADDR,92,speed); break;
+                case 2: writeRegister(ORANZOVYADDR,87,speed); break;
+                case 3: writeRegister(ORANZOVYADDR,92,speed); break;
+                case 4: writeRegister(MODRYADDR,87,speed); break;
+                case 5: writeRegister(ZLTYADDR,87,speed); break;
+                case 6: writeRegister(ZLTYADDR,92,speed); break;
             }
         }
         else if(dir==0){
             switch(pos){
-                case 1: writeRegister(0x08,91,speed); break;
-                case 2: writeRegister(0x0A,86,speed); break;
-                case 3: writeRegister(0x0A,91,speed); break;
-                case 4: writeRegister(0x08,86,speed); break;
-                case 5: writeRegister(0x09,86,speed); break;
-                case 6: writeRegister(0x09,91,speed); break;
+                case 1: writeRegister(MODRYADDR,91,speed); break;
+                case 2: writeRegister(ORANZOVYADDR,86,speed); break;
+                case 3: writeRegister(ORANZOVYADDR,91,speed); break;
+                case 4: writeRegister(MODRYADDR,86,speed); break;
+                case 5: writeRegister(ZLTYADDR,86,speed); break;
+                case 6: writeRegister(ZLTYADDR,91,speed); break;
             }
         }
         else{
             switch(pos){
-                case 1: writeRegister(0x08,90,speed); break;
-                case 2: writeRegister(0x0A,85,speed); break;
-                case 3: writeRegister(0x0A,90,speed); break;
-                case 4: writeRegister(0x08,85,speed); break;
-                case 5: writeRegister(0x09,85,speed); break;
-                case 6: writeRegister(0x09,90,speed); break;
+                case 1: writeRegister(MODRYADDR,90,speed); break;
+                case 2: writeRegister(ORANZOVYADDR,85,speed); break;
+                case 3: writeRegister(ORANZOVYADDR,90,speed); break;
+                case 4: writeRegister(MODRYADDR,85,speed); break;
+                case 5: writeRegister(ZLTYADDR,85,speed); break;
+                case 6: writeRegister(ZLTYADDR,90,speed); break;
             }
         }
     }
@@ -762,8 +801,6 @@ void setMPU6050Sensitivity(unsigned char acc_sens,unsigned char gy_sens){
                 case 2: GyScale = 32.75;      break;          //1000 stup/s
                 case 3: GyScale = 16.375;     break;          //2000 stup/s
 	}
-	printf("Gy sens,%d\n",(gy_sens<<3)|0xE0);
-	printf("Acc sens,%d\n",(acc_sens<<3)|0xE0);	
 	writeRegister(MPU6050ADDR,0x1B,(gy_sens<<3)|0xE0);
         writeRegister(MPU6050ADDR,0x1C,(acc_sens<<3)|0xE0);
 }
@@ -825,6 +862,11 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr){
 		robotVariables.voltagePercent = getVoltagePercent();
 		robotVariables.amper = getAmp();
 		robotVariables.ultrasonic = getUltrasonic();
+		if(BatteryLed3Indicate == 1){
+			if(robotVariables.voltagePercent > 60) 		 setLed(3,'G');
+			else if(robotVariables.voltagePercent > 20) 	 setLed(3,'O');
+			else						 setLed(3,'R');
+		}
 		break;
 	}
 }

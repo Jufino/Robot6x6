@@ -38,7 +38,11 @@
     #define PORT_I2C "/dev/i2c-1"
     #define PORT_GPS "/dev/ttyAMA0"
     #define MPU6050ADDR 0x68
+    #define MODRYADDR 8
+    #define ZLTYADDR 9
+    #define ORANZOVYADDR 10
 
+    #define BatteryLed3Indicate 1
     #define Wifi_camera  0
     #define Wifi_snimace 0
     #define PORT_snimace 1213
@@ -216,6 +220,11 @@
    
     void initRobot();
     void closeRobot();
+    int testModry();
+    int testZlty();
+    int testOranzovy();
+    int test();
+
 
     void setDevice(int addr);
     void writeRegister(int addr,unsigned char reg, unsigned char value);
@@ -249,7 +258,7 @@
     int getAmpRaw();
     float getAmpVolt();
     float getAmp();
-    void setLed(int pos,char color,bool state);
+    void setLed(int pos,char color);
     void setMotorPowerSupply(bool state);
     GPS_struct getGPS();
     void syncModules(int signal , siginfo_t * siginfo, void * ptr);  

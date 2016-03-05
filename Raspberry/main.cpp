@@ -38,13 +38,8 @@ int main(void){
 	int imageChooseMainL = 0;
 
     	initRobot();
-	setMotorPowerSupply(true);
-	setMotor(1,0,255,false);
-        setMotor(2,0,255,false);
-        setMotor(3,0,255,false);
-        setMotor(4,0,255,false);
-        setMotor(5,1,255,true);
-        setMotor(6,0,255,false);	
+//	setMotorPowerSupply(true);
+		
         cameraL = cvCaptureFromCAM(0);
 
         cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_WIDTH, sirka);
@@ -76,9 +71,11 @@ int main(void){
                 printf("Yaw: %f\n",robot.MPU6050.Yaw);
 		printf("Voltage: %f\n",robot.voltage);
 		printf("Ultrasonic: %f\n\n",robot.ultrasonic);*/
-		printf("x: %f\n",robot.robotPosition.x);
-		printf("y: %f\n",robot.robotPosition.y);
-		printf("uhol: %f\n\n",robot.robotPosition.angle);
+		//printf("x: %f\n",robot.robotPosition.x);
+		//printf("y: %f\n",robot.robotPosition.y);
+		//printf("uhol: %f\n\n",robot.robotPosition.angle);
+		//printf("Voltage: %f\n",robot.voltagePercent);
+
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
 
 /*
