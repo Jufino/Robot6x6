@@ -255,6 +255,7 @@ unsigned char readRegister8(unsigned char addr, unsigned char reg);
 
 void sendMatImage(Mat img, int quality);
 void setMotor(int pos, signed char dir, unsigned char speed, bool onReg);
+void setMove(char direction,unsigned char speed,bool onReg);
 int getSpeedRaw(int pos);
 int getDistanceRaw(int pos);
 int getDeltaDistanceRaw(int pos);

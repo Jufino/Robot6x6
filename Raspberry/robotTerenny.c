@@ -213,21 +213,22 @@ unsigned char getButton(char pos) {
 RobotAcculators getRobotAcculators() {
   RobotAcculators temp;
   semWait(sem_id, 1);
-  memcpy(&robotAcculators, &temp, sizeof(robotAcculators));
+  memcpy(&temp, &robotAcculators, sizeof(RobotAcculators));
   semPost(sem_id, 1);
   return temp;
 }
 void setRobotAcculators(RobotAcculators temp) {
   semWait(sem_id, 1);
-  memcpy(&temp, &robotAcculators, sizeof(temp));
+  memcpy(&robotAcculators, &temp, sizeof(RobotAcculators));
   semPost(sem_id, 1);
 }
 RobotSensors getRobotSensors() {
   RobotSensors temp;
   semWait(sem_id, 0);
-  memcpy(&robotSensors, &temp, sizeof(robotSensors));
+  memcpy(&temp, &robotSensors, sizeof(RobotSensors));
   semPost(sem_id, 0);
   return temp;
+  //  return robotSensors;
 }
 
 int getSocketCamera() {
@@ -971,13 +972,13 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
   {
     case SIGUSR1:
-      bool refreshPositionCheck = refreshPosition / refreshModule >= pocetPosition;
-      bool refreshMotorsCheck = refreshMotors / refreshModule >= pocetMotors;
-      bool refreshBatteryCheck = refreshBattery / refreshModule >= pocetBattery;
-      bool refreshMPU6050Check = refreshMPU6050 / refreshModule >= pocetMPU6050;
-      bool refreshLedsCheck = refreshLeds / refreshModule >= pocetLeds;
-      bool refreshAmpCheck = refreshAmp / refreshModule >= pocetAmp;
-      bool refreshUltrasonicCheck = refreshUltrasonic / refreshModule >= pocetUltrasonic;
+      bool refreshPositionCheck = true;//(refreshPosition / refreshModule) >= pocetPosition;
+      bool refreshMotorsCheck = (refreshMotors / refreshModule) >= pocetMotors;
+      bool refreshBatteryCheck = (refreshBattery / refreshModule) >= pocetBattery;
+      bool refreshMPU6050Check = (refreshMPU6050 / refreshModule) >= pocetMPU6050;
+      bool refreshLedsCheck = (refreshLeds / refreshModule) >= pocetLeds;
+      bool refreshAmpCheck = (refreshAmp / refreshModule) >= pocetAmp;
+      bool refreshUltrasonicCheck = (refreshUltrasonic / refreshModule) >= pocetUltrasonic;
 
       if (refreshMPU6050Check) {
         semWait(sem_id, 0);
@@ -1047,7 +1048,8 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         semWait(sem_id, 0);
         robotSensors.motors.motor5.distance += getDeltaDistance(5);
         robotSensors.motors.motor5.speed = getSpeed(5);
-        semPost(sem_id, 0);
+        //printf("distance = %d\n",robotSensors.motors.motor5.distance);
+	semPost(sem_id, 0);
         pocetPosition = 0;
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor5, lastRobotAcculators.motors.motor5)) {
@@ -1096,7 +1098,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       semPost(sem_id, 0);
 
       semWait(sem_id, 1);
-      memcpy(&robotAcculators, &lastRobotAcculators, sizeof(robotAcculators));
+      memcpy(&lastRobotAcculators, &robotAcculators, sizeof(RobotAcculators));
       semPost(sem_id, 1);
       break;
   }
