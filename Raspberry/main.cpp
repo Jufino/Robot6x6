@@ -72,12 +72,13 @@ int main(void){
 		printf("Voltage: %f\n",robot.voltage);
 		printf("Ultrasonic: %f\n\n",robot.ultrasonic);*/
 		setMove('F',0,false);
-		RobotSensors robotSensors = getRobotSensors();
-		printf("dist5: %d\n",robotSensors.motors.motor5.distance);
+/*		RobotSensors robotSensors = getRobotSensors();
+		printf("dist R: %f\n",getDistanceR());
+		printf("dist L: %f\n",getDistanceL());
 		printf("x: %f\n",robotSensors.robotPosition.x);
 		printf("y: %f\n",robotSensors.robotPosition.y);
 		printf("uhol: %f\n\n",robotSensors.robotPosition.angle);
-		//printf("Voltage: %f\n",robot.voltagePercent);
+*/		//printf("Voltage: %f\n",robot.voltagePercent);
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
 	//	RobotAcculators robotAcculators = getRobotAcculators();

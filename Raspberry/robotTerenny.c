@@ -25,6 +25,14 @@ void initRobot() {
     semInit(sem_id, 0, 1);
     semInit(sem_id, 1, 1);
 
+    resetDistance(1);
+    resetDistance(2);
+    resetDistance(3);
+    resetDistance(4);
+    resetDistance(5);
+    resetDistance(6);
+
+
     gpio_open(26, 1);
     setMotorPowerSupply(false);//potom zmenit na true
 
@@ -294,8 +302,8 @@ int getDeltaDistanceRaw(int pos) {
     default: return 0;
   }
 }
-int getDeltaDistance(int pos) {
-  return (int)((float)getDeltaDistanceRaw(pos) * ((M_PI * OtackomerPriemer) / OtackomerConstant));
+float getDeltaDistance(int pos) {
+  return ((float)getDeltaDistanceRaw(pos) * ((M_PI * OtackomerPriemer) / OtackomerConstant));
 }
 
 void resetDistance(int pos) {
@@ -938,11 +946,33 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
   writeRegister(MPU6050ADDR, 0x1A, gy_dlpf | (3 << 3));
   writeRegister(MPU6050ADDR, 0x1A, gy_dlpf | (4 << 3));
 }
-int getDistanceL() {
-  return ((float)(robotSensors.motors.motor4.distance + robotSensors.motors.motor5.distance + robotSensors.motors.motor6.distance) / 3);
+float getDistanceL() {
+  float data[] = {robotSensors.motors.motor4.distance,robotSensors.motors.motor5.distance,robotSensors.motors.motor6.distance};
+  float buffer;
+  for(int x=0;x<3;x++){
+	for(int i=x;i<3;i++){
+	   if(data[x] > data[i]){
+	      buffer = data[i];
+	      data[i] = data[x];
+	      data[x] = buffer;
+	   }
+	}
+  }
+  return data[1];
 }
-int getDistanceR() {
-  return ((float)(robotSensors.motors.motor1.distance + robotSensors.motors.motor2.distance + robotSensors.motors.motor3.distance) / 3);
+float getDistanceR() {
+  float data[] = {robotSensors.motors.motor4.distance,robotSensors.motors.motor5.distance,robotSensors.motors.motor6.distance};
+  float buffer;
+  for(int x=0;x<3;x++){
+        for(int i=x;i<3;i++){
+           if(data[x] > data[i]){
+              buffer = data[i];
+              data[i] = data[x];
+              data[x] = buffer;
+           }
+        }
+  }
+  return data[1];
 }
 
 float getSpeedFromDistanceL(float dt) {
@@ -952,11 +982,29 @@ float getSpeedFromDistanceR(float dt) {
   return (float)getDistanceR() / dt;
 }
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
+//http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float dt) {
-  robotSensors.robotPosition.angle += (getDistanceR() - getDistanceL()) / vzdialenostKolies;
-  robotSensors.robotPosition.x =  ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * cos(robotSensors.robotPosition.angle);
-  robotSensors.robotPosition.y = ((getSpeedFromDistanceL(dt) + getSpeedFromDistanceR(dt)) / 2) * sin(robotSensors.robotPosition.angle);
-}
+  float v = (getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2;
+  robotSensors.robotPosition.angle += (getSpeedFromDistanceR(dt)-getSpeedFromDistanceL(dt)) / vzdialenostKolies;
+  robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle);
+  robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angle);
+/*
+  printf("dt:%f\n",dt);
+  printf("motor1:%f\n",robotSensors.motors.motor1.distance);
+  printf("motor2:%f\n",robotSensors.motors.motor2.distance);
+  printf("motor3:%f\n",robotSensors.motors.motor3.distance);
+  printf("motor4:%f\n",robotSensors.motors.motor4.distance);
+  printf("motor5:%f\n",robotSensors.motors.motor5.distance);
+  printf("motor6:%f\n",robotSensors.motors.motor6.distance);
+	  
+  printf("dist R:%f\n",getDistanceR());
+  printf("dist L:%f\n",getDistanceL());
+  printf("speed R:%f\n",getSpeedFromDistanceR(dt));
+  printf("speed L:%f\n",getSpeedFromDistanceL(dt));
+  printf("x:%f\n",robotSensors.robotPosition.x);
+  printf("y:%f\n",robotSensors.robotPosition.y);
+  printf("angle:%f\n\n",robotSensors.robotPosition.angle);
+*/}
 int pocetPosition = 100;
 int pocetMotors = 100;
 int pocetBattery = 100;
@@ -964,7 +1012,6 @@ int pocetMPU6050 = 100;
 int pocetLeds = 100;
 int pocetAmp = 100;
 int pocetUltrasonic = 100;
-
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
   return motor.direction != lastMotor.direction || motor.speed != lastMotor.speed || motor.onRegulator != lastMotor.onRegulator;
 }
@@ -972,13 +1019,13 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
   {
     case SIGUSR1:
-      bool refreshPositionCheck = true;//(refreshPosition / refreshModule) >= pocetPosition;
-      bool refreshMotorsCheck = (refreshMotors / refreshModule) >= pocetMotors;
-      bool refreshBatteryCheck = (refreshBattery / refreshModule) >= pocetBattery;
-      bool refreshMPU6050Check = (refreshMPU6050 / refreshModule) >= pocetMPU6050;
-      bool refreshLedsCheck = (refreshLeds / refreshModule) >= pocetLeds;
-      bool refreshAmpCheck = (refreshAmp / refreshModule) >= pocetAmp;
-      bool refreshUltrasonicCheck = (refreshUltrasonic / refreshModule) >= pocetUltrasonic;
+      bool refreshPositionCheck = (refreshPosition / refreshModule) <= pocetPosition;
+      bool refreshMotorsCheck = (refreshMotors / refreshModule) <= pocetMotors;
+      bool refreshBatteryCheck = (refreshBattery / refreshModule) <= pocetBattery;
+      bool refreshMPU6050Check = (refreshMPU6050 / refreshModule) <= pocetMPU6050;
+      bool refreshLedsCheck = (refreshLeds / refreshModule) <= pocetLeds;
+      bool refreshAmpCheck = (refreshAmp / refreshModule) <= pocetAmp;
+      bool refreshUltrasonicCheck = (refreshUltrasonic / refreshModule) <= pocetUltrasonic;
 
       if (refreshMPU6050Check) {
         semWait(sem_id, 0);
@@ -988,7 +1035,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor1.distance += getDeltaDistance(1);
+        robotSensors.motors.motor1.distance = getDeltaDistance(1);
         robotSensors.motors.motor1.speed = getSpeed(1);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1001,7 +1048,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor4.distance += getDeltaDistance(4);
+        robotSensors.motors.motor4.distance = getDeltaDistance(4);
         robotSensors.motors.motor4.speed = getSpeed(4);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1014,7 +1061,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor2.distance += getDeltaDistance(2);
+        robotSensors.motors.motor2.distance = getDeltaDistance(2);
         robotSensors.motors.motor2.speed = getSpeed(2);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1033,7 +1080,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor3.distance += getDeltaDistance(3);
+        robotSensors.motors.motor3.distance = getDeltaDistance(3);
         robotSensors.motors.motor3.speed = getSpeed(3);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1046,7 +1093,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor5.distance += getDeltaDistance(5);
+        robotSensors.motors.motor5.distance = getDeltaDistance(5);
         robotSensors.motors.motor5.speed = getSpeed(5);
         //printf("distance = %d\n",robotSensors.motors.motor5.distance);
 	semPost(sem_id, 0);
@@ -1060,7 +1107,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor6.distance += getDeltaDistance(6);
+        robotSensors.motors.motor6.distance = getDeltaDistance(6);
         robotSensors.motors.motor6.speed = getSpeed(6);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1100,6 +1147,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       semWait(sem_id, 1);
       memcpy(&lastRobotAcculators, &robotAcculators, sizeof(RobotAcculators));
       semPost(sem_id, 1);
+      
+      pocetPosition++;
+      pocetMotors++;
+      pocetBattery++;
+      pocetMPU6050++;
+      pocetLeds++;
+      pocetAmp++;
+      pocetUltrasonic++;
       break;
   }
 }
