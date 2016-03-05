@@ -27,5 +27,5 @@ libclean:
 	rm /usr/lib/lib$(TARGET).a
 	rm /usr/include/$(TARGET).h
 clean:
-	rm libsemafor.o
-	rm main
+	rm -f libsemafor.o
+	rm -f main

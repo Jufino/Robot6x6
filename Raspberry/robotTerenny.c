@@ -938,6 +938,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
+      if (refreshMotorsCheck || robotAcculators.servoAngle != lastRobotAcculators.servoAngle) {
+        semWait(sem_id, 1);
+        setServo(robotAcculators.servoAngle);
+        semPost(sem_id, 1);
+        pocetMotors = 0;
+      }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
         robotSensors.motors.motor3.distance += getDeltaDistance(3);
@@ -947,7 +953,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor3, lastRobotAcculators.motors.motor3)) {
         semWait(sem_id, 1);
-        setMotor(3, robotAcculators.motors.motor3.direction, robotAcculators.motors.motor4.speed, robotAcculators.motors.motor3.onRegulator);
+        setMotor(3, robotAcculators.motors.motor3.direction, robotAcculators.motors.motor3.speed, robotAcculators.motors.motor3.onRegulator);
         semPost(sem_id, 1);
         pocetMotors = 0;
       }
