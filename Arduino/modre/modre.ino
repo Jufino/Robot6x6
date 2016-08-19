@@ -73,6 +73,7 @@ void motor(int motor, char smer, int rychlost) {
   }
 }
 void setup() {
+  smer1=1;
   for (int pin = 4; pin <= 11; pin++) {
     pinMode(pin, OUTPUT);
   }
@@ -106,6 +107,7 @@ void otackomerMotor1() {
     pocetTikov1--;
     lastVzdialenost1--;
   }
+   delayMicroseconds(100); 
 }
 
 void otackomerMotor4() {
@@ -117,6 +119,7 @@ void otackomerMotor4() {
     pocetTikov4--;
     lastVzdialenost4--;
   }
+   delayMicroseconds(100); 
 }
 
 void loop() {
@@ -129,6 +132,7 @@ void loop() {
   lastPrud = analogRead(Prud);
   delay(100);
   if (watchdogStatus) wdt_reset();
+  if(serialPortStatus) Serial.println(lastVzdialenost1, DEC);
 }
 
 void receiveEvent(int howMany) {

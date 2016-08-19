@@ -992,13 +992,11 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
 }
 
 float getSpeedFromDistance(float distance,float dt) {
-  return (float)distance / dt;
+  return distance / dt;
 }
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
-void calcRobotPosition(float deltaDistanceL,float deltaDistanceR,float dt) {
-  float deltaSpeedL = getSpeedFromDistance(deltaDistanceL,dt);
-  float deltaSpeedR = getSpeedFromDistance(deltaDistanceR,dt);
+void calcRobotPosition(float deltaSpeedL,float deltaSpeedR) {
   float v = (deltaSpeedL+deltaSpeedR)/2;
   robotSensors.robotPosition.angle += (deltaSpeedR-deltaSpeedL) / vzdialenostKolies;
   robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle);
@@ -1044,6 +1042,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       float pomocnaZmenaOtackomera = 0;
       float deltaDistanceL;
       float deltaDistanceR;
+      float deltaDistance1;
+      float deltaDistance2;
+      float deltaDistance3;
+      float deltaDistance4;
+      float deltaDistance5;
+      float deltaDistance6;
 /*      if (refreshMPU6050Check) {
         semWait(sem_id, 0);
         robotSensors.MPU6050 = getMPU6050Full((float)refreshMPU6050 / 1000);
@@ -1052,15 +1056,16 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }*/
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(1);
+	      pomocnaZmenaOtackomera = getDeltaDistanceRaw(1);
         if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
         else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
         robotSensors.motors.motor1.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
 
-	robotSensors.motors.motor1.pocetZmienOtackomera+= robotSensors.motors.motor1.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor1.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor1.pocetDeltaZmienOtackomera);
-        robotSensors.motors.motor1.distance += robotSensors.motors.motor1.deltaDistance;
-	robotSensors.motors.motor1.speed = getSpeed(1);
+        robotSensors.motors.motor1.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance1 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor1.distance +=  deltaDistance1;
+        robotSensors.motors.motor1.speed = getSpeedFromDistance(deltaDistance1,(float)refreshPosition / 1000);
+        
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1072,14 +1077,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(4);
-	if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
-	else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
-        robotSensors.motors.motor4.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
-        robotSensors.motors.motor4.pocetZmienOtackomera+= robotSensors.motors.motor4.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor4.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor4.pocetDeltaZmienOtackomera);
- 	robotSensors.motors.motor4.distance +=  robotSensors.motors.motor4.deltaDistance;
-        robotSensors.motors.motor4.speed = getSpeed(4);
+	      pomocnaZmenaOtackomera = getDeltaDistanceRaw(4);
+	      if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+	      else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        
+        robotSensors.motors.motor4.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance4 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor4.distance +=  deltaDistance4;
+        robotSensors.motors.motor4.speed = getSpeedFromDistance(deltaDistance4,(float)refreshPosition / 1000);
+        
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1091,16 +1097,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(2);
+	      pomocnaZmenaOtackomera = getDeltaDistanceRaw(2);
         if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
         else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
-        robotSensors.motors.motor2.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
 
-	robotSensors.motors.motor2.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
-        robotSensors.motors.motor2.pocetZmienOtackomera+= robotSensors.motors.motor2.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor2.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor2.pocetDeltaZmienOtackomera);
-	robotSensors.motors.motor2.distance += robotSensors.motors.motor2.deltaDistance;
-        robotSensors.motors.motor2.speed = getSpeed(2);
+        robotSensors.motors.motor2.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance2 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor2.distance +=  deltaDistance2;
+        robotSensors.motors.motor2.speed = getSpeedFromDistance(deltaDistance2,(float)refreshPosition / 1000);
+        
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1118,16 +1123,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(3);
+	      pomocnaZmenaOtackomera = getDeltaDistanceRaw(3);
         if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
         else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
-        robotSensors.motors.motor3.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
 
-        robotSensors.motors.motor3.pocetZmienOtackomera+= robotSensors.motors.motor3.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor3.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor3.pocetDeltaZmienOtackomera);
+        robotSensors.motors.motor3.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance3 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor3.distance +=  deltaDistance3;
+        robotSensors.motors.motor3.speed = getSpeedFromDistance(deltaDistance3,(float)refreshPosition / 1000);
 
-	robotSensors.motors.motor3.distance += robotSensors.motors.motor3.deltaDistance;
-        robotSensors.motors.motor3.speed = getSpeed(3);
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1139,16 +1143,17 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(5);
+	       pomocnaZmenaOtackomera = getDeltaDistanceRaw(5);
         if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
         else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
         robotSensors.motors.motor5.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;        
 
-        robotSensors.motors.motor5.pocetZmienOtackomera+= robotSensors.motors.motor5.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor5.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor5.pocetDeltaZmienOtackomera);
-	robotSensors.motors.motor5.distance += robotSensors.motors.motor5.deltaDistance;
-        robotSensors.motors.motor5.speed = getSpeed(5);
-	semPost(sem_id, 0);
+        robotSensors.motors.motor5.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance5 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor5.distance +=  deltaDistance5;
+        robotSensors.motors.motor5.speed = getSpeedFromDistance(deltaDistance5,(float)refreshPosition / 1000);
+
+	      semPost(sem_id, 0);
         pocetPosition = 0;
       }
       if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motor5, lastRobotAcculators.motors.motor5)) {
@@ -1159,16 +1164,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-	pomocnaZmenaOtackomera = getDeltaDistanceRaw(6);
+	       pomocnaZmenaOtackomera = getDeltaDistanceRaw(6);
         if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
         else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
-        robotSensors.motors.motor6.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
 
-        robotSensors.motors.motor6.pocetZmienOtackomera+= robotSensors.motors.motor6.pocetDeltaZmienOtackomera;
-        robotSensors.motors.motor6.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor6.pocetDeltaZmienOtackomera);
+        robotSensors.motors.motor6.distanceRaw+= pomocnaZmenaOtackomera;
+        deltaDistance6 = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+ 	      robotSensors.motors.motor6.distance +=  deltaDistance6;
+        robotSensors.motors.motor6.speed = getSpeedFromDistance(deltaDistance6,(float)refreshPosition / 1000);
 
-	robotSensors.motors.motor6.distance +=robotSensors.motors.motor6.deltaDistance;
-        robotSensors.motors.motor6.speed = getSpeed(6);
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1186,29 +1190,36 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         semPost(sem_id, 1);
       }
       if(refreshPositionCheck){
-	float diff1 = abs(robotSensors.motors.motor4.deltaDistance-robotSensors.motors.motor5.deltaDistance);
-	float diff2 = abs(robotSensors.motors.motor4.deltaDistance-robotSensors.motors.motor6.deltaDistance);
-	float diff3 = abs(robotSensors.motors.motor5.deltaDistance-robotSensors.motors.motor6.deltaDistance);
-	if(diff1 < diff2 && diff1 < diff3)
-		deltaDistanceL = (robotSensors.motors.motor4.deltaDistance+robotSensors.motors.motor5.deltaDistance)/2;
-	else if(diff2 < diff1 && diff2 < diff3)
-		deltaDistanceL = (robotSensors.motors.motor4.deltaDistance+robotSensors.motors.motor6.deltaDistance)/2;
-	else
-		deltaDistanceL = (robotSensors.motors.motor5.deltaDistance+robotSensors.motors.motor6.deltaDistance)/2;
-	robotSensors.motors.distanceL+= deltaDistanceL;
-	float diff4 = abs(robotSensors.motors.motor1.deltaDistance-robotSensors.motors.motor2.deltaDistance);
-        float diff5 = abs(robotSensors.motors.motor2.deltaDistance-robotSensors.motors.motor3.deltaDistance);
-        float diff6 = abs(robotSensors.motors.motor3.deltaDistance-robotSensors.motors.motor1.deltaDistance);
+      	float diff1 = abs(deltaDistance4-deltaDistance5);
+      	float diff2 = abs(deltaDistance4-deltaDistance6);
+      	float diff3 = abs(deltaDistance5-deltaDistance6);
+      	if(diff1 < diff2 && diff1 < diff3)
+      		deltaDistanceL = (deltaDistance4-deltaDistance5)/2;
+      	else if(diff2 < diff1 && diff2 < diff3)
+      		deltaDistanceL = (deltaDistance4-deltaDistance6)/2;
+      	else
+      		deltaDistanceL = (deltaDistance5-deltaDistance6)/2;
+      	robotSensors.robotPosition.distanceL+= deltaDistanceL;
+        robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL,(float)refreshPosition / 1000);
+                                                             
+        
+      	float diff4 = abs(deltaDistance1-deltaDistance2);
+        float diff5 = abs(deltaDistance2-deltaDistance3);
+        float diff6 = abs(deltaDistance3-deltaDistance1);
         if(diff4 < diff5 && diff4 < diff6)
-                deltaDistanceR = (robotSensors.motors.motor1.deltaDistance+robotSensors.motors.motor2.deltaDistance)/2;
+          deltaDistanceR = (deltaDistance1-deltaDistance2)/2;
         else if(diff5 < diff4 && diff5 < diff6)
-                deltaDistanceR = (robotSensors.motors.motor2.deltaDistance+robotSensors.motors.motor3.deltaDistance)/2;
+          deltaDistanceR = (deltaDistance2-deltaDistance3)/2;
         else
-                deltaDistanceR = (robotSensors.motors.motor3.deltaDistance+robotSensors.motors.motor1.deltaDistance)/2;
-	robotSensors.motors.distanceR+= deltaDistanceR;      
+          deltaDistanceR = (deltaDistance3-deltaDistance1)/2;
+      	robotSensors.robotPosition.distanceR+= deltaDistanceR;      
+        robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR,(float)refreshPosition / 1000);
+        
+        calcRobotPosition(deltaDistanceL,deltaDistanceR,(float)refreshPosition / 1000);
+        
       }
       semWait(sem_id, 0);
-      if (refreshPositionCheck) calcRobotPosition(deltaDistanceL,deltaDistanceR,(float)refreshPosition / 1000);
+
       robotSensors.buttons.button1 = getButton(1);
       robotSensors.buttons.button2 = getButton(2);
       robotSensors.buttons.button3 = getButton(3);

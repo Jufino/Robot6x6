@@ -96,6 +96,7 @@ void otackomerMotor6() {
     pocetTikov6--;
     lastVzdialenost6--;
   }
+   delayMicroseconds(100); 
 }
 
 void otackomerMotor5() {
@@ -107,6 +108,7 @@ void otackomerMotor5() {
     pocetTikov5--;
     lastVzdialenost5--;
   }
+   delayMicroseconds(100); 
 }
 
 void loop() {
@@ -117,6 +119,7 @@ void loop() {
   pocetTikov6 = 0;
   delay(100);
   if (watchdogStatus) wdt_reset();
+    if(serialPortStatus) Serial.println(lastVzdialenost5, DEC);
 }
 
 void receiveEvent(int howMany) {

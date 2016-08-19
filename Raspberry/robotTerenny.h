@@ -199,17 +199,12 @@ struct MotorsAcculator_struct {
   MotorAcculator_struct motor6;
 };
 struct MotorSensor_struct {
+  int distanceRaw;
   float distance;
-  int pocetZmienOtackomera;
-  float deltaDistance;
-  int pocetDeltaZmienOtackomera;
-  int speed;
+  int speedRaw;
+  float speed;
 };
 struct MotorsSensor_struct {
-  float distanceL;
-  float distanceR;
-  float speedL;
-  float speedR;
   MotorSensor_struct motor1;
   MotorSensor_struct motor2;
   MotorSensor_struct motor3;
@@ -231,6 +226,12 @@ struct RobotPosition_struct {
   float x;
   float y;
   float angle;
+  float distanceL;
+  float distanceR;
+  float distance;
+  float speedL;
+  float speedR;
+  float speed;
 };
 struct RobotSensors {
   GPS_struct gps;

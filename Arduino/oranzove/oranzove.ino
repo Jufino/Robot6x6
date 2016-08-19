@@ -106,6 +106,7 @@ void otackomerMotor3() {
     pocetTikov3--;
     lastVzdialenost3--;
   }
+   delayMicroseconds(100); 
 }
 
 void otackomerMotor2() {
@@ -117,16 +118,17 @@ void otackomerMotor2() {
     pocetTikov2--;
     lastVzdialenost2--;
   }
+  delayMicroseconds(100); 
 }
 int v = 10;
 void loop() {
   digitalWrite(LModra, LOW);
-  digitalWrite(trigPin, LOW);  // Added this line
+/*  digitalWrite(trigPin, LOW);  // Added this line
   delayMicroseconds(2); // Added this line
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10); // Added this line
   digitalWrite(trigPin, LOW);
-  ultrasonic = pulseIn(echoPin, HIGH);
+  ultrasonic = pulseIn(echoPin, HIGH);*/
   lastRychlost2 = pocetTikov2;
   lastRychlost3 = pocetTikov3;
   pocetTikov2 = 0;
