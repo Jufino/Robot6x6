@@ -16,11 +16,13 @@ void initRobot() {
     perror("Problem s otvorenim portu.\n");
     exit(1);
   }
-  portHandle = SerialOpen(PORT_GPS, B9600);
-  gpio_open(17, 0);
-  gpio_open(27, 0);
-  gpio_open(22, 0);
   if (test() == 1) {
+    portHandle = SerialOpen(PORT_GPS, B9600);
+
+    gpio_open(17, 0);
+    gpio_open(27, 0);
+    gpio_open(22, 0);
+
     sem_id = semCreate(getpid() + 1, 2); //vytvor semafor
     semInit(sem_id, 0, 1);
     semInit(sem_id, 1, 1);
@@ -32,9 +34,8 @@ void initRobot() {
     resetDistance(5);
     resetDistance(6);
 
-
     gpio_open(26, 1);
-    setMotorPowerSupply(false);//potom zmenit na true
+    setMotorPowerSupply(true);//potom zmenit na true
 
     setLed(1, 'R');
     setLed(2, 'R');
@@ -51,25 +52,7 @@ void initRobot() {
     setLed(1, 'V');
     setLed(2, 'V');
     setLed(3, 'V');
-    struct sigevent CasovacSignalEvent;
-    CasovacSignalEvent.sigev_notify = SIGEV_SIGNAL;
-    CasovacSignalEvent.sigev_signo = SIGUSR1;
-
-    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
-    struct itimerspec cas;
-    cas.it_value.tv_sec = 0;
-    cas.it_value.tv_nsec = refreshModule * 1000 * 1000;
-    cas.it_interval.tv_sec = 0;
-    cas.it_interval.tv_nsec = refreshModule * 1000 * 1000;
-    timer_settime(casovac, CLOCK_REALTIME, &cas, NULL);
-    sigset_t signalSet;
-    struct sigaction CasovacSignalAction;
-    sigemptyset(&signalSet);
-    CasovacSignalAction.sa_sigaction = syncModules;
-    CasovacSignalAction.sa_flags = SA_SIGINFO;
-    CasovacSignalAction.sa_mask = signalSet;
-    sigaction(CasovacSignalEvent.sigev_signo, &CasovacSignalAction, NULL);
-
+    
     if (Wifi_snimace == 1) {
       struct sockaddr_in server;
       if ((serversock_snimace = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -120,8 +103,36 @@ void initRobot() {
       }
       printf("Spojenie na porte %d ok.\n", PORT_camera);
     }
+    struct sigevent CasovacSignalEvent;
+    CasovacSignalEvent.sigev_notify = SIGEV_SIGNAL;
+    CasovacSignalEvent.sigev_signo = SIGUSR1;
+
+    timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
+    struct itimerspec cas;
+    cas.it_value.tv_sec = 0;
+    cas.it_value.tv_nsec = 100 * 1000 * 1000;
+    cas.it_interval.tv_sec = 0;
+    cas.it_interval.tv_nsec = 100 * 1000 * 1000;
+    timer_settime(casovac, CLOCK_REALTIME, &cas, NULL);
+    sigset_t signalSet;
+    struct sigaction CasovacSignalAction;
+    sigemptyset(&signalSet);
+    CasovacSignalAction.sa_sigaction = syncModules;
+    CasovacSignalAction.sa_flags = SA_SIGINFO;
+    CasovacSignalAction.sa_mask = signalSet;
+    sigaction(CasovacSignalEvent.sigev_signo, &CasovacSignalAction, NULL);
   }
   else {
+    for(int i=0;i<10;i++){
+	setLed(1, 'R');
+        setLed(2, 'R');
+        setLed(3, 'R');
+        usleep(500000);
+	setLed(1, 'V');
+    	setLed(2, 'V');
+    	setLed(3, 'V');
+    	usleep(500000);
+    }
     exit(0);
   }
 }
@@ -169,32 +180,62 @@ void writeRegister(unsigned char addr, unsigned char reg, unsigned char value) {
   data[0] = reg;
   data[1] = value;
   setDevice(addr);
-  if (write(file, data, 2) != 2) printf("addr:%i, write register %i,val %i", (int)addr, (int)reg, (int)value);
+  if (write(file, data, 2) != 2)
+	printf("addr:%i, write register %i,val %i\n", (int)addr, (int)reg, (int)value);
 }
 unsigned int readRegister16(unsigned char addr, unsigned char reg) {
   char data[3];
+  char errorTimeout = 0;
   data[0] = reg;
   setDevice(addr);
-  if (write(file, data, 1) != 1)  printf("addr:%i, write register %i", (int)addr, (int)reg);
-  if (read(file, data, 2) != 2)   printf("addr:%i, read register %i", (int)addr, (int)reg);
-  return (data[0] << 8) + data[1];
+  while (write(file, data, 1) != 1){ 
+	printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg,(int)errorTimeout);
+	if(errorTimeout++ >= i2cWriteTimeout) break;
+  }
+  if(errorTimeout < i2cWriteTimeout){
+  	if (read(file, data, 2) != 2){   
+		printf("addr:%i, read register %i\n", (int)addr, (int)reg);
+  	}
+  	return (data[0] << 8) + data[1];
+  }
+  else{
+	return 0;
+  }
 }
 signed int readRegister16s(unsigned char addr, unsigned char reg) {
   char wdata[2];
+  char errorTimeout = 0;
   wdata[0] = reg;
   setDevice(addr);
-  if (write(file, wdata, 1) != 1)  printf("addr:%i, write register %i", (int)addr, (int)reg);
+  while (write(file, wdata, 1) != 1){  
+	printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg,(int)errorTimeout);
+  	if(errorTimeout++ >= i2cWriteTimeout) break;
+  }
   signed char data[3];
-  if (read(file, data, 2) != 2)   printf("addr:%i, read register %i", (int)addr, (int)reg);
-  return (data[0] << 8) + data[1];
+  if(errorTimeout < i2cWriteTimeout){
+  	if (read(file, data, 2) != 2)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
+  	return (data[0] << 8) + data[1];
+  }
+  else{
+	return 0;
+  }
 }
 unsigned char readRegister8(unsigned char addr, unsigned char reg) {
   char data[2];
+  char errorTimeout = 0;
   data[0] = reg;
   setDevice(addr);
-  if (write(file, data, 1) != 1)  printf("addr:%i, write register %i", (int)addr, (int)reg);
-  if (read(file, data, 1) != 1)   printf("addr:%i, read register %i", (int)addr, (int)reg);
-  return data[0];
+  while (write(file, data, 1) != 1){  
+	printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg,(int)errorTimeout);
+	if(errorTimeout++ >= i2cWriteTimeout) break;
+  }
+  if(errorTimeout < i2cWriteTimeout){
+  	if (read(file, data, 1) != 1)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
+  	return data[0];
+  }
+  else{
+	return 0;
+  }
 }
 
 void sendMatImage(Mat img, int quality) {
@@ -288,8 +329,11 @@ int getDistanceRaw(int pos) {
     default: return 0;
   }
 }
+float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov){
+  return ((float)pocetTikov * ((M_PI * OtackomerPriemer) / OtackomerConstant));
+}
 int getDistance(int pos) {
-  return (int)((float)getDistanceRaw(pos) * ((M_PI * OtackomerPriemer) / OtackomerConstant));
+  return (int)prepocetTikovOtackomeraDoVzdialenosti(getDistanceRaw(pos));
 }
 int getDeltaDistanceRaw(int pos) {
   switch (pos) {
@@ -303,7 +347,7 @@ int getDeltaDistanceRaw(int pos) {
   }
 }
 float getDeltaDistance(int pos) {
-  return ((float)getDeltaDistanceRaw(pos) * ((M_PI * OtackomerPriemer) / OtackomerConstant));
+  return prepocetTikovOtackomeraDoVzdialenosti(getDeltaDistanceRaw(pos));
 }
 
 void resetDistance(int pos) {
@@ -946,46 +990,17 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
   writeRegister(MPU6050ADDR, 0x1A, gy_dlpf | (3 << 3));
   writeRegister(MPU6050ADDR, 0x1A, gy_dlpf | (4 << 3));
 }
-float getDistanceL() {
-  float data[] = {robotSensors.motors.motor4.distance,robotSensors.motors.motor5.distance,robotSensors.motors.motor6.distance};
-  float buffer;
-  for(int x=0;x<3;x++){
-	for(int i=x;i<3;i++){
-	   if(data[x] > data[i]){
-	      buffer = data[i];
-	      data[i] = data[x];
-	      data[x] = buffer;
-	   }
-	}
-  }
-  return data[1];
-}
-float getDistanceR() {
-  float data[] = {robotSensors.motors.motor4.distance,robotSensors.motors.motor5.distance,robotSensors.motors.motor6.distance};
-  float buffer;
-  for(int x=0;x<3;x++){
-        for(int i=x;i<3;i++){
-           if(data[x] > data[i]){
-              buffer = data[i];
-              data[i] = data[x];
-              data[x] = buffer;
-           }
-        }
-  }
-  return data[1];
-}
 
-float getSpeedFromDistanceL(float dt) {
-  return (float)getDistanceL() / dt;
-}
-float getSpeedFromDistanceR(float dt) {
-  return (float)getDistanceR() / dt;
+float getSpeedFromDistance(float distance,float dt) {
+  return (float)distance / dt;
 }
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
-void calcRobotPosition(float dt) {
-  float v = (getSpeedFromDistanceL(dt)+getSpeedFromDistanceR(dt))/2;
-  robotSensors.robotPosition.angle += (getSpeedFromDistanceR(dt)-getSpeedFromDistanceL(dt)) / vzdialenostKolies;
+void calcRobotPosition(float deltaDistanceL,float deltaDistanceR,float dt) {
+  float deltaSpeedL = getSpeedFromDistance(deltaDistanceL,dt);
+  float deltaSpeedR = getSpeedFromDistance(deltaDistanceR,dt);
+  float v = (deltaSpeedL+deltaSpeedR)/2;
+  robotSensors.robotPosition.angle += (deltaSpeedR-deltaSpeedL) / vzdialenostKolies;
   robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle);
   robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angle);
 /*
@@ -1026,17 +1041,26 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       bool refreshLedsCheck = (refreshLeds / refreshModule) <= pocetLeds;
       bool refreshAmpCheck = (refreshAmp / refreshModule) <= pocetAmp;
       bool refreshUltrasonicCheck = (refreshUltrasonic / refreshModule) <= pocetUltrasonic;
-
-      if (refreshMPU6050Check) {
+      float pomocnaZmenaOtackomera = 0;
+      float deltaDistanceL;
+      float deltaDistanceR;
+/*      if (refreshMPU6050Check) {
         semWait(sem_id, 0);
         robotSensors.MPU6050 = getMPU6050Full((float)refreshMPU6050 / 1000);
         semPost(sem_id, 0);
         pocetMPU6050 = 0;
-      }
+      }*/
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor1.distance = getDeltaDistance(1);
-        robotSensors.motors.motor1.speed = getSpeed(1);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(1);
+        if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+        else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor1.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+
+	robotSensors.motors.motor1.pocetZmienOtackomera+= robotSensors.motors.motor1.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor1.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor1.pocetDeltaZmienOtackomera);
+        robotSensors.motors.motor1.distance += robotSensors.motors.motor1.deltaDistance;
+	robotSensors.motors.motor1.speed = getSpeed(1);
         semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1048,7 +1072,13 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor4.distance = getDeltaDistance(4);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(4);
+	if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+	else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor4.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+        robotSensors.motors.motor4.pocetZmienOtackomera+= robotSensors.motors.motor4.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor4.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor4.pocetDeltaZmienOtackomera);
+ 	robotSensors.motors.motor4.distance +=  robotSensors.motors.motor4.deltaDistance;
         robotSensors.motors.motor4.speed = getSpeed(4);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1061,7 +1091,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor2.distance = getDeltaDistance(2);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(2);
+        if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+        else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor2.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+
+	robotSensors.motors.motor2.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+        robotSensors.motors.motor2.pocetZmienOtackomera+= robotSensors.motors.motor2.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor2.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor2.pocetDeltaZmienOtackomera);
+	robotSensors.motors.motor2.distance += robotSensors.motors.motor2.deltaDistance;
         robotSensors.motors.motor2.speed = getSpeed(2);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1080,7 +1118,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor3.distance = getDeltaDistance(3);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(3);
+        if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+        else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor3.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+
+        robotSensors.motors.motor3.pocetZmienOtackomera+= robotSensors.motors.motor3.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor3.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor3.pocetDeltaZmienOtackomera);
+
+	robotSensors.motors.motor3.distance += robotSensors.motors.motor3.deltaDistance;
         robotSensors.motors.motor3.speed = getSpeed(3);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1093,9 +1139,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor5.distance = getDeltaDistance(5);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(5);
+        if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+        else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor5.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;        
+
+        robotSensors.motors.motor5.pocetZmienOtackomera+= robotSensors.motors.motor5.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor5.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor5.pocetDeltaZmienOtackomera);
+	robotSensors.motors.motor5.distance += robotSensors.motors.motor5.deltaDistance;
         robotSensors.motors.motor5.speed = getSpeed(5);
-        //printf("distance = %d\n",robotSensors.motors.motor5.distance);
 	semPost(sem_id, 0);
         pocetPosition = 0;
       }
@@ -1107,7 +1159,15 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       }
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
-        robotSensors.motors.motor6.distance = getDeltaDistance(6);
+	pomocnaZmenaOtackomera = getDeltaDistanceRaw(6);
+        if(pomocnaZmenaOtackomera > maxZmenaOtackomera) pomocnaZmenaOtackomera = maxZmenaOtackomera;
+        else if(pomocnaZmenaOtackomera < -maxZmenaOtackomera) pomocnaZmenaOtackomera = -maxZmenaOtackomera;
+        robotSensors.motors.motor6.pocetDeltaZmienOtackomera = pomocnaZmenaOtackomera;
+
+        robotSensors.motors.motor6.pocetZmienOtackomera+= robotSensors.motors.motor6.pocetDeltaZmienOtackomera;
+        robotSensors.motors.motor6.deltaDistance = prepocetTikovOtackomeraDoVzdialenosti(robotSensors.motors.motor6.pocetDeltaZmienOtackomera);
+
+	robotSensors.motors.motor6.distance +=robotSensors.motors.motor6.deltaDistance;
         robotSensors.motors.motor6.speed = getSpeed(6);
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1125,13 +1185,34 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         if (!BatteryLed3Indicate) setLed(3, robotAcculators.leds.Led3);
         semPost(sem_id, 1);
       }
-
+      if(refreshPositionCheck){
+	float diff1 = abs(robotSensors.motors.motor4.deltaDistance-robotSensors.motors.motor5.deltaDistance);
+	float diff2 = abs(robotSensors.motors.motor4.deltaDistance-robotSensors.motors.motor6.deltaDistance);
+	float diff3 = abs(robotSensors.motors.motor5.deltaDistance-robotSensors.motors.motor6.deltaDistance);
+	if(diff1 < diff2 && diff1 < diff3)
+		deltaDistanceL = (robotSensors.motors.motor4.deltaDistance+robotSensors.motors.motor5.deltaDistance)/2;
+	else if(diff2 < diff1 && diff2 < diff3)
+		deltaDistanceL = (robotSensors.motors.motor4.deltaDistance+robotSensors.motors.motor6.deltaDistance)/2;
+	else
+		deltaDistanceL = (robotSensors.motors.motor5.deltaDistance+robotSensors.motors.motor6.deltaDistance)/2;
+	robotSensors.motors.distanceL+= deltaDistanceL;
+	float diff4 = abs(robotSensors.motors.motor1.deltaDistance-robotSensors.motors.motor2.deltaDistance);
+        float diff5 = abs(robotSensors.motors.motor2.deltaDistance-robotSensors.motors.motor3.deltaDistance);
+        float diff6 = abs(robotSensors.motors.motor3.deltaDistance-robotSensors.motors.motor1.deltaDistance);
+        if(diff4 < diff5 && diff4 < diff6)
+                deltaDistanceR = (robotSensors.motors.motor1.deltaDistance+robotSensors.motors.motor2.deltaDistance)/2;
+        else if(diff5 < diff4 && diff5 < diff6)
+                deltaDistanceR = (robotSensors.motors.motor2.deltaDistance+robotSensors.motors.motor3.deltaDistance)/2;
+        else
+                deltaDistanceR = (robotSensors.motors.motor3.deltaDistance+robotSensors.motors.motor1.deltaDistance)/2;
+	robotSensors.motors.distanceR+= deltaDistanceR;      
+      }
       semWait(sem_id, 0);
-      if (refreshPositionCheck) calcRobotPosition((float)refreshPosition / 1000);
+      if (refreshPositionCheck) calcRobotPosition(deltaDistanceL,deltaDistanceR,(float)refreshPosition / 1000);
       robotSensors.buttons.button1 = getButton(1);
       robotSensors.buttons.button2 = getButton(2);
       robotSensors.buttons.button3 = getButton(3);
-      if (refreshBatteryCheck) {
+  /*    if (refreshBatteryCheck) {
         robotSensors.voltage = getVoltage();
         robotSensors.voltagePercent = getVoltagePercent();
         if (BatteryLed3Indicate == 1) {
@@ -1139,7 +1220,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
           else if (robotSensors.voltagePercent > 20)      setLed(3, 'O');
           else                                            setLed(3, 'R');
         }
-      }
+      }*/
       if (refreshAmpCheck)    robotSensors.amper = getAmp();
       if (refreshUltrasonicCheck) robotSensors.ultrasonic = getUltrasonic();
       semPost(sem_id, 0);

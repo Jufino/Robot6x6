@@ -53,11 +53,11 @@ int main(void){
 	
         pthread_t vlaknoImgL;
         pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
-	MPU6050WakeUp();
+/*	MPU6050WakeUp();
 	setMPU6050Sensitivity(1,1);
 	setMPU6050DLPF(6,6);
 	MPU6050CalibrateOffset(20);
-	while(1){
+*/	while(1){
 		//RobotAcculators robot = getRobotAcculators();
 		/*printf("AcX: %f\n",robot.MPU6050.AccX);
 		printf("AcY: %f\n",robot.MPU6050.AccY);
@@ -71,40 +71,50 @@ int main(void){
                 printf("Yaw: %f\n",robot.MPU6050.Yaw);
 		printf("Voltage: %f\n",robot.voltage);
 		printf("Ultrasonic: %f\n\n",robot.ultrasonic);*/
-		setMove('F',0,false);
-/*		RobotSensors robotSensors = getRobotSensors();
-		printf("dist R: %f\n",getDistanceR());
-		printf("dist L: %f\n",getDistanceL());
-		printf("x: %f\n",robotSensors.robotPosition.x);
-		printf("y: %f\n",robotSensors.robotPosition.y);
-		printf("uhol: %f\n\n",robotSensors.robotPosition.angle);
-*/		//printf("Voltage: %f\n",robot.voltagePercent);
+	//	setMove('F',0,false);
+		RobotSensors robotSensors = getRobotSensors();
+		printf("dist1Raw:%d -> dist1: %f,dist2Raw:%d -> dist2: %f,dist3Raw:%d -> dist3 %f => distR:%f\n",
+			robotSensors.motors.motor1.pocetZmienOtackomera,robotSensors.motors.motor1.distance,
+			robotSensors.motors.motor2.pocetZmienOtackomera,robotSensors.motors.motor2.distance,
+			robotSensors.motors.motor3.pocetZmienOtackomera,robotSensors.motors.motor3.distance,robotSensors.motors.distanceR);
+		printf("dist4Raw:%d -> dist4: %f,dist5Raw:%d -> dist5: %f,dist6Raw:%d -> dist6 %f => distL:%f\n",
+                        robotSensors.motors.motor4.pocetZmienOtackomera,robotSensors.motors.motor4.distance,
+                        robotSensors.motors.motor5.pocetZmienOtackomera,robotSensors.motors.motor5.distance,
+                        robotSensors.motors.motor6.pocetZmienOtackomera,robotSensors.motors.motor6.distance,robotSensors.motors.distanceL);
+		printf("x:%f, y:%f, angle:%f\n",
+                        robotSensors.robotPosition.x,
+			robotSensors.robotPosition.y,
+			robotSensors.robotPosition.angle);
+
+		usleep(100000);
+//		printf("x: %f\n",robotSensors.robotPosition.x);
+//		printf("y: %f\n",robotSensors.robotPosition.y);
+//		printf("uhol: %f\n\n",robotSensors.robotPosition.angle);
+		//printf("Voltage: %f\n",robot.voltagePercent);
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
-	//	RobotAcculators robotAcculators = getRobotAcculators();
-	//	robotAcculators.servoAngle = 50;
-	//	setRobotAcculators(robotAcculators);
-/*
-                semWait(sem_id,0);
+//		RobotAcculators robotAcculators = getRobotAcculators();
+//		setRobotAcculators(robotAcculators);
+		setMove('F',255,false);
+
+                semWait(sem_id1,0);
                 imageChooseMainL = imageChooseL;
-                semPost(sem_id,0);
+                semPost(sem_id1,0);
 		if(imageChooseMainL !=0){
                         if(imageChooseMainL == 1){        
-				semWait(sem_id,1);
+				semWait(sem_id1,1);
 				cvarrToMat(img1L).copyTo(imgSendL);
-				semPost(sem_id,1);
+				semPost(sem_id1,1);
 			}
                         else if(imageChooseMainL == 2){   
-				semWait(sem_id,2);
+				semWait(sem_id1,2);
 				cvarrToMat(img2L).copyTo(imgSendL);
-				semPost(sem_id,2);
+				semPost(sem_id1,2);
 			}
                         if(Wifi_camera == 1) wifiCamera();
                 }
-
-*/
 		//printf("napetie:%d,%f,%f\nprud: %d,%f,%f\n",napetieRaw(),napetieVolt,napetiePercent(),prudRaw(),prudVolt(),prudAmp());
-		usleep(10000);
+//		usleep(10000);
 	}
         closeRobot();
 	return 0;

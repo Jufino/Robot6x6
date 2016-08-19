@@ -65,9 +65,12 @@ extern "C" {
 #define minNapetie 22.8f
 #define UltrasonicConstant 58.0f
 #define rozliseniePrud 0.185f // 185mV/A
-#define OtackomerConstant 180.0f
-#define OtackomerPriemer 0.046f
+#define OtackomerConstant 200.0f
+#define OtackomerPriemer 0.085f
 #define vzdialenostKolies 0.24f //vzdialenost kolies
+#define maxZmenaOtackomera 200  //v pocte tikov za cas refreshPosition
+#define i2cWriteTimeout 10 //pocet kolkokrat ma opakovat zapis pri zlyhani
+
 struct MPU6050_struct {
   float AccX;
   float AccY;
@@ -197,9 +200,16 @@ struct MotorsAcculator_struct {
 };
 struct MotorSensor_struct {
   float distance;
+  int pocetZmienOtackomera;
+  float deltaDistance;
+  int pocetDeltaZmienOtackomera;
   int speed;
 };
 struct MotorsSensor_struct {
+  float distanceL;
+  float distanceR;
+  float speedL;
+  float speedR;
   MotorSensor_struct motor1;
   MotorSensor_struct motor2;
   MotorSensor_struct motor3;
@@ -262,8 +272,6 @@ int getDeltaDistanceRaw(int pos);
 float getSpeed(int pos);
 int getDistance(int pos);
 float getDeltaDistance(int pos);
-float getDistanceL();
-float getDistanceR();
 float getSpeedFromDistanceL(float dt);
 float getSpeedFromDistanceR(float dt);
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
