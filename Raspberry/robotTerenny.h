@@ -38,8 +38,8 @@ extern "C" {
 #define PORT_I2C "/dev/i2c-1"
 #define PORT_GPS "/dev/ttyAMA0"
 #define MPU6050ADDR 0x68
-#define HMC5883L 0x1E
-#define BMP180 0x77
+#define HMC5883LADDR 0x1E
+#define BMP180ADDR 0x77
 #define MODRYADDR 8
 #define ZLTYADDR 9
 #define ORANZOVYADDR 10
@@ -53,7 +53,9 @@ extern "C" {
 #define refreshModule 100 //v ms
 #define refreshBattery refreshModule*20
 #define refreshMotors refreshModule*10
-#define refreshMPU6050 refreshModule*1
+#define refreshHMC5883L refreshModule*1
+#define refreshBMP180 refreshModule*1
+#define refreshMPU6050 refreshModule*10
 #define refreshLeds refreshModule*1
 #define refreshPosition refreshModule*1
 #define refreshAmp refreshModule*20
@@ -66,12 +68,12 @@ extern "C" {
 #define maxNapetie 25.2f
 #define minNapetie 22.8f
 #define UltrasonicConstant 58.0f
-#define rozliseniePrud 0.185f // 185mV/A
+#define rozliseniePrud 0.185f     // 185mV/A
 #define OtackomerConstant 200.0f
 #define OtackomerPriemer 0.085f
-#define vzdialenostKolies 0.24f //vzdialenost kolies
-#define maxZmenaOtackomera 200  //v pocte tikov za cas refreshPosition
-#define i2cWriteTimeout 10 //pocet kolkokrat ma opakovat zapis pri zlyhani
+#define vzdialenostKolies 0.24f   //vzdialenost kolies
+#define maxZmenaOtackomera 200    //maximalna zmena pozicie - v pocte tikov za cas refreshPosition
+#define i2cWriteTimeout 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
 
 struct MPU6050_struct {
   float AccX;
@@ -85,6 +87,18 @@ struct MPU6050_struct {
   float Pitch;
   float Yaw;
 };
+
+struct HMC5883L_struct {
+  float X;
+  float Y;
+  float Z;
+};
+
+struct BMP180_struct {
+  float temperature;
+  float preasure;
+};
+
 struct GPGGA_struct {
   char UTCTime[9];
   float Latitude;
@@ -102,6 +116,7 @@ struct GPGGA_struct {
   int DiffRefereceCorrections;
   char Checksum[3];
 };
+
 struct GPGLL_struct {
   float Latitude;
   char NSIndicator;
@@ -112,6 +127,7 @@ struct GPGLL_struct {
   char ModeIndicator;
   char Checksum[3];
 };
+
 struct GPGSA_struct {
   char ModeChar;
   int ModeInt;
@@ -132,6 +148,7 @@ struct GPGSA_struct {
   float VDOP;
   char Checksum[3];
 };
+
 struct GPGSV_struct {
   int NumberOfMessages;
   int MessageNumber;
@@ -154,6 +171,7 @@ struct GPGSV_struct {
   int SNR4;
   char Checksum[3];
 };
+
 struct GPRMC_struct {
   char UTCTime[9];
   char Status;
@@ -167,6 +185,7 @@ struct GPRMC_struct {
   char Mode;
   char Checksum[3];
 };
+
 struct GPVTG_struct {
   float CourseTrue;
   char ReferenceTrue;
@@ -179,6 +198,7 @@ struct GPVTG_struct {
   char Mode;
   char Checksum[3];
 };
+
 struct GPS_struct {
   GPGGA_struct GPGGA;
   GPGLL_struct GPGLL;
@@ -187,11 +207,13 @@ struct GPS_struct {
   GPRMC_struct GPRMC;
   GPVTG_struct GPVTG;
 };
+
 struct MotorAcculator_struct {
   signed char direction;
   unsigned char speed;
   bool onRegulator;
 };
+
 struct MotorsAcculator_struct {
   MotorAcculator_struct motor1;
   MotorAcculator_struct motor2;
@@ -200,12 +222,14 @@ struct MotorsAcculator_struct {
   MotorAcculator_struct motor5;
   MotorAcculator_struct motor6;
 };
+
 struct MotorSensor_struct {
   int distanceRaw;
   float distance;
   int speedRaw;
   float speed;
 };
+
 struct MotorsSensor_struct {
   MotorSensor_struct motor1;
   MotorSensor_struct motor2;
@@ -214,40 +238,49 @@ struct MotorsSensor_struct {
   MotorSensor_struct motor5;
   MotorSensor_struct motor6;
 };
+
 struct Buttons_struct {
   char button1;
   char button2;
   char button3;
 };
+
 struct Leds_struct {
   char Led1;
   char Led2;
   char Led3;
 };
+
 struct RobotPosition_struct {
   float x;
   float y;
   float angleRad;
   float angleDeg;
+  
   float distanceL;
   float distanceR;
   float distance;
+  
   float speedL;
   float speedR;
   float speed;
 };
-struct RobotSensors {
-  GPS_struct gps;
-  MPU6050_struct MPU6050;
-  MotorsSensor_struct motors;
-  Buttons_struct buttons;
-  RobotPosition_struct robotPosition;
-  float ultrasonic;
-  float voltage;
-  float voltagePercent;
-  float amper;
+
+struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
+  GPS_struct gps;                     //gps
+  MPU6050_struct MPU6050;             //akcelerometer, gyroskop a teplomer
+  BMP180_struct BMP180;               //barometer, teplomer - zatial nie je implementovane
+  HMC5883L_struct HMC5883L;           //kompas
+  MotorsSensor_struct motors;         //meranie s otackomerov
+  Buttons_struct buttons;             //tlacidla
+  RobotPosition_struct robotPosition; //prepocitana pozicia
+  float ultrasonic;                   //udaje z ultrazvuku
+  float voltage;                      //napatie na bateriach
+  float voltagePercent;               //napetie na bateriach(%)
+  float amper;                        //prud odoberany z baterii
 };
-struct RobotAcculators {
+
+struct RobotAcculators {              //struktura pre riadiace veliciny s casom refresh podla jednotlivych hodnot pre riadenie
   MotorsAcculator_struct motors;
   Buttons_struct buttons;
   Leds_struct leds;
@@ -255,67 +288,20 @@ struct RobotAcculators {
 };
 
 void initRobot();
+
 void closeRobot();
-int testModry();
-int testZlty();
-int testOranzovy();
-int test();
-
-void setDevice(unsigned char addr);
-void writeRegister(unsigned char addr, unsigned char reg, unsigned char value);
-unsigned int readRegister16(unsigned char addr, unsigned char reg);
-signed int readRegister16s(unsigned char addr, unsigned char reg);
-unsigned char readRegister8(unsigned char addr, unsigned char reg);
-
-void sendMatImage(Mat img, int quality);
-void setMotor(int pos, signed char dir, unsigned char speed, bool onReg);
-void setMove(char direction,unsigned char speed,bool onReg);
-int getSpeedRaw(int pos);
-int getDistanceRaw(int pos);
-int getDeltaDistanceRaw(int pos);
-float getSpeed(int pos);
-int getDistance(int pos);
-float getDeltaDistance(int pos);
-float getSpeedFromDistanceL(float dt);
-float getSpeedFromDistanceR(float dt);
-//http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
-void calcRobotPosition(float dt);
-
-unsigned char getButton();
-void resetDistance(int poradie);
-void setServo(int uhol);
-unsigned int getUltrasonicRaw();
-float getUltrasonic();
-int getVoltageRaw();
-float getVoltage();
-float getVoltagePercent();
-int getAmpRaw();
-float getAmpVolt();
-float getAmp();
-void setLed(int pos, char color);
-void setMotorPowerSupply(bool state);
-GPS_struct getGPS();
-void syncModules(int signal , siginfo_t * siginfo, void * ptr);
-
-void MPU6050ResetPRY();
-void MPU6050ResetOffset();
-void MPU6050WakeUp();
-MPU6050_struct getMPU6050Raw();
-MPU6050_struct getMPU6050();
-void MPU6050CalibrateOffset(int pocet);
-MPU6050_struct getMPU6050Full(float dt);
-void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens);
-void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf);
 
 int getSocketCamera();
+
 int getSocketSnimace();
+
 RobotSensors getRobotSensors();
+
 void setRobotAcculators(RobotAcculators temp);
+
 RobotAcculators getRobotAcculators();
 
-
 int getKbhit(void);
-float dist(float a, float b);
-bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
+
 #endif
 

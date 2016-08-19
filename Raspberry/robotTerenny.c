@@ -144,6 +144,7 @@ void initRobot() {
     exit(0);
   }
 }
+
 void closeRobot() {
   SerialClose(portHandle);
   semRem(sem_id);
@@ -183,6 +184,7 @@ void setDevice(unsigned char addr) {
     lastAddr = addr;
   }
 }
+
 void writeRegister(unsigned char addr, unsigned char reg, unsigned char value) {
   unsigned char data[3];
   data[0] = reg;
@@ -191,6 +193,7 @@ void writeRegister(unsigned char addr, unsigned char reg, unsigned char value) {
   if (write(file, data, 2) != 2)
 	printf("addr:%i, write register %i,val %i\n", (int)addr, (int)reg, (int)value);
 }
+
 unsigned int readRegister16(unsigned char addr, unsigned char reg) {
   char data[3];
   char errorTimeout = 0;
@@ -210,6 +213,7 @@ unsigned int readRegister16(unsigned char addr, unsigned char reg) {
 	return 0;
   }
 }
+
 signed int readRegister16s(unsigned char addr, unsigned char reg) {
   char wdata[2];
   char errorTimeout = 0;
@@ -228,6 +232,7 @@ signed int readRegister16s(unsigned char addr, unsigned char reg) {
 	return 0;
   }
 }
+
 unsigned char readRegister8(unsigned char addr, unsigned char reg) {
   char data[2];
   char errorTimeout = 0;
@@ -258,6 +263,7 @@ void sendMatImage(Mat img, int quality) {
   send(clientsock_camera, &buff[0], buff.size(), 0);
   buff.clear();
 }
+
 unsigned char getButton(char pos) {
   switch (pos) {
     case 1: return !gpio_read(27); break;
@@ -274,11 +280,13 @@ RobotAcculators getRobotAcculators() {
   semPost(sem_id, 1);
   return temp;
 }
+
 void setRobotAcculators(RobotAcculators temp) {
   semWait(sem_id, 1);
   memcpy(&robotAcculators, &temp, sizeof(RobotAcculators));
   semPost(sem_id, 1);
 }
+
 RobotSensors getRobotSensors() {
   RobotSensors temp;
   semWait(sem_id, 0);
@@ -291,39 +299,29 @@ RobotSensors getRobotSensors() {
 int getSocketCamera() {
   return clientsock_camera;
 }
+
 int getSocketSnimace() {
   return clientsock_snimace;
 }
+
 int testModry() {
-  if (300 == readRegister16(MODRYADDR, 127)) return 1;
-  else           return 0;
-}
-int testZlty() {
-  if (300 == readRegister16(ZLTYADDR, 127)) return 1;
-  else          return 0;
-}
-int testOranzovy() {
-  if (300 == readRegister16(ORANZOVYADDR, 127)) return 1;
-  else              return 0;
-}
-int test() {
-  if (testZlty() && testOranzovy() && testModry()) return 1;
-  else            return 0;
+  if (300 == readRegister16(MODRYADDR, 127))  return 1;
+  else                                        return 0;
 }
 
-int getSpeedRaw(int pos) {
-  switch (pos) {
-    case 1: return readRegister16s(MODRYADDR, 1); break;
-    case 2: return readRegister16s(ORANZOVYADDR, 1); break;
-    case 3: return readRegister16s(ORANZOVYADDR, 2); break;
-    case 4: return readRegister16s(MODRYADDR, 2); break;
-    case 5: return readRegister16s(ZLTYADDR, 2); break;
-    case 6: return readRegister16s(ZLTYADDR, 1); break;
-    default: return 0;
-  }
+int testZlty() {
+  if (300 == readRegister16(ZLTYADDR, 127)) return 1;
+  else                                      return 0;
 }
-float getSpeed(int pos) {
-  return (float)getSpeedRaw(pos) * ((M_PI * OtackomerPriemer) / OtackomerConstant); //??? totoo este nie je dobre ????
+
+int testOranzovy() {
+  if (300 == readRegister16(ORANZOVYADDR, 127)) return 1;
+  else                                          return 0;
+}
+
+int test() {
+  if (testZlty() && testOranzovy() && testModry())  return 1;
+  else                                              return 0;
 }
 
 int getDistanceRaw(int pos) {
@@ -337,12 +335,15 @@ int getDistanceRaw(int pos) {
     default: return 0;
   }
 }
+
 float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov){
   return ((float)pocetTikov * ((M_PI * OtackomerPriemer) / OtackomerConstant));
 }
+
 int getDistance(int pos) {
   return (int)prepocetTikovOtackomeraDoVzdialenosti(getDistanceRaw(pos));
 }
+
 int getDeltaDistanceRaw(int pos) {
   switch (pos) {
     case 1: return readRegister16s(MODRYADDR, 7); break;
@@ -354,6 +355,7 @@ int getDeltaDistanceRaw(int pos) {
     default: return 0;
   }
 }
+
 float getDeltaDistance(int pos) {
   return prepocetTikovOtackomeraDoVzdialenosti(getDeltaDistanceRaw(pos));
 }
@@ -374,29 +376,37 @@ void setServo(int angle) {
   else if (angle + 91 > 181) writeRegister(ORANZOVYADDR, 84, 181);
   else writeRegister(0x0A, 84, angle + 91);
 }
+
 unsigned int getUltrasonicRaw() {
   return readRegister16(ORANZOVYADDR, 6);
 }
+
 float getUltrasonic() {
   return (float)readRegister16(ORANZOVYADDR, 6) / UltrasonicConstant;
 }
+
 int getVoltageRaw() {
   return readRegister16(MODRYADDR, 5);
 }
+
 float getVoltage() {
   float napHod = (float)getVoltageRaw() * (maxVoltADC / rozlisenieADC) * ((R1 + R2) / R2);
   return napHod;
 }
+
 float getVoltagePercent() {
   float napHod = (float)getVoltage() * (100 / (maxNapetie - minNapetie)) - (100 / (maxNapetie - minNapetie)) * minNapetie;
   return napHod;
 }
+
 int getAmpRaw() {
   return readRegister16(MODRYADDR, 6);
 }
+
 float getAmpVolt() {
   return (float)getAmpRaw() * (maxVoltADC / rozlisenieADC);
 }
+
 float getAmp() {
   return ((float)getAmpVolt() - maxVoltADC / 2) / rozliseniePrud;
 }
@@ -457,10 +467,12 @@ void setLed(int pos, char color) {
     }
   }
 }
+
 void setMotorPowerSupply(bool state) {
   if (state == false)   gpio_write(26, 1);
   else                 gpio_write(26, 0);
 }
+
 void setMotor(int pos, signed char dir, unsigned char speed, bool onReg) {
   if (onReg == true) {
     if (dir >= 0) {
@@ -517,6 +529,7 @@ void setMotor(int pos, signed char dir, unsigned char speed, bool onReg) {
     }
   }
 }
+
 void setMove(char direction,unsigned char speed,bool onReg){
   semWait(sem_id, 1);
   if(direction == 'F'){
@@ -601,6 +614,7 @@ void setMove(char direction,unsigned char speed,bool onReg){
   }
   semPost(sem_id, 1);
 }
+
 int getKbhit(void) {
   struct termios oldt, newt;
   int ch;
@@ -621,6 +635,7 @@ int getKbhit(void) {
   }
   return 0;
 }
+
 GPS_struct getGPS() {
   GPS_struct GPS;
   while (strcmp(SerialRead(portHandle, 1), "$") != 0);
@@ -867,7 +882,13 @@ void HMC5883LSetting(){
 	writeRegister(HMC5883L,0x02,0x00);
 }
 
-
+HMC5883L_struct getHMC5883L() {
+  HMC5883L_struct HMC5883L;
+  HMC5883L.X = (float)readRegister16s(refreshHMC5883L, 0x03);
+  HMC5883L.Y = (float)readRegister16s(refreshHMC5883L, 0x07);
+  HMC5883L.Z = (float)readRegister16s(refreshHMC5883L, 0x05);
+  return HMC5883L;
+}
 
 float AccX_offset = 0;
 float AccY_offset = 0;
@@ -886,6 +907,7 @@ void MPU6050ResetPRY() {
   Roll = 0;
   Yaw = 0;
 }
+
 void MPU6050ResetOffset() {
   AccX_offset = 0;
   AccY_offset = 0;
@@ -894,9 +916,11 @@ void MPU6050ResetOffset() {
   GyY_offset = 0;
   GyZ_offset = 0;
 }
+
 void MPU6050WakeUp() {
   writeRegister(MPU6050ADDR, 0x6B, 0);
 }
+
 MPU6050_struct getMPU6050Raw() {
   MPU6050_struct MPU6050;
   MPU6050.AccX = (float)readRegister16s(MPU6050ADDR, 0x3B);
@@ -908,6 +932,7 @@ MPU6050_struct getMPU6050Raw() {
   MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR, 0x47);
   return MPU6050;
 }
+
 MPU6050_struct getMPU6050() {
   MPU6050_struct MPU6050;
   MPU6050.AccX = (float)readRegister16s(MPU6050ADDR, 0x3B) / AccScale - AccX_offset;
@@ -917,14 +942,8 @@ MPU6050_struct getMPU6050() {
   MPU6050.GyX  = (float)readRegister16s(MPU6050ADDR, 0x43) / GyScale - GyX_offset;
   MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR, 0x45) / GyScale - GyY_offset;
   MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR, 0x47) / GyScale - GyZ_offset;
-  /*  if(MPU6050.AccX <0.01 && MPU6050.AccX > -0.01) MPU6050.AccX = 0;
-    if(MPU6050.AccY <0.01 && MPU6050.AccY > -0.01) MPU6050.AccY = 0;
-    if(MPU6050.AccZ <0.01 && MPU6050.AccZ > -0.01) MPU6050.AccZ = 0;
-    if(MPU6050.GyX <0.1 && MPU6050.GyX > -0.1) MPU6050.GyX = 0;
-    if(MPU6050.GyY <0.1 && MPU6050.GyY > -0.1) MPU6050.GyY = 0;
-    if(MPU6050.GyZ <0.1 && MPU6050.GyZ > -0.1) MPU6050.GyZ = 0;
-  */  return MPU6050;
-}
+  return MPU6050;
+}  F
 
 void MPU6050CalibrateOffset(int pocet) {
   float acc_x = 0, acc_y = 0, acc_z = 0;
@@ -947,37 +966,9 @@ void MPU6050CalibrateOffset(int pocet) {
   GyY_offset = gy_y / pocet;
   GyZ_offset = gy_z / pocet;
 }
+
 float dist(float a, float b) {
   return sqrt(a * a + b * b);
-}
-//komplementarny filter - http://www.pieter-jan.com/node/11
-//https://b94be14129454da9cf7f056f5f8b89a9b17da0be.googledrive.com/host/0B0ZbiLZrqVa6Y2d3UjFVWDhNZms/filter.pdf
-//http://husstechlabs.com/projects/atb1/using-the-accelerometer/
-MPU6050_struct getMPU6050Full(float dt) {
-  float pitchAcc;
-  float rollAcc;
-  float yawAcc;
-  MPU6050_struct MPU6050 = getMPU6050();
-  MPU6050.Pitch += MPU6050.GyX * dt + Pitch;
-  MPU6050.Roll  -= MPU6050.GyY * dt + Roll;
-  MPU6050.Yaw += MPU6050.GyZ * dt + Yaw;
-  int forceMagnitudeApprox = abs(MPU6050.AccX) + abs(MPU6050.AccY) + abs(MPU6050.AccZ);
-  if (forceMagnitudeApprox > AccScale && forceMagnitudeApprox < 32768) {
-    //pitchAcc = atan2f(MPU6050.AccY, dist(MPU6050.AccZ,MPU6050.AccX)) * 180 / M_PI;
-    pitchAcc = atan2f(MPU6050.AccY, MPU6050.AccX * MPU6050.AccX + MPU6050.AccZ * MPU6050.AccZ) * 180 / M_PI;
-    MPU6050.Pitch = MPU6050.Pitch * 0.98 + pitchAcc * 0.02;
-    Pitch = MPU6050.Pitch;
-
-    //rollAcc = atan2f(MPU6050.AccX, dist(MPU6050.AccZ,MPU6050.AccY)) * 180 / M_PI;
-    rollAcc = atan2f(MPU6050.AccX, MPU6050.AccY * MPU6050.AccY + MPU6050.AccZ * MPU6050.AccZ) * 180 / M_PI;
-    MPU6050.Roll = MPU6050.Roll * 0.98 + rollAcc * 0.02;
-    Roll = MPU6050.Roll;
-
-    yawAcc = atan2f(dist(MPU6050.AccX, MPU6050.AccY), MPU6050.AccZ) * 180 / M_PI;
-    MPU6050.Yaw = MPU6050.Yaw * 0.98 + yawAcc * 0.02;
-    Yaw = MPU6050.Yaw;
-  }
-  return MPU6050;
 }
 
 void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens) {
@@ -997,6 +988,7 @@ void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens) {
   writeRegister(MPU6050ADDR, 0x1B, (gy_sens << 3) | 0xE0);
   writeRegister(MPU6050ADDR, 0x1C, (acc_sens << 3) | 0xE0);
 }
+
 void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
   writeRegister(MPU6050ADDR, 0x1A, acc_dlpf | (5 << 3));
   writeRegister(MPU6050ADDR, 0x1A, acc_dlpf | (6 << 3));
@@ -1009,6 +1001,7 @@ void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
 float getSpeedFromDistance(float distance,float dt) {
   return distance / dt;
 }
+
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
@@ -1017,44 +1010,37 @@ void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
   robotSensors.robotPosition.angleDeg = robotSensors.robotPosition.angleRad*(360/(2*M_PI));
   robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angleRad)*dt;
   robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angleRad)*dt;
-/*
-  printf("dt:%f\n",dt);
-  printf("motor1:%f\n",robotSensors.motors.motor1.distance);
-  printf("motor2:%f\n",robotSensors.motors.motor2.distance);
-  printf("motor3:%f\n",robotSensors.motors.motor3.distance);
-  printf("motor4:%f\n",robotSensors.motors.motor4.distance);
-  printf("motor5:%f\n",robotSensors.motors.motor5.distance);
-  printf("motor6:%f\n",robotSensors.motors.motor6.distance);
-	  
-  printf("dist R:%f\n",getDistanceR());
-  printf("dist L:%f\n",getDistanceL());
-  printf("speed R:%f\n",getSpeedFromDistanceR(dt));
-  printf("speed L:%f\n",getSpeedFromDistanceL(dt));
-  printf("x:%f\n",robotSensors.robotPosition.x);
-  printf("y:%f\n",robotSensors.robotPosition.y);
-  printf("angle:%f\n\n",robotSensors.robotPosition.angle);
-*/}
+}
+
+bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
+  return motor.direction != lastMotor.direction || motor.speed != lastMotor.speed || motor.onRegulator != lastMotor.onRegulator;
+}
+
 int pocetPosition = 100;
 int pocetMotors = 100;
 int pocetBattery = 100;
 int pocetMPU6050 = 100;
+int pocetBMP180 = 100;
+int pocetHMC5883L = 100;
 int pocetLeds = 100;
 int pocetAmp = 100;
 int pocetUltrasonic = 100;
-bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
-  return motor.direction != lastMotor.direction || motor.speed != lastMotor.speed || motor.onRegulator != lastMotor.onRegulator;
-}
+
 void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
   {
     case SIGUSR1:
+    
       bool refreshPositionCheck = (refreshPosition / refreshModule) <= pocetPosition;
       bool refreshMotorsCheck = (refreshMotors / refreshModule) <= pocetMotors;
       bool refreshBatteryCheck = (refreshBattery / refreshModule) <= pocetBattery;
       bool refreshMPU6050Check = (refreshMPU6050 / refreshModule) <= pocetMPU6050;
+      bool refreshBMP180Check = (refreshBMP180 / refreshModule) <= pocetBMP180;
+      bool refreshHMC5883LCheck = (refreshHMC5883L / refreshModule) <= pocetHMC5883L;
       bool refreshLedsCheck = (refreshLeds / refreshModule) <= pocetLeds;
       bool refreshAmpCheck = (refreshAmp / refreshModule) <= pocetAmp;
       bool refreshUltrasonicCheck = (refreshUltrasonic / refreshModule) <= pocetUltrasonic;
+      
       float pomocnaZmenaOtackomera = 0;
       float deltaDistanceL;
       float deltaDistanceR;
@@ -1064,12 +1050,21 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       float deltaDistance4;
       float deltaDistance5;
       float deltaDistance6;
-/*      if (refreshMPU6050Check) {
+      
+      if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
-        robotSensors.MPU6050 = getMPU6050Full((float)refreshMPU6050 / 1000);
+        robotSensors.HMC5883L = getHMC5883L();
+        semPost(sem_id, 0);
+        pocetHMC5883L = 0;
+      }
+      
+      if (refreshMPU6050Check) {
+        semWait(sem_id, 0);
+        robotSensors.MPU6050 = getMPU6050();
         semPost(sem_id, 0);
         pocetMPU6050 = 0;
-      }*/
+      }
+
       if (refreshPositionCheck) {
         semWait(sem_id, 0);
 	      pomocnaZmenaOtackomera = getDeltaDistanceRaw(1);
@@ -1216,7 +1211,6 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       	robotSensors.robotPosition.distanceL+= deltaDistanceL;
         robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL,(float)refreshPosition / 1000);
                                                              
-        
       	float diff4 = abs(deltaDistance1-deltaDistance2);
         float diff5 = abs(deltaDistance2-deltaDistance3);
         float diff6 = abs(deltaDistance3-deltaDistance1);
@@ -1237,7 +1231,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.buttons.button1 = getButton(1);
       robotSensors.buttons.button2 = getButton(2);
       robotSensors.buttons.button3 = getButton(3);
-  /*    if (refreshBatteryCheck) {
+      if (refreshBatteryCheck) {
         robotSensors.voltage = getVoltage();
         robotSensors.voltagePercent = getVoltagePercent();
         if (BatteryLed3Indicate == 1) {
@@ -1245,7 +1239,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
           else if (robotSensors.voltagePercent > 20)      setLed(3, 'O');
           else                                            setLed(3, 'R');
         }
-      }*/
+      }
       if (refreshAmpCheck)    robotSensors.amper = getAmp();
       if (refreshUltrasonicCheck) robotSensors.ultrasonic = getUltrasonic();
       semPost(sem_id, 0);
