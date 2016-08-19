@@ -38,6 +38,8 @@ extern "C" {
 #define PORT_I2C "/dev/i2c-1"
 #define PORT_GPS "/dev/ttyAMA0"
 #define MPU6050ADDR 0x68
+#define HMC5883L 0x1E
+#define BMP180 0x77
 #define MODRYADDR 8
 #define ZLTYADDR 9
 #define ORANZOVYADDR 10
@@ -225,7 +227,8 @@ struct Leds_struct {
 struct RobotPosition_struct {
   float x;
   float y;
-  float angle;
+  float angleRad;
+  float angleDeg;
   float distanceL;
   float distanceR;
   float distance;

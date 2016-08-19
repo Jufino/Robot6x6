@@ -74,28 +74,25 @@ int main(void){
 	//	setMove('F',0,false);
 		RobotSensors robotSensors = getRobotSensors();
 		printf("dist1Raw:%d -> dist1: %f,dist2Raw:%d -> dist2: %f,dist3Raw:%d -> dist3 %f => distR:%f\n",
-			robotSensors.motors.motor1.pocetZmienOtackomera,robotSensors.motors.motor1.distance,
-			robotSensors.motors.motor2.pocetZmienOtackomera,robotSensors.motors.motor2.distance,
-			robotSensors.motors.motor3.pocetZmienOtackomera,robotSensors.motors.motor3.distance,robotSensors.motors.distanceR);
+			robotSensors.motors.motor1.distanceRaw,robotSensors.motors.motor1.distance,
+			robotSensors.motors.motor2.distanceRaw,robotSensors.motors.motor2.distance,
+			robotSensors.motors.motor3.distanceRaw,robotSensors.motors.motor3.distance,robotSensors.robotPosition.distanceR);
 		printf("dist4Raw:%d -> dist4: %f,dist5Raw:%d -> dist5: %f,dist6Raw:%d -> dist6 %f => distL:%f\n",
-                        robotSensors.motors.motor4.pocetZmienOtackomera,robotSensors.motors.motor4.distance,
-                        robotSensors.motors.motor5.pocetZmienOtackomera,robotSensors.motors.motor5.distance,
-                        robotSensors.motors.motor6.pocetZmienOtackomera,robotSensors.motors.motor6.distance,robotSensors.motors.distanceL);
+                        robotSensors.motors.motor4.distanceRaw,robotSensors.motors.motor4.distance,
+                        robotSensors.motors.motor5.distanceRaw,robotSensors.motors.motor5.distance,
+                        robotSensors.motors.motor6.distanceRaw,robotSensors.motors.motor6.distance,robotSensors.robotPosition.distanceL);
 		printf("x:%f, y:%f, angle:%f\n",
                         robotSensors.robotPosition.x,
 			robotSensors.robotPosition.y,
-			robotSensors.robotPosition.angle);
+			robotSensors.robotPosition.angleDeg);
 
 		usleep(100000);
-//		printf("x: %f\n",robotSensors.robotPosition.x);
-//		printf("y: %f\n",robotSensors.robotPosition.y);
-//		printf("uhol: %f\n\n",robotSensors.robotPosition.angle);
 		//printf("Voltage: %f\n",robot.voltagePercent);
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);
 //		RobotAcculators robotAcculators = getRobotAcculators();
 //		setRobotAcculators(robotAcculators);
-		setMove('F',255,false);
+//		setMove('F',255,false);
 
                 semWait(sem_id1,0);
                 imageChooseMainL = imageChooseL;
