@@ -50,16 +50,16 @@ extern "C" {
 #define PORT_snimace 1213
 #define PORT_camera  1212
 
-#define refreshModule 100 //v ms
-#define refreshBattery refreshModule*20
-#define refreshMotors refreshModule*10
-#define refreshHMC5883L refreshModule*1
-#define refreshBMP180 refreshModule*1
-#define refreshMPU6050 refreshModule*10
-#define refreshLeds refreshModule*1
-#define refreshPosition refreshModule*1
-#define refreshAmp refreshModule*20
-#define refreshUltrasonic refreshModule*1
+#define refreshModule 10 //v ms
+#define refreshBattery refreshModule*200
+#define refreshMotors refreshModule*100
+#define refreshHMC5883L refreshModule*33
+#define refreshBMP180 refreshModule*10
+#define refreshMPU6050 refreshModule*100
+#define refreshLeds refreshModule*10
+#define refreshPosition refreshModule*10
+#define refreshAmp refreshModule*200
+#define refreshUltrasonic refreshModule*10    
 
 #define R2 5.3f
 #define R1 31.4f
@@ -74,6 +74,7 @@ extern "C" {
 #define vzdialenostKolies 0.24f   //vzdialenost kolies
 #define maxZmenaOtackomera 200    //maximalna zmena pozicie - v pocte tikov za cas refreshPosition
 #define i2cWriteTimeout 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
+//---------------------
 
 struct MPU6050_struct {
   float AccX;
@@ -87,11 +88,13 @@ struct MPU6050_struct {
   float Pitch;
   float Yaw;
 };
-
+//https://github.com/jarzebski/Arduino-HMC5883L/blob/master/HMC5883L_compass_MPU6050/HMC5883L_compass_MPU6050.ino
 struct HMC5883L_struct {
   float X;
   float Y;
   float Z;
+  float angleRad;
+  float angleDeg;
 };
 
 struct BMP180_struct {

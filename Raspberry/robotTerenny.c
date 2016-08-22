@@ -128,7 +128,9 @@ void initRobot() {
     setMPU6050DLPF(6,6);
     MPU6050CalibrateOffset(20);
 
-    HMC5883LSetting();
+    HMC5883LSampleAndModeSetting(0,5);
+    HMC5883LGainSetting(2);
+    HMC5883LReadModeSetting(0);
   }
   else {
     for(int i=0;i<10;i++){
@@ -878,15 +880,91 @@ GPS_struct getGPS() {
   return GPS;
 }
 
-void HMC5883LSetting(){
-	writeRegister(HMC5883L,0x02,0x00);
+void HMC5883LSampleAndModeSetting(int mode,int sample){
+  swich(mode){
+    case 1: mode = 0; break;   // normal measurement configuration(Default)
+    case 2: mode = 1; break;   // positive bias configuration (more resistive)
+    case 3: mode = 2; break;   // negative bias configuration (more resistive)
+    default:mode = 0; break;   // normal measurement configuration(Default)
+  }
+  switch(sample){
+    case 1: sample = 0;  break; //0.75 Hz
+    case 2: sample = 1;  break; //1.5 Hz
+    case 3: sample = 2;  break; //3 Hz
+    case 4: sample = 3;  break; //7.5 Hz
+    case 5: sample = 4;  break; //15 Hz (default)
+    case 6: sample = 5;  break; //30 Hz
+    case 7: sample = 6;  break; //75 Hz
+    default: sample = 4; break; //15 Hz
+  }
+	writeRegister(HMC5883LADDR,0x00,((sample<<2)||mode));
+}
+float mgPerDigit = 0.92;
+void HMC5883LGainSetting(int gain){
+  swich(gain){
+    case 1: gain = 0; 
+            mgPerDigit = 0.73;
+            break; // 0.73
+    case 2: gain = 1; 
+            mgPerDigit = 0.92;
+            break; // 0.92(default)
+    case 3: gain = 2; 
+            mgPerDigit = 1.22;
+            break; // 1.22
+    case 3: gain = 3; 
+            mgPerDigit = 1.52;
+            break; // 1.52
+    case 3: gain = 4; 
+            mgPerDigit = 2.27;
+            break; // 2.27
+    case 3: gain = 5; 
+            mgPerDigit = 2.56;
+            break; // 2.56
+    case 3: gain = 6; 
+            mgPerDigit = 3.03;
+            break; // 3.03
+    case 3: gain = 7; 
+            mgPerDigit = 4.35;
+            break; // 4.35
+    default:gain = 1; 
+            mgPerDigit = 0.92;
+            break; // 0.92(default)
+  }
+	writeRegister(HMC5883LADDR,0x01,gain<<5);
+}
+
+void HMC5883LReadModeSetting(int highI2cSpeed,int mode){
+  swich(mode){
+    case 1: mode = 0; break;   // continous-measurement mode
+    case 2: mode = 1; break;   // single measurement mode
+    case 3: mode = 2; break;   // idle mode
+    default:mode = 0; break;   // continous-measurement mode
+  }
+	writeRegister(HMC5883LADDR,0x02,((highI2cSpeed<<7)||mode));
+}
+
+HMC5883L_struct getHMC5883LRaw() {
+  HMC5883L_struct HMC5883L;
+  HMC5883L.X = (float)readRegister16s(HMC5883LADDR, 0x03);
+  HMC5883L.Y = (float)readRegister16s(HMC5883LADDR, 0x07);
+  HMC5883L.Z = (float)readRegister16s(HMC5883LADDR, 0x05);
+  return HMC5883L;
 }
 
 HMC5883L_struct getHMC5883L() {
   HMC5883L_struct HMC5883L;
-  HMC5883L.X = (float)readRegister16s(refreshHMC5883L, 0x03);
-  HMC5883L.Y = (float)readRegister16s(refreshHMC5883L, 0x07);
-  HMC5883L.Z = (float)readRegister16s(refreshHMC5883L, 0x05);
+  HMC5883L.X = (float)readRegister16s(HMC5883LADDR, 0x03)*mgPerDigit;
+  HMC5883L.Y = (float)readRegister16s(HMC5883LADDR, 0x07)*mgPerDigit;
+  HMC5883L.Z = (float)readRegister16s(HMC5883LADDR, 0x05)*mgPerDigit;
+  float declinationAngle = (4.0 + (30.0 / 60.0)) / (180 / M_PI);   //posun podla zemepisnej sirky a dlzky
+  HMC5883L.angleRad = atan2(HMC5883L.X,HMC5883L.Y) + declinationAngle; 
+  if(HMC5883L.angleRad < 0){
+    HMC5883L.angleRad+= 2*M_PI;
+  }
+  else if(HMC5883L.angleRad > 2*M_PI){
+    HMC5883L.angleRad-=2*M_PI;
+  }
+  HMC5883L.angleDeg = HMC5883L.angleRad*(180/M_PI);
   return HMC5883L;
 }
 
@@ -943,7 +1021,7 @@ MPU6050_struct getMPU6050() {
   MPU6050.GyY  = (float)readRegister16s(MPU6050ADDR, 0x45) / GyScale - GyY_offset;
   MPU6050.GyZ  = (float)readRegister16s(MPU6050ADDR, 0x47) / GyScale - GyZ_offset;
   return MPU6050;
-}  F
+}
 
 void MPU6050CalibrateOffset(int pocet) {
   float acc_x = 0, acc_y = 0, acc_z = 0;
