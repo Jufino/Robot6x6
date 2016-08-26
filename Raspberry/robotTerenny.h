@@ -52,10 +52,10 @@ extern "C" {
 
 #define refreshModule 10 //v ms
 #define refreshBattery refreshModule*200
-#define refreshMotors refreshModule*100
-#define refreshHMC5883L refreshModule*33
+#define refreshMotors refreshModule*10
+#define refreshHMC5883L refreshModule*3
 #define refreshBMP180 refreshModule*10
-#define refreshMPU6050 refreshModule*100
+#define refreshMPU6050 refreshModule*10
 #define refreshLeds refreshModule*10
 #define refreshPosition refreshModule*10
 #define refreshAmp refreshModule*200
@@ -74,6 +74,15 @@ extern "C" {
 #define vzdialenostKolies 0.24f   //vzdialenost kolies
 #define maxZmenaOtackomera 200    //maximalna zmena pozicie - v pocte tikov za cas refreshPosition
 #define i2cWriteTimeout 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
+
+#define defaultMinXHMC5883L -892.0f
+#define defaultMinYHMC5883L -781.0f
+
+#define defaultMaxXHMC5883L 363.3f
+#define defaultMaxYHMC5883L 88.9f
+
+#define degHMC5883L 4.0f
+#define minHMC5883L 30.0f
 //---------------------
 
 struct MPU6050_struct {
@@ -291,20 +300,69 @@ struct RobotAcculators {              //struktura pre riadiace veliciny s casom 
 };
 
 void initRobot();
-
 void closeRobot();
 
-int getSocketCamera();
+void setDevice(unsigned char addr);
+void writeRegister(unsigned char addr, unsigned char reg, unsigned char value);
+unsigned int readRegister16(unsigned char addr, unsigned char reg);
+signed int readRegister16s(unsigned char addr, unsigned char reg);
+unsigned char readRegister8(unsigned char addr, unsigned char reg);
 
-int getSocketSnimace();
-
-RobotSensors getRobotSensors();
-
-void setRobotAcculators(RobotAcculators temp);
+void sendMatImage(Mat img, int quality);
+unsigned char getButton(char pos);
 
 RobotAcculators getRobotAcculators();
+void setRobotAcculators(RobotAcculators temp);
+RobotSensors getRobotSensors();
+int getSocketCamera();
+int getSocketSnimace();
 
+
+int testModry();
+int testZlty();
+int testOranzovy();
+int test();
+
+int getDistanceRaw(int pos);
+float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov);
+int getDistance(int pos);
+int getDeltaDistanceRaw(int pos);
+float getDeltaDistance(int pos);
+void resetDistance(int pos);
+void setServo(int angle);
+unsigned int getUltrasonicRaw();
+float getUltrasonic();
+int getVoltageRaw();
+float getVoltage();
+float getVoltagePercent();
+int getAmpRaw();
+float getAmpVolt();
+float getAmp();
+void setLed(int pos, char color);
+void setMotorPowerSupply(bool state);
+void setMotor(int pos, signed char dir, unsigned char speed, bool onReg);
+void setMove(char direction,unsigned char speed,bool onReg);
 int getKbhit(void);
-
+GPS_struct getGPS();
+void calibrateHMC5883L();
+void HMC5883LSampleRateAndModeSetting(int sample,int datarate,int mode);
+void HMC5883LGainSetting(int gain);
+void HMC5883LReadModeSetting(int highI2cSpeed,int mode);
+HMC5883L_struct getHMC5883LRaw();
+HMC5883L_struct getHMC5883L();
+void MPU6050ResetPRY();
+void MPU6050ResetOffset();
+void MPU6050WakeUp();
+MPU6050_struct getMPU6050Raw() ;
+MPU6050_struct getMPU6050();
+void MPU6050CalibrateOffset(int pocet);
+float dist(float a, float b);
+void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens);
+void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf);
+float getSpeedFromDistance(float distance,float dt);
+void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);
+bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
+void syncModules(int signal , siginfo_t * siginfo, void * ptr);
+void MPU6050DisableAsMaster();
 #endif
 

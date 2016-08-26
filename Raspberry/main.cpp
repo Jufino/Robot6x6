@@ -72,7 +72,8 @@ int main(void){
 		printf("Voltage: %f\n",robot.voltage);
 		printf("Ultrasonic: %f\n\n",robot.ultrasonic);*/
 	//	setMove('F',0,false);
-		RobotSensors robotSensors = getRobotSensors();
+
+/*	 	RobotSensors robotSensors = getRobotSensors();
 		printf("dist1Raw:%d -> dist1: %f,dist2Raw:%d -> dist2: %f,dist3Raw:%d -> dist3 %f => distR:%f\n",
 			robotSensors.motors.motor1.distanceRaw,robotSensors.motors.motor1.distance,
 			robotSensors.motors.motor2.distanceRaw,robotSensors.motors.motor2.distance,
@@ -85,8 +86,9 @@ int main(void){
                         robotSensors.robotPosition.x,
 			robotSensors.robotPosition.y,
 			robotSensors.robotPosition.angleDeg);
+		printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f\n",robotSensors.HMC5883L.X,robotSensors.HMC5883L.Y,robotSensors.HMC5883L.Z,robotSensors.HMC5883L.angleRad,robotSensors.HMC5883L.angleDeg);
+*/		usleep(100000);
 
-		usleep(100000);
 		//printf("Voltage: %f\n",robot.voltagePercent);
 
 		//printf("dist5: %d\n",robot.motors.motor5.distance);

@@ -122,15 +122,15 @@ void initRobot() {
     CasovacSignalAction.sa_mask = signalSet;
     sigaction(CasovacSignalEvent.sigev_signo, &CasovacSignalAction, NULL);
 
-
     MPU6050WakeUp();
     setMPU6050Sensitivity(1,1);
     setMPU6050DLPF(6,6);
     MPU6050CalibrateOffset(20);
-
-    HMC5883LSampleAndModeSetting(0,5);
-    HMC5883LGainSetting(2);
-    HMC5883LReadModeSetting(0);
+    MPU6050DisableAsMaster();
+    MPU6050WakeUp();
+    HMC5883LSampleRateAndModeSetting(4,5,3);
+    HMC5883LGainSetting(1);
+    HMC5883LReadModeSetting(0,0);
   }
   else {
     for(int i=0;i<10;i++){
@@ -186,6 +186,7 @@ void setDevice(unsigned char addr) {
     lastAddr = addr;
   }
 }
+
 
 void writeRegister(unsigned char addr, unsigned char reg, unsigned char value) {
   unsigned char data[3];
@@ -392,13 +393,11 @@ int getVoltageRaw() {
 }
 
 float getVoltage() {
-  float napHod = (float)getVoltageRaw() * (maxVoltADC / rozlisenieADC) * ((R1 + R2) / R2);
-  return napHod;
+  return (float)getVoltageRaw() * (maxVoltADC / rozlisenieADC) * ((R1 + R2) / R2);
 }
 
 float getVoltagePercent() {
-  float napHod = (float)getVoltage() * (100 / (maxNapetie - minNapetie)) - (100 / (maxNapetie - minNapetie)) * minNapetie;
-  return napHod;
+  return (float)getVoltage() * (100 / (maxNapetie - minNapetie)) - (100 / (maxNapetie - minNapetie)) * minNapetie;
 }
 
 int getAmpRaw() {
@@ -880,90 +879,118 @@ GPS_struct getGPS() {
   return GPS;
 }
 
-void HMC5883LSampleAndModeSetting(int mode,int sample){
-  swich(mode){
-    case 1: mode = 0; break;   // normal measurement configuration(Default)
-    case 2: mode = 1; break;   // positive bias configuration (more resistive)
-    case 3: mode = 2; break;   // negative bias configuration (more resistive)
+void HMC5883LSampleRateAndModeSetting(int sample, int datarate,int mode){
+  switch(mode){
+    case 0: mode = 0; break;   // normal measurement configuration(Default)
+    case 1: mode = 1; break;   // positive bias configuration (more resistive)
+    case 2: mode = 2; break;   // negative bias configuration (more resistive)
     default:mode = 0; break;   // normal measurement configuration(Default)
   }
-  switch(sample){
-    case 1: sample = 0;  break; //0.75 Hz
-    case 2: sample = 1;  break; //1.5 Hz
-    case 3: sample = 2;  break; //3 Hz
-    case 4: sample = 3;  break; //7.5 Hz
-    case 5: sample = 4;  break; //15 Hz (default)
-    case 6: sample = 5;  break; //30 Hz
-    case 7: sample = 6;  break; //75 Hz
-    default: sample = 4; break; //15 Hz
+  switch(datarate){
+    case 0: datarate = 0;  break; //0.75 Hz
+    case 1: datarate = 1;  break; //1.5 Hz
+    case 2: datarate = 2;  break; //3 Hz
+    case 3: datarate = 3;  break; //7.5 Hz
+    case 4: datarate = 4;  break; //15 Hz (default)
+    case 5: datarate = 5;  break; //30 Hz
+    case 6: datarate = 6;  break; //75 Hz
+    default: datarate = 4; break; //15 Hz
   }
-	writeRegister(HMC5883LADDR,0x00,((sample<<2)||mode));
+  switch(sample){
+    case 0: sample = 0; break; //1
+    case 1: sample = 1; break; //2
+    case 2: sample = 2; break; //4
+    case 3: sample = 3; break; //8
+  }
+  writeRegister(HMC5883LADDR,0x00,((sample<<5)|(datarate<<2)|mode));
 }
-float mgPerDigit = 0.92;
+
+float mgPerDigit = 0.92f;
 void HMC5883LGainSetting(int gain){
-  swich(gain){
-    case 1: gain = 0; 
-            mgPerDigit = 0.73;
+  switch(gain){
+    case 0: gain = 0; 
+            mgPerDigit = 0.73f;
             break; // 0.73
-    case 2: gain = 1; 
-            mgPerDigit = 0.92;
+    case 1: gain = 1; 
+            mgPerDigit = 0.92f;
             break; // 0.92(default)
-    case 3: gain = 2; 
-            mgPerDigit = 1.22;
+    case 2: gain = 2; 
+            mgPerDigit = 1.22f;
             break; // 1.22
     case 3: gain = 3; 
-            mgPerDigit = 1.52;
+            mgPerDigit = 1.52f;
             break; // 1.52
-    case 3: gain = 4; 
-            mgPerDigit = 2.27;
+    case 4: gain = 4; 
+            mgPerDigit = 2.27f;
             break; // 2.27
-    case 3: gain = 5; 
-            mgPerDigit = 2.56;
+    case 5: gain = 5; 
+            mgPerDigit = 2.56f;
             break; // 2.56
-    case 3: gain = 6; 
-            mgPerDigit = 3.03;
+    case 6: gain = 6; 
+            mgPerDigit = 3.03f;
             break; // 3.03
-    case 3: gain = 7; 
-            mgPerDigit = 4.35;
+    case 7: gain = 7; 
+            mgPerDigit = 4.35f;
             break; // 4.35
     default:gain = 1; 
-            mgPerDigit = 0.92;
+            mgPerDigit = 0.92f;
             break; // 0.92(default)
   }
-	writeRegister(HMC5883LADDR,0x01,gain<<5);
+  writeRegister(HMC5883LADDR,0x01,gain<<5);
 }
 
 void HMC5883LReadModeSetting(int highI2cSpeed,int mode){
-  swich(mode){
-    case 1: mode = 0; break;   // continous-measurement mode
-    case 2: mode = 1; break;   // single measurement mode
-    case 3: mode = 2; break;   // idle mode
+  switch(mode){
+    case 0: mode = 0; break;   // continous-measurement mode
+    case 1: mode = 1; break;   // single measurement mode
+    case 2: mode = 2; break;   // idle mode
     default:mode = 0; break;   // continous-measurement mode
   }
-	writeRegister(HMC5883LADDR,0x02,((highI2cSpeed<<7)||mode));
+  writeRegister(HMC5883LADDR,0x02,((highI2cSpeed<<7)|mode));
 }
+
+float minX = defaultMinXHMC5883L;
+float minY = defaultMinYHMC5883L;
+float maxX = defaultMaxXHMC5883L;
+float maxY = defaultMaxYHMC5883L;
+float offX = -326.0f;
+float offY = -174.0f;
 
 HMC5883L_struct getHMC5883LRaw() {
   HMC5883L_struct HMC5883L;
   HMC5883L.X = (float)readRegister16s(HMC5883LADDR, 0x03);
   HMC5883L.Y = (float)readRegister16s(HMC5883LADDR, 0x07);
   HMC5883L.Z = (float)readRegister16s(HMC5883LADDR, 0x05);
+  printf("X:%f,Y:%f,normX:%f,normY:%f,mgPerDigit:%f\n",HMC5883L.X,HMC5883L.Y,HMC5883L.X*mgPerDigit,HMC5883L.Y*mgPerDigit,mgPerDigit);
   return HMC5883L;
 }
 
-HMC5883L_struct getHMC5883L() {
-  HMC5883L_struct HMC5883L;
-  HMC5883L.X = (float)readRegister16s(HMC5883LADDR, 0x03)*mgPerDigit;
-  HMC5883L.Y = (float)readRegister16s(HMC5883LADDR, 0x07)*mgPerDigit;
-  HMC5883L.Z = (float)readRegister16s(HMC5883LADDR, 0x05)*mgPerDigit;
-  float declinationAngle = (4.0 + (30.0 / 60.0)) / (180 / M_PI);   //posun podla zemepisnej sirky a dlzky
-  HMC5883L.angleRad = atan2(HMC5883L.X,HMC5883L.Y) + declinationAngle; 
-  if(HMC5883L.angleRad < 0){
+void calibrateOffsetHMC5883L(HMC5883L_struct HMC5883L){
+ if (HMC5883L.X < minX) minX = HMC5883L.X;
+ if (HMC5883L.X > maxX) maxX = HMC5883L.X;
+ if (HMC5883L.Y < minY) minY = HMC5883L.Y;
+ if (HMC5883L.Y > maxY) maxY = HMC5883L.Y;
+ offX = (maxX + minX)/2;
+ offY = (maxY + minY)/2;
+// printf("minX:%f,minY:%f,maxX:%f,maxY:%f,offX:%f,offY:%f\n",minX,minY,maxX,maxY,offX,offY);
+}
+
+HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L) {
+  
+  HMC5883L.X = (HMC5883L.X-offX) * mgPerDigit;
+  HMC5883L.Y = (HMC5883L.Y-offY) * mgPerDigit;
+  HMC5883L.Z = HMC5883L.Z * mgPerDigit;
+
+//  float declinationAngle = (degHMC5883L + (minHMC5883L / 60.0)) / (180 / M_PI);   //posun podla zemepisnej sirky a dlzky
+  HMC5883L.angleRad = atan2(HMC5883L.Y,HMC5883L.X); //+ declinationAngle; 
+  
+if(HMC5883L.angleRad < 0){
     HMC5883L.angleRad+= 2*M_PI;
   }
   else if(HMC5883L.angleRad > 2*M_PI){
     HMC5883L.angleRad-=2*M_PI;
   }
+
   HMC5883L.angleDeg = HMC5883L.angleRad*(180/M_PI);
   return HMC5883L;
 }
@@ -996,7 +1023,12 @@ void MPU6050ResetOffset() {
 }
 
 void MPU6050WakeUp() {
-  writeRegister(MPU6050ADDR, 0x6B, 0);
+  writeRegister(MPU6050ADDR, 0x6B, readRegister8(MPU6050ADDR,0x6B)&(!(1<<6)));
+}
+
+void MPU6050DisableAsMaster(){
+   writeRegister(MPU6050ADDR, 0x6A, readRegister8(MPU6050ADDR,0x6A)&(!(1<<5|1<<4)));
+   writeRegister(MPU6050ADDR, 0x37, readRegister8(MPU6050ADDR,0x37)|(1<<1));
 }
 
 MPU6050_struct getMPU6050Raw() {
@@ -1129,9 +1161,18 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       float deltaDistance5;
       float deltaDistance6;
       
+      if (refreshBMP180Check) {
+        semWait(sem_id, 0);
+        //sem pojde BMO180
+        semPost(sem_id, 0);
+        pocetBMP180 = 0;
+      }
+
       if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
-        robotSensors.HMC5883L = getHMC5883L();
+        robotSensors.HMC5883L = getHMC5883LRaw();
+//	calibrateOffsetHMC5883L(robotSensors.HMC5883L);
+	robotSensors.HMC5883L = normHMC5883L(robotSensors.HMC5883L); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
       }
@@ -1325,7 +1366,9 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       semWait(sem_id, 1);
       memcpy(&lastRobotAcculators, &robotAcculators, sizeof(RobotAcculators));
       semPost(sem_id, 1);
-      
+
+      pocetBMP180++;
+      pocetHMC5883L++;      
       pocetPosition++;
       pocetMotors++;
       pocetBattery++;
