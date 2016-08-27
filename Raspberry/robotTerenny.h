@@ -75,16 +75,14 @@ extern "C" {
 #define LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL 0.24f   //vzdialenost kolies
 #define MAX_DELTA_TICKS_ENCODER 200    //maximalna zmena pozicie - v pocte tikov za cas refreshPosition
 #define I2C_WRITE_TIMEOUT 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
+#define CALLIBRATE_DATA_CALCULATE 1
 
-#define HMC5883L_MIN_X -892.0f
-#define HMC5883L_MIN_Y -781.0f
-#define HMC5883L_MAX_X 363.3f
-#define HMC5883L_MAX_Y 88.9f
+#define HMC5883L_OFFSET_X 0.0f
+#define HMC5883L_OFFSET_Y 0.0f
 
 // zavisle na zemepisnej sirke: http://magnetic-declination.com/  
 #define HMC5883L_DEGREE 4.0f
 #define HMC5883L_MINUTES 30.0f
-
 #define CAMERA_WIFI  0
 #define CAMERA_PORT  1212
 #define CAMERA_HEIGHT 240
@@ -199,10 +197,10 @@ typedef enum{
 } hmc5883l_mode_t;
 
 typedef enum{
-    HMC5883L_IDLE          = 0b10,
-    HMC5883L_SINGLE        = 0b01,
-    HMC5883L_CONTINOUS     = 0b00
-} hmc5883l_mode_t;
+    HMC5883L_NORMAL          = 0b00,
+    HMC5883L_POSITIVE_BIAS   = 0b01,
+    HMC5883L_NEGATIVE_BIAS   = 0b10
+} hmc5883l_measurement_t;
 
 struct HMC5883L_struct {
   float X;
@@ -367,6 +365,12 @@ struct Buttons_struct {
   char buttonUp;
 };
 
+struct Callibrate {
+  float HMC5883LOffsetX;
+  float HMC5883LOffsetY;
+};
+
+
 struct Leds_struct {
   char LedDown;
   char LedMiddle;
@@ -416,33 +420,35 @@ struct RobotAcculators {              //struktura pre riadiace veliciny s casom 
 };
 
 void initRobot();
+void closeRobot();
 
+void initI2C();
+void closeI2C();
+void errorLedBlink();
 void sendMatImage(Mat img, int quality);
-
 void *getImgL(void *arg);
 void *getImgR(void *arg);
 void wifiCamera();
-
 void initButton(position3_t pos);
 void closeButton(position3_t pos);
 unsigned char getButton(position3_t pos);
-
 RobotAcculators getRobotAcculators();
 void setRobotAcculators(RobotAcculators temp);
 RobotSensors getRobotSensors();
-int getSocketCamera();
-int getSocketSnimace();
-int testModry();
-int testZlty();
-int testOranzovy();
-int test();
+Callibrate getCallibrate();
+
+int getCameraClientsock();
+int getSensorsClientsock();
+bool blueTestConnection() {
+bool yellowTestConnection();
+bool orangeTestConnection();
 int getDistanceRaw(position6_t pos);
-float prepocetTikovOtackomeraDoVzdialenosti(position6_t pocetTikov);
-int getDistance(position6_t pos);
 int getDeltaDistanceRaw(position6_t pos);
-float getDeltaDistance(position6_t pos);
 void resetDistance(position6_t pos);
 void resetDistanceAll();
+float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov);
+float getDistance(position6_t pos);
+float getDeltaDistance(position6_t pos);
 void setServo(int angle);
 unsigned int getUltrasonicRaw();
 float getUltrasonic();
@@ -462,7 +468,9 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
 void setMove(direction_t direction,unsigned char speed,bool onReg);
 int getKbhit(void);
 GPS_struct getGPS();
-void HMC5883LMeasurementSetting(int mode);
+
+bool HMC5883LTestConnection();
+void HMC5883LMeasurementSetting(hmc5883l_measurement_t measurement);
 void HMC5883LSampleSetting(hmc5883l_samples_t sample);
 void HMC5883LRateSetting(hmc5883l_dataRate_t datarate);
 void HMC5883LRangeSetting(hmc5883l_range_t range);
@@ -470,6 +478,7 @@ void HMC5883LReadModeSetting(hmc5883l_mode_t mode);
 void HMC5883LHighI2CSpeedSetting(bool status);
 HMC5883L_struct getHMC5883LRaw();
 void calibrateOffsetHMC5883L(HMC5883L_struct HMC5883L);
+HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L);    
 
 void MPU6050ResetPRY();
 void MPU6050ResetOffset();
@@ -482,7 +491,6 @@ float dist(float a, float b);
 void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens);
 void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf);
 float getSpeedFromDistance(float distance,float dt);
-
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);

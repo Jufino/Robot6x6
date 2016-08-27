@@ -2,8 +2,8 @@
 
 int i2cHandle;
 unsigned char lastAddr = 0x00;
-int serversock_snimace, serversock_camera;
-int clientsock_snimace, clientsock_camera;
+int sensorsServersock, cameraServersock;
+int sensorsClientsock, cameraClientsock;
 int portHandle;  
 int sem_id;
 bool onAllThreads = true;
@@ -21,6 +21,8 @@ IplImage *img2R;
 RobotAcculators robotAcculators;
 RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
+Callibrate callibrate;
+
 timer_t casovac;
 float mgPerDigit = 0.92f;
 
@@ -47,142 +49,206 @@ int pocetAmp = 100;
 int pocetUltrasonic = 100;
 int pocetCamera = 100;
 
-float minX = HMC5883L_MIN_X;
-float minY = HMC5883L_MIN_Y;
-float maxX = HMC5883L_MAX_X;
-float maxY = HMC5883L_MAX_Y;
-float offX = (HMC5883L_MIN_X+HMC5883L_MAX_X)/2;
-float offY = (HMC5883L_MIN_Y+HMC5883L_MAX_Y)/2;
+float minX = 0;
+float minY = 0;
+float maxX = 0;
+float maxY = 0;
 
 void initRobot() {
+  initI2C();
+  
+  if(!HMC5883LTestConnection()){
+    errorLedBlink();
+    closeI2C();
+    printf("HMC5883L problem s konektivitou")
+    exit(0);
+  }
+  if(!blueTestConnection()){
+    errorLedBlink();
+    closeI2C();
+    printf("Modry problem s konektivitou")
+    exit(0);
+  } 
+  if(!yellowTestConnection()){
+    errorLedBlink();
+    closeI2C();
+    printf("Zlty problem s konektivitou")
+    exit(0);
+  } 
+  if(!orangeTestConnection()){
+    errorLedBlink();
+    closeI2C();
+    printf("Oranzovy problem s konektivitou")
+    exit(0);
+  } 
+
+  portHandle = SerialOpen(PORT_GPS, B9600);
+
+  initButton(POSITION_DOWN);
+  initButton(POSITION_MIDDLE);
+  initButton(POSITION_UP);
+  initMotorPowerSupply();
+
+  stopAllMotors();
+
+  sem_id = semCreate(getpid(), 8);
+  semInit(sem_id, 0, 1);
+  semInit(sem_id, 1, 1);
+  semInit(sem_id, 2, 1);
+  semInit(sem_id, 3, 1);
+	semInit(sem_id, 4, 1);
+  semInit(sem_id, 5, 1);
+	semInit(sem_id, 6, 1);
+  semInit(sem_id, 7, 1);
+    
+  if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
+    cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
+    cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
+    cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
+  }
+    
+  if(NUMBER_OF_CAMERA == 2){
+    cameraR = cvCaptureFromCAM(INDEX_CAMERA_RIGHT);
+    cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
+    cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
+  }
+
+  setLed(POSITION_DOWN, COLOR_RED);
+  setLed(POSITION_MIDDLE, COLOR_RED);
+  setLed(POSITION_UP, COLOR_RED);
+  usleep(500000);
+  setLed(POSITION_DOWN, COLOR_GREEN);
+  setLed(POSITION_MIDDLE, COLOR_GREEN);
+  setLed(POSITION_UP, COLOR_GREEN);
+  usleep(500000);
+  setLed(POSITION_DOWN, COLOR_ORANGE);
+  setLed(POSITION_MIDDLE, COLOR_ORANGE);
+  setLed(POSITION_UP, COLOR_ORANGE);
+  usleep(500000);
+  setLed(POSITION_DOWN, COLOR_OFF);
+  setLed(POSITION_MIDDLE, COLOR_OFF);
+  setLed(POSITION_UP, COLOR_OFF);
+    
+  if (SENSORS_WIFI == 1) {
+    struct sockaddr_in server;
+    if ((sensorsServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      perror("socket() failed");
+      exit(1);
+    }
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(SENSORS_PORT);
+    server.sin_addr.s_addr = INADDR_ANY;
+    if (bind(sensorsServersock, (struct sockaddr *)&server, sizeof(server)) == -1) {
+      perror("bind() failed");
+      exit(1);
+    }
+    if (listen(sensorsServersock, 10) == -1) {
+      perror("listen() failed.");
+      exit(1);
+    }
+    printf("Cakanie spojenia pre snimace na porte: %d\n", SENSORS_PORT);
+    if ((sensorsClientsock = accept(sensorsServersock, NULL, NULL)) == -1) {
+      perror("accept() failed");
+      exit(1);
+    }
+    printf("Spojenie na porte %d ok.\n", SENSORS_PORT);
+  }
+  if (CAMERA_WIFI == 1) {
+    struct sockaddr_in server1;
+    if ((cameraServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      perror("socket() failed");
+      exit(1);
+    }
+    memset(&server1, 0, sizeof(server1));
+    server1.sin_family = AF_INET;
+    server1.sin_port = htons(CAMERA_PORT);
+    server1.sin_addr.s_addr = INADDR_ANY;
+    if (bind(cameraServersock, (struct sockaddr *)&server1, sizeof(server1)) == -1) {
+      perror("bind() failed");
+      exit(1);
+    }
+    if (listen(cameraServersock, 10) == -1) {
+      perror("listen() failed.");
+      exit(1);
+    }
+    printf("Cakanie spojenia pre kameru na porte: %d\n", CAMERA_PORT);
+    if ((cameraClientsock = accept(cameraServersock, NULL, NULL)) == -1) {
+      perror("accept() failed");
+      exit(1);
+    }
+    printf("Spojenie na porte %d ok.\n", CAMERA_PORT);
+  }
+    
+  resetDistanceAll();
+  
+  MPU6050WakeUp();
+  setMPU6050Sensitivity(1,1);
+  setMPU6050DLPF(6,6);
+  MPU6050CalibrateOffset(20);
+  MPU6050DisableAsMaster();
+  MPU6050WakeUp();
+    
+  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
+  HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
+  HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
+  HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
+  HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
+  HMC5883LHighI2CSpeedSetting(false);
+    
+  setMotorPowerSupply(true);//potom zmenit na true
+    
+  if(REFRESH_STATUS == 1){
+    initRefresh();
+  }
+  
+  if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
+    pthread_t vlaknoImgL;
+    pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
+  }
+  if(NUMBER_OF_CAMERA == 2){
+    pthread_t vlaknoImgR;
+    pthread_create(&vlaknoImgR,NULL,&getImgR,NULL);
+  }
+}
+
+void closeRobot() {
+  onAllThreads = false;
+
+  stopRefresh();
+  closeI2C();
+  SerialClose(portHandle);
+  semRem(sem_id);
+  
+  closeButton(POSITION_DOWN);
+  closeButton(POSITION_MIDDLE);
+  closeButton(POSITION_UP);
+  closeMotorPowerSupply();
+  
+  if (CAMERA_WIFI == 1) {
+    close(cameraServersock);
+    close(cameraClientsock);
+  }
+  if (SENSORS_WIFI == 1) {
+    close(sensorsServersock);
+    close(sensorsClientsock);
+  }
+  
+  stopAllMotors();
+}
+
+void initI2C(){
   if ((i2cHandle = open(PORT_I2C, O_RDWR)) < 0) {
     perror("Problem s otvorenim portu.\n");
     exit(1);
   }
-  if (test() == 1) {
-    portHandle = SerialOpen(PORT_GPS, B9600);
+}
 
-    initButton(POSITION_DOWN);
-    initButton(POSITION_MIDDLE);
-    initButton(POSITION_UP);
-    initMotorPowerSupply();
+void closeI2C(){
+  close(i2cHandle);
+}
 
-    stopAllMotors();
-
-    sem_id = semCreate(getpid(), 8); //vytvor semafor
-    semInit(sem_id, 0, 1);
-    semInit(sem_id, 1, 1);
-    semInit(sem_id, 2, 1);
-    semInit(sem_id, 3, 1);
-	  semInit(sem_id, 4, 1);
-    semInit(sem_id, 5, 1);
-	  semInit(sem_id, 6, 1);
-    semInit(sem_id, 7, 1);
-    
-    if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
-      cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
-      cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
-      cvSetCaptureProperty( cameraL, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
-    }
-    
-    if(NUMBER_OF_CAMERA == 2){
-      cameraR = cvCaptureFromCAM(INDEX_CAMERA_RIGHT);
-      cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
-      cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
-    }
-
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    usleep(500000);
-    setLed(POSITION_DOWN, COLOR_GREEN);
-    setLed(POSITION_MIDDLE, COLOR_GREEN);
-    setLed(POSITION_UP, COLOR_GREEN);
-    usleep(500000);
-    setLed(POSITION_DOWN, COLOR_ORANGE);
-    setLed(POSITION_MIDDLE, COLOR_ORANGE);
-    setLed(POSITION_UP, COLOR_ORANGE);
-    usleep(500000);
-    setLed(POSITION_DOWN, COLOR_OFF);
-    setLed(POSITION_MIDDLE, COLOR_OFF);
-    setLed(POSITION_UP, COLOR_OFF);
-    
-    if (SENSORS_WIFI == 1) {
-      struct sockaddr_in server;
-      if ((serversock_snimace = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket() failed");
-        exit(1);
-      }
-      memset(&server, 0, sizeof(server));
-      server.sin_family = AF_INET;
-      server.sin_port = htons(SENSORS_PORT);
-      server.sin_addr.s_addr = INADDR_ANY;
-      if (bind(serversock_snimace, (struct sockaddr *)&server, sizeof(server)) == -1) {
-        perror("bind() failed");
-        exit(1);
-      }
-      if (listen(serversock_snimace, 10) == -1) {
-        perror("listen() failed.");
-        exit(1);
-      }
-      printf("Cakanie spojenia pre snimace na porte: %d\n", SENSORS_PORT);
-      if ((clientsock_snimace = accept(serversock_snimace, NULL, NULL)) == -1) {
-        perror("accept() failed");
-        exit(1);
-      }
-      printf("Spojenie na porte %d ok.\n", SENSORS_PORT);
-    }
-    if (CAMERA_WIFI == 1) {
-      struct sockaddr_in server1;
-      if ((serversock_camera = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket() failed");
-        exit(1);
-      }
-      memset(&server1, 0, sizeof(server1));
-      server1.sin_family = AF_INET;
-      server1.sin_port = htons(CAMERA_PORT);
-      server1.sin_addr.s_addr = INADDR_ANY;
-      if (bind(serversock_camera, (struct sockaddr *)&server1, sizeof(server1)) == -1) {
-        perror("bind() failed");
-        exit(1);
-      }
-      if (listen(serversock_camera, 10) == -1) {
-        perror("listen() failed.");
-        exit(1);
-      }
-      printf("Cakanie spojenia pre kameru na porte: %d\n", CAMERA_PORT);
-      if ((clientsock_camera = accept(serversock_camera, NULL, NULL)) == -1) {
-        perror("accept() failed");
-        exit(1);
-      }
-      printf("Spojenie na porte %d ok.\n", CAMERA_PORT);
-    }
-    
-    resetDistanceAll();
-    MPU6050WakeUp();
-    setMPU6050Sensitivity(1,1);
-    setMPU6050DLPF(6,6);
-    MPU6050CalibrateOffset(20);
-    MPU6050DisableAsMaster();
-    MPU6050WakeUp();
-    HMC5883LSampleRateAndModeSetting(4,5,3);
-    HMC5883LGainSetting(1);
-    HMC5883LReadModeSetting(0,0);
-    setMotorPowerSupply(true);//potom zmenit na true
-    
-    if(REFRESH_STATUS == 1){
-      initRefresh();
-    }
-    if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
-        pthread_t vlaknoImgL;
-        pthread_create(&vlaknoImgL,NULL,&getImgL,NULL);
-    }
-    if(NUMBER_OF_CAMERA == 2){
-        pthread_t vlaknoImgR;
-        pthread_create(&vlaknoImgR,NULL,&getImgR,NULL);
-    }
-  }
-  else {
+void errorLedBlink(){
     for(int i=0;i<10;i++){
       setLed(POSITION_DOWN, COLOR_RED);
       setLed(POSITION_MIDDLE, COLOR_RED);
@@ -193,33 +259,6 @@ void initRobot() {
       setLed(POSITION_UP, COLOR_OFF);
       usleep(500000);
     }
-    exit(0);
-  }
-}
-
-void closeRobot() {
-  onAllThreads = false;
-
-  stopRefresh();
-  
-  SerialClose(portHandle);
-  semRem(sem_id);
-  
-  closeButton(POSITION_DOWN);
-  closeButton(POSITION_MIDDLE);
-  closeButton(POSITION_UP);
-  closeMotorPowerSupply();
-  
-  if (CAMERA_WIFI == 1) {
-    close(serversock_camera);
-    close(clientsock_camera);
-  }
-  if (SENSORS_WIFI == 1) {
-    close(serversock_snimace);
-    close(clientsock_snimace);
-  }
-  
-  stopAllMotors();
 }
 
 void setDevice(unsigned char addr) {
@@ -306,8 +345,8 @@ void sendMatImage(Mat img, int quality) {
   imencode(".jpg", img, buff, param);
   char len[10];
   sprintf(len, "%.8d", buff.size());
-  send(clientsock_camera, len, strlen(len), 0);
-  send(clientsock_camera, &buff[0], buff.size(), 0);
+  send(cameraClientsock, len, strlen(len), 0);
+  send(cameraClientsock, &buff[0], buff.size(), 0);
   buff.clear();
 }
 
@@ -414,68 +453,55 @@ RobotSensors getRobotSensors() {
   return temp;
 }
 
-int getSocketCamera() {
-  return clientsock_camera;
+Callibrate getCallibrate(){
+  Callibrate temp;
+  semWait(sem_id, 0);
+  memcpy(&temp, &callibrate, sizeof(callibrate));
+  semPost(sem_id, 0);
+  return temp;}
+
+int getCameraClientsock() {
+  return cameraClientsock;
 }
 
-int getSocketSnimace() {
-  return clientsock_snimace;
+int getSensorsClientsock() {
+  return sensorsClientsock;
 }
 
-int testModry() {
-  if (300 == readRegister16(MODRYADDR, 127))  return 1;
-  else                                        return 0;
+bool blueTestConnection() {
+  return (300 == readRegister16(BLUE_ADDRESS, 127));
 }
 
-int testZlty() {
-  if (300 == readRegister16(ZLTYADDR, 127)) return 1;
-  else                                      return 0;
+bool yellowTestConnection() {
+  return (300 == readRegister16(YELLOW_ADDRESS, 127));
 }
 
-int testOranzovy() {
-  if (300 == readRegister16(ORANGE_ADDRESS, 127)) return 1;
-  else                                          return 0;
-}
-
-int test() {
-  if (testZlty() && testOranzovy() && testModry())  return 1;
-  else                                              return 0;
+bool orangeTestConnection() {
+  return (300 == readRegister16(ORANGE_ADDRESS, 127));
 }
 
 int getDistanceRaw(position6_t pos) {
   switch (pos) {
-    case POSITION_DOWN_RIGHT: return readRegister16s(BLUE_ADDRESS, 3); break;
+    case POSITION_DOWN_RIGHT:   return readRegister16s(BLUE_ADDRESS, 3); break;
     case POSITION_MIDDLE_RIGHT: return readRegister16s(ORANGE_ADDRESS, 3); break;
-    case POSITION_UP_RIGHT: return readRegister16s(ORANGE_ADDRESS, 4); break;
-    case POSITION_UP_LEFT: return readRegister16s(BLUE_ADDRESS, 4); break;
-    case POSITION_MIDDLE_LEFT: return readRegister16s(ZLTYADDR, 4); break;
-    case POSITION_DOWN_LEFT: return readRegister16s(ZLTYADDR, 3); break;
+    case POSITION_UP_RIGHT:     return readRegister16s(ORANGE_ADDRESS, 4); break;
+    case POSITION_UP_LEFT:      return readRegister16s(BLUE_ADDRESS, 4); break;
+    case POSITION_MIDDLE_LEFT:  return readRegister16s(YELLOW_ADDRESS, 4); break;
+    case POSITION_DOWN_LEFT:    return readRegister16s(YELLOW_ADDRESS, 3); break;
     default: return 0;
   }
-}
-
-float prepocetTikovOtackomeraDoVzdialenosti(position6_t pocetTikov){
-  return ((float)pocetTikov * ((M_PI * DIAMERER_WHEEL) / CONST_ENCODER));
-}
-
-int getDistance(position6_t pos) {
-  return (int)prepocetTikovOtackomeraDoVzdialenosti(getDistanceRaw(pos));
 }
 
 int getDeltaDistanceRaw(position6_t pos) {
   switch (pos) {
-    case POSITION_DOWN_RIGHT: return readRegister16s(BLUE_ADDRESS, 7); break;
+    case POSITION_DOWN_RIGHT:   return readRegister16s(BLUE_ADDRESS, 7); break;
     case POSITION_MIDDLE_RIGHT: return readRegister16s(ORANGE_ADDRESS, 7); break;
-    case POSITION_UP_RIGHT: return readRegister16s(ORANGE_ADDRESS, 8); break;
-    case POSITION_UP_LEFT: return readRegister16s(BLUE_ADDRESS, 8); break;
-    case POSITION_MIDDLE_LEFT: return readRegister16s(ZLTYADDR, 6); break;
-    case POSITION_DOWN_LEFT: return readRegister16s(ZLTYADDR, 5); break;
+    case POSITION_UP_RIGHT:     return readRegister16s(ORANGE_ADDRESS, 8); break;
+    case POSITION_UP_LEFT:      return readRegister16s(BLUE_ADDRESS, 8); break;
+    case POSITION_MIDDLE_LEFT:  return readRegister16s(YELLOW_ADDRESS, 6); break;
+    case POSITION_DOWN_LEFT:    return readRegister16s(YELLOW_ADDRESS, 5); break;
     default: return 0;
   }
-}
-
-float getDeltaDistance(position6_t pos) {
-  return prepocetTikovOtackomeraDoVzdialenosti(getDeltaDistanceRaw(pos));
 }
 
 void resetDistance(position6_t pos) {
@@ -484,8 +510,8 @@ void resetDistance(position6_t pos) {
     case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 100, 0);  break;
     case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 99, 0);   break;
     case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 99, 0);   break;
-    case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 99, 0);   break;
-    case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 100, 0);  break;
+    case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 99, 0);   break;
+    case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 100, 0);  break;
   }
 }
 
@@ -496,6 +522,18 @@ void resetDistanceAll(){
       resetDistance(POSITION_UP_RIGHT);
       resetDistance(POSITION_MIDDLE_LEFT);
       resetDistance(POSITION_DOWN_LEFT);
+}
+
+float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov){
+  return ((float)pocetTikov * ((M_PI * DIAMERER_WHEEL) / CONST_ENCODER));
+}
+
+float getDistance(position6_t pos) {
+  return prepocetTikovOtackomeraDoVzdialenosti(getDistanceRaw(pos));
+}
+
+float getDeltaDistance(position6_t pos) {
+  return prepocetTikovOtackomeraDoVzdialenosti(getDeltaDistanceRaw(pos));
 }
 
 void setServo(int angle) {
@@ -557,20 +595,20 @@ void setLed(position3_t pos, color_t color) {
   }
   else if (pos == POSITION_MIDDLE) {
     if (color == COLOR_GREEN) {
-      writeRegister(ZLTYADDR, 96, 0);
-      writeRegister(ZLTYADDR, 97, 1);
+      writeRegister(YELLOW_ADDRESS, 96, 0);
+      writeRegister(YELLOW_ADDRESS, 97, 1);
     }
     else if (color == COLOR_RED) {
-      writeRegister(ZLTYADDR, 97, 0);
-      writeRegister(ZLTYADDR, 96, 1);
+      writeRegister(YELLOW_ADDRESS, 97, 0);
+      writeRegister(YELLOW_ADDRESS, 96, 1);
     }
     else if (color == COLOR_ORANGE) {
-      writeRegister(ZLTYADDR, 97, 1);
-      writeRegister(ZLTYADDR, 96, 1);
+      writeRegister(YELLOW_ADDRESS, 97, 1);
+      writeRegister(YELLOW_ADDRESS, 96, 1);
     }
     else if (color == COLOR_OFF) {
-      writeRegister(ZLTYADDR, 97, 0);
-      writeRegister(ZLTYADDR, 96, 0);
+      writeRegister(YELLOW_ADDRESS, 97, 0);
+      writeRegister(YELLOW_ADDRESS, 96, 0);
     }
   }
   else if (pos == POSITION_UP) {
@@ -614,8 +652,8 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 89, speed); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 94, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 89, speed); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 89, speed); break;
-        case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 94, speed); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 89, speed); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 94, speed); break;
       }
     }
     else if(rotate == ROTATE_ANTICLOCKWISE) {
@@ -624,8 +662,8 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 88, speed); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 93, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 88, speed); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 88, speed); break;
-        case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 93, speed); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 88, speed); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 93, speed); break;
       }
     }   
     else if(rotate == ROTATE_STOP){
@@ -634,8 +672,8 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 88, 0); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 93, 0); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 88, 0); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 88, 0); break;
-        case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 93, 0); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 88, 0); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 93, 0); break;
       }    
     
     }
@@ -647,8 +685,8 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 87, speed); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 92, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 87, speed); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 87, speed); break;
-        case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 92, speed); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 87, speed); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 92, speed); break;
       }
     }
     else if (ROTATE_STOP == 0) {
@@ -657,8 +695,8 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 86, speed); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 91, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 86, speed); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 86, speed); break;
-        case POSITION_DOWN_LEFT: writeRegister(ZLTYADDR, 91, speed); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 86, speed); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 91, speed); break;
       }
     }
     else if(rotate ROTATE_ANTICLOCKWISE) {
@@ -667,7 +705,7 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 85, speed); break;
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 90, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 85, speed); break;
-        case POSITION_MIDDLE_LEFT: writeRegister(ZLTYADDR, 85, speed); break;
+        case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 85, speed); break;
         case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 90, speed); break;
       }
     }
@@ -758,8 +796,6 @@ void setMove(direction_t direction,unsigned char speed,bool onReg){
   }
   semPost(sem_id, 1);
 }
-
-
 
 int getKbhit(void) {
   struct termios oldt, newt;
@@ -1024,24 +1060,26 @@ GPS_struct getGPS() {
   return GPS;
 }
 
-void HMC5883LMeasurementSetting(int mode){
-  switch(mode){
-    case 0: mode = 0; break;   // normal measurement configuration(Default)
-    case 1: mode = 1; break;   // positive bias configuration (more resistive)
-    case 2: mode = 2; break;   // negative bias configuration (more resistive)
-    default:mode = 0; break;   // normal measurement configuration(Default)
-  }
-  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,((sample<<5)|(datarate<<2)|mode));
+bool HMC5883LTestConnection(){
+   char identA = readRegister8(HMC5883L_REG_IDENT_A);  
+   char identB = readRegister8(HMC5883L_REG_IDENT_B);  
+   char identC = readRegister8(HMC5883L_REG_IDENT_C);  
+   return identA=='H' && identB=='4' && identC=='3';
+}
+
+void HMC5883LMeasurementSetting(hmc5883l_measurement_t measurement){
+  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b00000011;
+  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(measurement));
 }
 
 void HMC5883LSampleSetting(hmc5883l_samples_t sample){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) && 0x80;
-  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,((sample<<5)|(datarate<<2)|mode));
+  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b00011111;
+  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(sample<<5)|0b10000000);
 }
 
 void HMC5883LRateSetting(hmc5883l_dataRate_t datarate){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) && 0x80;
-  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,((sample<<5)|(datarate<<2)|mode));
+  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b11100011;
+  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(datarate<<2));
 }
 
 void HMC5883LRangeSetting(hmc5883l_range_t range){
@@ -1071,16 +1109,16 @@ void HMC5883LRangeSetting(hmc5883l_range_t range){
             mgPerDigit = 4.35f;
             break; 
   }
-  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,range<<5);
+  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,range<<5);
 }
 
 void HMC5883LReadModeSetting(hmc5883l_mode_t mode){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) && 0x80;
-  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,oldRegister | mode);
+  char oldRegister = readRegister8(HMC5883L_REG_MODE) & 0b10000000;
+  writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_MODE,oldRegister | mode);
 }
 
 void HMC5883LHighI2CSpeedSetting(bool status){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) && 0x7F;
+  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) & 0b00000011;
   if(status)
     oldRegister |= 0x80;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,oldRegister);
@@ -1100,21 +1138,20 @@ void calibrateOffsetHMC5883L(HMC5883L_struct HMC5883L){
  if (HMC5883L.X > maxX) maxX = HMC5883L.X;
  if (HMC5883L.Y < minY) minY = HMC5883L.Y;
  if (HMC5883L.Y > maxY) maxY = HMC5883L.Y;
- offX = (maxX + minX)/2;
- offY = (maxY + minY)/2;
-// printf("minX:%f,minY:%f,maxX:%f,maxY:%f,offX:%f,offY:%f\n",minX,minY,maxX,maxY,offX,offY);
+ callibrate.HMC5883LOffsetX = (maxX + minX)/2;
+ callibrate.HMC5883LOffsetY = (maxY + minY)/2; 
 }
 
 HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L) {
   
-  HMC5883L.X = (HMC5883L.X-offX) * mgPerDigit;
-  HMC5883L.Y = (HMC5883L.Y-offY) * mgPerDigit;
+  HMC5883L.X = (HMC5883L.X-HMC5883L_OFFSET_X) * mgPerDigit;
+  HMC5883L.Y = (HMC5883L.Y-HMC5883L_OFFSET_Y) * mgPerDigit;
   HMC5883L.Z = HMC5883L.Z * mgPerDigit;
 
 //  float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun podla zemepisnej sirky a dlzky
   HMC5883L.angleRad = atan2(HMC5883L.Y,HMC5883L.X); //+ declinationAngle; 
   
-if(HMC5883L.angleRad < 0){
+  if(HMC5883L.angleRad < 0){
     HMC5883L.angleRad+= 2*M_PI;
   }
   else if(HMC5883L.angleRad > 2*M_PI){
@@ -1288,7 +1325,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       bool refreshLedsCheck = (REFRESH_Leds / REFRESH_MODULE) <= pocetLeds;
       bool refreshAmpCheck = (REFRESH_AMP / REFRESH_MODULE) <= pocetAmp;
       bool refreshUltrasonicCheck = (REFRESH_ULTRASONIC / REFRESH_MODULE) <= pocetUltrasonic;   
-      bool refreshUltrasonicCheck = (REFRESH_CAMERA / REFRESH_MODULE) <= pocetCamera;
+      bool refreshCameraCheck = (REFRESH_CAMERA / REFRESH_MODULE) <= pocetCamera;
       
       float pomocnaZmenaOtackomera = 0;
       float deltaDistanceL;
@@ -1302,7 +1339,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       float imageChooseMainL;
       float imageChooseMainR;
       
-      if(refreshCamera && numberOfCamera > 0){
+      if(refreshCameraCheck){
         if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
           semWait(sem_id,3);
           imageChooseMainL = imageChooseL;
@@ -1345,6 +1382,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     			  }
           }
         }
+        pocetCamera = 0;
       }
         
       if (refreshBMP180Check) {
@@ -1357,7 +1395,9 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
         robotSensors.HMC5883L = getHMC5883LRaw();
-//	calibrateOffsetHMC5883L(robotSensors.HMC5883L);
+        if(CALLIBRATE_DATA_CALCULATE){
+          calibrateOffsetHMC5883L(robotSensors.HMC5883L);
+        }
 	      robotSensors.HMC5883L = normHMC5883L(robotSensors.HMC5883L); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
@@ -1536,13 +1576,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.buttons.buttonDown =   getButton(POSITION_DOWN);
       robotSensors.buttons.buttonMiddle = getButton(POSITION_MIDDLE);
       robotSensors.buttons.buttonUp =     getButton(POSITION_UP);
+      
       if (refreshBatteryCheck) {
         robotSensors.voltage = getVoltage();
         robotSensors.voltagePercent = getVoltagePercent();
         if (BATTERY_LED_INDICATING == 1) {
-          if (robotSensors.voltagePercent > 60)           setLed(3, 'G');
-          else if (robotSensors.voltagePercent > 20)      setLed(3, 'O');
-          else                                            setLed(3, 'R');
+          if (robotSensors.voltagePercent > 60)           setLed(POSITION_DOWN, COLOR_GREEN);
+          else if (robotSensors.voltagePercent > 20)      setLed(POSITION_DOWN, COLOR_ORANGE);
+          else                                            setLed(POSITION_DOWN, COLOR_RED);
         }
       }
       if (refreshAmpCheck)    robotSensors.amper = getAmp();
@@ -1562,6 +1603,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       pocetLeds++;
       pocetAmp++;
       pocetUltrasonic++;
+      pocetCamera++;
       break;
   }
 }
