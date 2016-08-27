@@ -707,7 +707,7 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 90, speed); break;
         case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 85, speed); break;
         case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 85, speed); break;
-        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 90, speed); break;
+        case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 90, speed); break;                                                  
       }
     }
   }
@@ -725,21 +725,9 @@ void stopAllMotors(){
 void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg){
   switch(side){
     case SIDE_LEFT:
-      if(rotate == ROTATE_CLOCKWISE){
-        robotAcculators.motors.motorUpLeft.direction = 1;
-        robotAcculators.motors.motorMiddleLeft.direction = 1;
-        robotAcculators.motors.motorDownLeft.direction = 1;
-      }
-      else if(rotate == ROTATE_ANTICLOCKWISE){
-        robotAcculators.motors.motorUpLeft.direction = -1;
-        robotAcculators.motors.motorMiddleLeft.direction = -1;
-        robotAcculators.motors.motorDownLeft.direction = -1;      
-      }
-      else if(rotate == ROTATE_STOP){
-        robotAcculators.motors.motorUpLeft.direction = 0;
-        robotAcculators.motors.motorMiddleLeft.direction = 0;
-        robotAcculators.motors.motorDownLeft.direction = 0;                  
-      }
+      robotAcculators.motors.motorUpLeft.direction = rotate;
+      robotAcculators.motors.motorMiddleLeft.direction = rotate;
+      robotAcculators.motors.motorDownLeft.direction = rotate;
       robotAcculators.motors.motorUpLeft.speed = speed;
       robotAcculators.motors.motorMiddleLeft.speed = speed;
       robotAcculators.motors.motorDownLeft.speed = speed;
@@ -748,21 +736,9 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg){
       robotAcculators.motors.motorDownLeft.onRegulator = onReg;    
       break;    
     case SIDE_RIGHT:
-      if(rotate == ROTATE_CLOCKWISE){
-        robotAcculators.motors.motorDownRight.direction = 1;
-        robotAcculators.motors.motorMiddleRight.direction = 1;
-        robotAcculators.motors.motormotorUpRight.direction = 1;
-      }
-      else if(rotate == ROTATE_ANTICLOCKWISE){
-        robotAcculators.motors.motorDownRight.direction = -1;
-        robotAcculators.motors.motorMiddleRight.direction = -1;
-        robotAcculators.motors.motorUpRight.direction = -1;      
-      }
-      else if(rotate == ROTATE_STOP){
-        robotAcculators.motors.motorDownRight.direction = 0;
-        robotAcculators.motors.motorMiddleRight.direction = 0;
-        robotAcculators.motors.motorUpRight.direction = 0;                  
-      }
+      robotAcculators.motors.motorDownRight.direction = rotate;
+      robotAcculators.motors.motorMiddleRight.direction = rotate;
+      robotAcculators.motors.motormotorUpRight.direction = rotate;
       robotAcculators.motors.motorDownRight.speed = speed;
       robotAcculators.motors.motorMiddleRight.speed = speed;
       robotAcculators.motors.motorUpRight.speed = speed;
@@ -1069,17 +1045,17 @@ bool HMC5883LTestConnection(){
 }
 
 void HMC5883LMeasurementSetting(hmc5883l_measurement_t measurement){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b00000011;
+  char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b00000011;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(measurement));
 }
 
 void HMC5883LSampleSetting(hmc5883l_samples_t sample){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b00011111;
+  char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b00011111;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(sample<<5)|0b10000000);
 }
 
 void HMC5883LRateSetting(hmc5883l_dataRate_t datarate){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_A) & 0b11100011;
+  char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b11100011;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(datarate<<2));
 }
 
@@ -1114,12 +1090,12 @@ void HMC5883LRangeSetting(hmc5883l_range_t range){
 }
 
 void HMC5883LReadModeSetting(hmc5883l_mode_t mode){
-  char oldRegister = readRegister8(HMC5883L_REG_MODE) & 0b10000000;
+  char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_MODE) & 0b10000000;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_MODE,oldRegister | mode);
 }
 
 void HMC5883LHighI2CSpeedSetting(bool status){
-  char oldRegister = readRegister8(HMC5883L_REG_CONFIG_B) & 0b00000011;
+  char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B) & 0b00000011;
   if(status)
     oldRegister |= 0x80;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,oldRegister);

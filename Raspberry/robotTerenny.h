@@ -329,7 +329,7 @@ struct GPS_struct {
 //------------------------------
 
 struct MotorAcculator_struct {
-  signed char direction;
+  rotate_t direction;
   unsigned char speed;
   bool onRegulator;
 };
