@@ -56,6 +56,13 @@ float maxY = 0;
 
 void initRobot() {
   initI2C();
+
+  MPU6050WakeUp();
+  setMPU6050Sensitivity(1,1);
+  setMPU6050DLPF(6,6);
+  MPU6050CalibrateOffset(20);
+  MPU6050DisableAsMaster();
+  MPU6050WakeUp();
   
   if(!HMC5883LTestConnection()){
     errorLedBlink();
@@ -63,6 +70,14 @@ void initRobot() {
     printf("HMC5883L problem s konektivitou");
     exit(0);
   }
+
+  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
+  HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
+  HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
+  HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
+  HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
+  HMC5883LHighI2CSpeedSetting(false);
+
   if(!blueTestConnection()){
     errorLedBlink();
     closeI2C();
@@ -181,14 +196,7 @@ void initRobot() {
   }
     
   resetDistanceAll();
-  
-  MPU6050WakeUp();
-  setMPU6050Sensitivity(1,1);
-  setMPU6050DLPF(6,6);
-  MPU6050CalibrateOffset(20);
-  MPU6050DisableAsMaster();
-  MPU6050WakeUp();
-    
+
   HMC5883LMeasurementSetting(HMC5883L_NORMAL);
   HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
   HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
@@ -370,6 +378,7 @@ void *getImgL(void *arg){
     
     semPost(sem_id,4);
   }
+  return 0;
 }
 
 void *getImgR(void *arg){
@@ -391,14 +400,15 @@ void *getImgR(void *arg){
     semPost(sem_id,6);
     semPost(sem_id,7);
   }
+  return 0;
 }
 
 void wifiCamera(){    //premenovat
         char recvdata[30];
         int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
         if (bytes == 0){
-		closeRobot();
-		exit(0);
+		//closeRobot();
+		//exit(0);
         }
         if (strcmp(recvdata, "img\n") == 0){ //&& imgSendL.empty() != true){
           semWait(sem_id, 1);
@@ -700,7 +710,7 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
         case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 91, speed); break;
       }
     }
-    else if(rotate ROTATE_ANTICLOCKWISE) {
+    else if(rotate == ROTATE_ANTICLOCKWISE) {
       switch (pos) {
         case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 90, speed); break;
         case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 85, speed); break;
@@ -738,7 +748,7 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg){
     case SIDE_RIGHT:
       robotAcculators.motors.motorDownRight.direction = rotate;
       robotAcculators.motors.motorMiddleRight.direction = rotate;
-      robotAcculators.motors.motormotorUpRight.direction = rotate;
+      robotAcculators.motors.motorUpRight.direction = rotate;
       robotAcculators.motors.motorDownRight.speed = speed;
       robotAcculators.motors.motorMiddleRight.speed = speed;
       robotAcculators.motors.motorUpRight.speed = speed;
@@ -1038,9 +1048,9 @@ GPS_struct getGPS() {
 }
 
 bool HMC5883LTestConnection(){
-   char identA = readRegister8(HMC5883L_REG_IDENT_A);  
-   char identB = readRegister8(HMC5883L_REG_IDENT_B);  
-   char identC = readRegister8(HMC5883L_REG_IDENT_C);  
+   char identA = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_IDENT_A);  
+   char identB = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_IDENT_B);  
+   char identC = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_IDENT_C);  
    return identA=='H' && identB=='4' && identC=='3';
 }
 
@@ -1106,7 +1116,6 @@ HMC5883L_struct getHMC5883LRaw() {
   HMC5883L.X = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
   HMC5883L.Y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
   HMC5883L.Z = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
-  printf("X:%f,Y:%f,normX:%f,normY:%f,mgPerDigit:%f\n",HMC5883L.X,HMC5883L.Y,HMC5883L.X*mgPerDigit,HMC5883L.Y*mgPerDigit,mgPerDigit);
   return HMC5883L;
 }
 

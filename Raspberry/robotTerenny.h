@@ -372,7 +372,7 @@ struct Callibrate {
 
 
 struct Leds_struct {
-  colot_t LedDown;
+  color_t LedDown;
   color_t LedMiddle;
   color_t LedUp;
 };
