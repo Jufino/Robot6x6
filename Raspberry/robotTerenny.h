@@ -439,7 +439,7 @@ Callibrate getCallibrate();
 
 int getCameraClientsock();
 int getSensorsClientsock();
-bool blueTestConnection() {
+bool blueTestConnection();
 bool yellowTestConnection();
 bool orangeTestConnection();
 int getDistanceRaw(position6_t pos);
