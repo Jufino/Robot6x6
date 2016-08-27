@@ -60,25 +60,25 @@ void initRobot() {
   if(!HMC5883LTestConnection()){
     errorLedBlink();
     closeI2C();
-    printf("HMC5883L problem s konektivitou")
+    printf("HMC5883L problem s konektivitou");
     exit(0);
   }
   if(!blueTestConnection()){
     errorLedBlink();
     closeI2C();
-    printf("Modry problem s konektivitou")
+    printf("Modry problem s konektivitou");
     exit(0);
   } 
   if(!yellowTestConnection()){
     errorLedBlink();
     closeI2C();
-    printf("Zlty problem s konektivitou")
+    printf("Zlty problem s konektivitou");
     exit(0);
   } 
   if(!orangeTestConnection()){
     errorLedBlink();
     closeI2C();
-    printf("Oranzovy problem s konektivitou")
+    printf("Oranzovy problem s konektivitou");
     exit(0);
   } 
 
@@ -395,30 +395,31 @@ void *getImgR(void *arg){
 
 void wifiCamera(){    //premenovat
         char recvdata[30];
-        int bytes = recv(getSocketCamera(), recvdata, 4, 0);
+        int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
         if (bytes == 0){
-		      sigctrl(0);
+		closeRobot();
+		exit(0);
         }
         if (strcmp(recvdata, "img\n") == 0){ //&& imgSendL.empty() != true){
           semWait(sem_id, 1);
-		      sendMatImage(robotSensors.camera.imgLeft,80);
+	  sendMatImage(robotSensors.camera.imgLeft,80);
           semPost(sem_id, 1);
         }
 }
 
 void initButton(position3_t pos){
   switch (pos) {
-    case POSITION_DOWN:   return !gpio_open(27, 0); break;
-    case POSITION_MIDDLE: return !gpio_open(17, 0); break;
-    case POSITION_UP:     return !gpio_open(22, 0); break;
+    case POSITION_DOWN:   gpio_open(27, 0); break;
+    case POSITION_MIDDLE: gpio_open(17, 0); break;
+    case POSITION_UP:     gpio_open(22, 0); break;
   }   
 }
 
 void closeButton(position3_t pos){
   switch (pos) {
-    case POSITION_DOWN:   return gpio_close(27); break;
-    case POSITION_MIDDLE: return gpio_close(17); break;
-    case POSITION_UP:     return gpio_close(22); break;
+    case POSITION_DOWN:   gpio_close(27); break;
+    case POSITION_MIDDLE: gpio_close(17); break;
+    case POSITION_UP:     gpio_close(22); break;
   }   
 }
 
@@ -1322,7 +1323,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       bool refreshMPU6050Check = (REFRESH_MPU6050 / REFRESH_MODULE) <= pocetMPU6050;
       bool refreshBMP180Check = (REFRESH_BMP180 / REFRESH_MODULE) <= pocetBMP180;
       bool refreshHMC5883LCheck = (REFRESH_HMC5883L / REFRESH_MODULE) <= pocetHMC5883L;
-      bool refreshLedsCheck = (REFRESH_Leds / REFRESH_MODULE) <= pocetLeds;
+      bool refreshLedsCheck = (REFRESH_LEDS / REFRESH_MODULE) <= pocetLeds;
       bool refreshAmpCheck = (REFRESH_AMP / REFRESH_MODULE) <= pocetAmp;
       bool refreshUltrasonicCheck = (REFRESH_ULTRASONIC / REFRESH_MODULE) <= pocetUltrasonic;   
       bool refreshCameraCheck = (REFRESH_CAMERA / REFRESH_MODULE) <= pocetCamera;
@@ -1353,11 +1354,11 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     				  semPost(sem_id,2);
     			  }
             else if(imageChooseMainL == 2){   
-    				  semWait(sem_id1,4);
+    				  semWait(sem_id,4);
               semWait(sem_id, 0);
     				  cvarrToMat(img2L).copyTo(robotSensors.camera.imgLeft);
               semPost(sem_id, 0);
-    				  semPost(sem_id1,4);
+    				  semPost(sem_id,4);
     			  }
           }
         }
@@ -1419,7 +1420,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorDownRight.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceDownRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
-        robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight,(float)refreshPosition / 1000);
+        robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight,(float)REFRESH_POSITION / 1000);
         
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1439,7 +1440,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorUpLeft.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceUpLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorUpLeft.distance +=  deltaDistanceUpLeft;
-        robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft,(float)refreshPosition / 1000);
+        robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft,(float)REFRESH_POSITION / 1000);
         
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1459,7 +1460,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorMiddleRight.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceMiddleRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorMiddleRight.distance +=  deltaDistanceMiddleRight;
-        robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight,(float)refreshPosition / 1000);
+        robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight,(float)REFRESH_POSITION / 1000);
         
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1485,7 +1486,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorUpRight.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
-        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight,(float)refreshPosition / 1000);
+        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight,(float)REFRESH_POSITION / 1000);
 
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1505,7 +1506,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorMiddleLeft.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceMiddleLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
-        robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft,(float)refreshPosition / 1000);
+        robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft,(float)REFRESH_POSITION / 1000);
 
 	      semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1525,7 +1526,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorDownLeft.distanceRaw+= pomocnaZmenaOtackomera;
         deltaDistanceDownLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
  	      robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
-        robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft,(float)refreshPosition / 1000);
+        robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft,(float)REFRESH_POSITION / 1000);
 
         semPost(sem_id, 0);
         pocetPosition = 0;
@@ -1554,7 +1555,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       	else
       		deltaDistanceL = (deltaDistanceMiddleLeft+deltaDistanceDownLeft)/2;
       	robotSensors.robotPosition.distanceL+= deltaDistanceL;
-        robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL,(float)refreshPosition / 1000);
+        robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL,(float)REFRESH_POSITION / 1000);
                                                              
       	float diff4 = abs(deltaDistanceDownRight-deltaDistanceMiddleRight);
         float diff5 = abs(deltaDistanceMiddleRight-deltaDistanceUpRight);
@@ -1566,9 +1567,9 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         else
           deltaDistanceR = (deltaDistanceUpRight+deltaDistanceDownRight)/2;
       	robotSensors.robotPosition.distanceR+= deltaDistanceR;      
-        robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR,(float)refreshPosition / 1000);
+        robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR,(float)REFRESH_POSITION / 1000);
         
-        calcRobotPosition(robotSensors.robotPosition.speedL,robotSensors.robotPosition.speedR,(float)refreshPosition / 1000);
+        calcRobotPosition(robotSensors.robotPosition.speedL,robotSensors.robotPosition.speedR,(float)REFRESH_POSITION / 1000);
         
       }
       semWait(sem_id, 0);
