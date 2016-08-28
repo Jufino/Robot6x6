@@ -30,13 +30,10 @@ int main(void){
  
   while(1){
 	RobotSensors robotSensors = getRobotSensors();
-//    	Callibrate callibrate = getCallibrate();
-		/*printf("x:%f, y:%f, angle:%f\n",
-                        robotSensors.robotPosition.x,
-			robotSensors.robotPosition.y,
-			robotSensors.robotPosition.angleDeg);*/
-		printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f\n",robotSensors.HMC5883L.X,robotSensors.HMC5883L.Y,robotSensors.HMC5883L.Z,robotSensors.HMC5883L.angleRad,robotSensors.HMC5883L.angleDeg/*,callibrate.HMC5883LOffsetX,callibrate.HMC5883LOffsetY*/);
-    	usleep(100000);
+    	Callibrate callibrate = getCallibrate();
+	printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f",robotSensors.HMC5883L.X,robotSensors.HMC5883L.Y,robotSensors.HMC5883L.Z,robotSensors.HMC5883L.angleRad,robotSensors.HMC5883L.angleDeg);
+	printf(" calibX%f,calibY:%f\n",callibrate.HMC5883LOffsetX,callibrate.HMC5883LOffsetY); 
+  	usleep(100000);
    }
    closeRobot();
    return 0;

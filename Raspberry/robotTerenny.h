@@ -77,8 +77,8 @@ extern "C" {
 #define I2C_WRITE_TIMEOUT 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
 #define CALLIBRATE_DATA_CALCULATE 1
 
-#define HMC5883L_OFFSET_X 0.0f
-#define HMC5883L_OFFSET_Y 0.0f
+#define HMC5883L_OFFSET_X -345.0f
+#define HMC5883L_OFFSET_Y -540.0f
 
 // zavisle na zemepisnej sirke: http://magnetic-declination.com/  
 #define HMC5883L_DEGREE 4.0f
@@ -370,7 +370,6 @@ struct Callibrate {
   float HMC5883LOffsetY;
 };
 
-
 struct Leds_struct {
   color_t LedDown;
   color_t LedMiddle;
@@ -398,7 +397,6 @@ struct Camera_struct {
 };
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
-  Camera_struct camera;               //kamera
   GPS_struct gps;                     //gps
   MPU6050_struct MPU6050;             //akcelerometer, gyroskop a teplomer
   BMP180_struct BMP180;               //barometer, teplomer - zatial nie je implementovane

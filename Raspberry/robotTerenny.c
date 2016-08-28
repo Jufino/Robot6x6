@@ -56,14 +56,14 @@ float maxY = 0;
 
 void initRobot() {
   initI2C();
-
+/*
   MPU6050WakeUp();
   setMPU6050Sensitivity(1,1);
   setMPU6050DLPF(6,6);
   MPU6050CalibrateOffset(20);
   MPU6050DisableAsMaster();
   MPU6050WakeUp();
-  
+  (/
   if(!HMC5883LTestConnection()){
     errorLedBlink();
     closeI2C();
@@ -71,13 +71,13 @@ void initRobot() {
     exit(0);
   }
 
-  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
+/*  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
   HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
   HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
   HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
   HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
   HMC5883LHighI2CSpeedSetting(false);
-
+*/
   if(!blueTestConnection()){
     errorLedBlink();
     closeI2C();
@@ -301,7 +301,7 @@ unsigned int readRegister16(unsigned char addr, unsigned char reg) {
   	if (read(i2cHandle, data, 2) != 2){   
 		printf("addr:%i, read register %i\n", (int)addr, (int)reg);
   	}
-  	return (data[0] << 8) + data[1];
+  	return (data[0] << 8) | (data[1]&0xFF);
   }
   else{
 	return 0;
@@ -320,7 +320,7 @@ signed int readRegister16s(unsigned char addr, unsigned char reg) {
   signed char data[3];
   if(errorTimeout < I2C_WRITE_TIMEOUT){
   	if (read(i2cHandle, data, 2) != 2)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
-  	return (data[0] << 8) + data[1];
+  	return (data[0] << 8) | (data[1]&0xFF);
   }
   else{
 	return 0;
@@ -412,7 +412,7 @@ void wifiCamera(){    //premenovat
         }
         if (strcmp(recvdata, "img\n") == 0){ //&& imgSendL.empty() != true){
           semWait(sem_id, 1);
-	  sendMatImage(robotSensors.camera.imgLeft,80);
+	  //sendMatImage(robotSensors.camera.imgLeft,80);
           semPost(sem_id, 1);
         }
 }
@@ -467,7 +467,7 @@ RobotSensors getRobotSensors() {
 Callibrate getCallibrate(){
   Callibrate temp;
   semWait(sem_id, 0);
-  memcpy(&temp, &callibrate, sizeof(callibrate));
+  memcpy(&temp, &callibrate, sizeof(Callibrate));
   semPost(sem_id, 0);
   return temp;}
 
@@ -1334,14 +1334,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
             if(imageChooseMainL == 1){        
     				  semWait(sem_id,2);
                 semWait(sem_id, 0);
-      				  cvarrToMat(img1L).copyTo(robotSensors.camera.imgLeft);
+      				  //cvarrToMat(img1L).copyTo(robotSensors.camera.imgLeft);
                 semPost(sem_id, 0);
     				  semPost(sem_id,2);
     			  }
             else if(imageChooseMainL == 2){   
     				  semWait(sem_id,4);
               semWait(sem_id, 0);
-    				  cvarrToMat(img2L).copyTo(robotSensors.camera.imgLeft);
+    				  //cvarrToMat(img2L).copyTo(robotSensors.camera.imgLeft);
               semPost(sem_id, 0);
     				  semPost(sem_id,4);
     			  }
@@ -1355,14 +1355,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
             if(imageChooseMainR == 1){        
     				  semWait(sem_id,5);
                 semWait(sem_id, 0);
-      				  cvarrToMat(img1R).copyTo(robotSensors.camera.imgRight);
+      				  //cvarrToMat(img1R).copyTo(robotSensors.camera.imgRight);
                 semPost(sem_id, 0);
     				  semPost(sem_id,5);
     			  }
             else if(imageChooseMainR == 2){   
     				  semWait(sem_id,7);
                 semWait(sem_id, 0);
-      				  cvarrToMat(img2R).copyTo(robotSensors.camera.imgRight);
+      				  //cvarrToMat(img2R).copyTo(robotSensors.camera.imgRight);
                 semPost(sem_id, 0);
     				  semPost(sem_id,7);
     			  }
@@ -1384,7 +1384,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         if(CALLIBRATE_DATA_CALCULATE){
           calibrateOffsetHMC5883L(robotSensors.HMC5883L);
         }
-	      robotSensors.HMC5883L = normHMC5883L(robotSensors.HMC5883L); 
+	robotSensors.HMC5883L = normHMC5883L(robotSensors.HMC5883L); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
       }
