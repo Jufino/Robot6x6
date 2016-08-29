@@ -1553,7 +1553,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       if (refreshGyCheck) {
         semWait(sem_id, 0);
         robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
-        Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,REFRESH_GY / REFRESH_MODULE);
+        Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,(REFRESH_GY / REFRESH_MODULE)/1000);
         robotSensors.MPU6050.gyAngle.pitch.radian = robotSensors.MPU6050.gyAngle.pitch.radian + deltaAngle3d.pitch.radian;
         robotSensors.MPU6050.gyAngle.pitch.degree = robotSensors.MPU6050.gyAngle.pitch.degree + deltaAngle3d.pitch.degree;
         robotSensors.MPU6050.gyAngle.roll.radian = robotSensors.MPU6050.gyAngle.roll.radian + deltaAngle3d.roll.radian;
