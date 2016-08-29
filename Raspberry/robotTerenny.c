@@ -56,7 +56,7 @@ float maxY = 0;
 
 void initRobot() {
   initI2C();
-/*
+
   MPU6050WakeUp();
   setMPU6050Sensitivity(1,1);
   setMPU6050DLPF(6,6);
@@ -71,13 +71,13 @@ void initRobot() {
     exit(0);
   }
 
-/*  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
+  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
   HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
   HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
   HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
   HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
   HMC5883LHighI2CSpeedSetting(false);
-*/
+
   if(!blueTestConnection()){
     errorLedBlink();
     closeI2C();
