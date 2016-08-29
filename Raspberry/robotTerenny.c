@@ -28,19 +28,19 @@ float mgPerDigit = 0.92f;
 float rangePerDigit = 0.0f;
 float dpsPerDigit = 0.0f;
 
-Axis_struct gyAxisOffset;
-Axis_struct gyAxisthreshold;
-
 int pocetPosition = 100;
 int pocetMotors = 100;
 int pocetBattery = 100;
-int pocetMPU6050 = 100;
 int pocetBMP180 = 100;
 int pocetHMC5883L = 100;
 int pocetLeds = 100;
 int pocetAmp = 100;
 int pocetUltrasonic = 100;
 int pocetCamera = 100;
+
+int pocetAcc = 100;
+int pocetGy = 100;
+int pocetTemp = 100;
 
 Axis_struct minAxis;
 Axis_struct maxAxis;
@@ -50,6 +50,7 @@ void initRobot() {
 
   setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
   setMPU6050RangeSetting(MPU6050_RANGE_2G);
+  setMPU6050DLPFModeSetting(MPU6050_DLPF_3);
   setMPU6050I2CMasterModeEnabledSetting(false);
   setMPU6050I2CBypassEnabledSetting(true) ;
   setMPU6050SleepEnabledSetting(false);
@@ -98,7 +99,7 @@ void initRobot() {
 
   stopAllMotors();
 
-  sem_id = semCreate(getpid(), 8);
+  sem_id = semCreate(getpid(), 9);
   semInit(sem_id, 0, 1);
   semInit(sem_id, 1, 1);
   semInit(sem_id, 2, 1);
@@ -107,6 +108,7 @@ void initRobot() {
   semInit(sem_id, 5, 1);
 	semInit(sem_id, 6, 1);
   semInit(sem_id, 7, 1);
+  semInit(sem_id, 8, 1);
     
   if(NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2){
     cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
@@ -455,9 +457,9 @@ RobotSensors getRobotSensors() {
 
 Callibrate getCallibrate(){
   Callibrate temp;
-  semWait(sem_id, 0);
+  semWait(sem_id, 8);
   memcpy(&temp, &callibrate, sizeof(Callibrate));
-  semPost(sem_id, 0);
+  semPost(sem_id, 8);
   return temp;}
 
 int getCameraClientsock() {
@@ -1144,9 +1146,12 @@ HMC5883L_struct getHMC5883LNorm() {
     if (HMC5883L.compassAxis.y > maxAxis.y) maxAxis.y = HMC5883L.compassAxis.y;
     if (HMC5883L.compassAxis.z < maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
     if (HMC5883L.compassAxis.z > maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
+    
+    semWait(sem_id, 8);
     callibrate.HMC5883LOffsetAxis.x = (maxAxis.x + minAxis.x)/2;
     callibrate.HMC5883LOffsetAxis.y = (maxAxis.y + minAxis.y)/2; 
     callibrate.HMC5883LOffsetAxis.z = (maxAxis.z + minAxis.z)/2; 
+    semPost(sem_id, 8);
   }
   
   HMC5883L.compassAxis.x = (HMC5883L.compassAxis.x-HMC5883L_OFFSET_X) * mgPerDigit;
@@ -1179,25 +1184,27 @@ void callibrateMPU6050Gyroscope(int samples){
 
     for (unsigned char i = 0; i < samples; ++i)
     {
-	MPU6050_struct MPU6050 = getMPU6050Raw();
-	sumX += MPU6050.gyAxis.x;
-	sumY += MPU6050.gyAxis.y;
-	sumZ += MPU6050.gyAxis.z;
-
-	sigmaX += MPU6050.gyAxis.x * MPU6050.gyAxis.x;
-	sigmaY += MPU6050.gyAxis.y * MPU6050.gyAxis.y;
-	sigmaZ += MPU6050.gyAxis.z * MPU6050.gyAxis.z;	
-
-	usleep(5);
+    	MPU6050_struct MPU6050 = getMPU6050Raw();
+    	sumX += MPU6050.gyAxis.x;
+    	sumY += MPU6050.gyAxis.y;
+    	sumZ += MPU6050.gyAxis.z;
+    
+    	sigmaX += MPU6050.gyAxis.x * MPU6050.gyAxis.x;
+    	sigmaY += MPU6050.gyAxis.y * MPU6050.gyAxis.y;
+    	sigmaZ += MPU6050.gyAxis.z * MPU6050.gyAxis.z;	
+    
+    	usleep(5);
     }
+    
+    semWait(sem_id, 8);
+    callibrate.MPU6050GyOffsetAxis.x = sumX / samples;
+    callibrate.MPU6050GyOffsetAxis.y = sumY / samples;
+    callibrate.MPU6050GyOffsetAxis.z = sumZ / samples;
 
-    gyAxisOffset.x = sumX / samples;
-    gyAxisOffset.y = sumY / samples;
-    gyAxisOffset.z = sumZ / samples;
-
-    gyAxisthreshold.x = sqrt((sigmaX / samples) - (gyAxisOffset.x * gyAxisOffset.x));
-    gyAxisthreshold.y = sqrt((sigmaY / samples) - (gyAxisOffset.y * gyAxisOffset.y));
-    gyAxisthreshold.z = sqrt((sigmaZ / samples) - (gyAxisOffset.z * gyAxisOffset.z));
+    callibrate.MPU6050GyThresholdAxis.x = sqrt((sigmaX / samples) - (callibrate.MPU6050GyOffsetAxis.x * gyAxisOffset.x));
+    callibrate.MPU6050GyThresholdAxis.y = sqrt((sigmaY / samples) - (callibrate.MPU6050GyOffsetAxis.y * gyAxisOffset.y));
+    callibrate.MPU6050GyThresholdAxis.z = sqrt((sigmaZ / samples) - (callibrate.MPU6050GyOffsetAxis.z * gyAxisOffset.z));
+    semPost(sem_id, 8);
 }
 
 void setMPU6050ScaleSetting(mpu6050_dps_t scale)
@@ -1321,36 +1328,55 @@ bool getMPU6050I2CBypassEnabledSetting(void)
   return readRegisterBit(MPU6050_ADDRESS,MPU6050_REG_INT_PIN_CFG,1);
 }
 
-MPU6050_struct getMPU6050Raw() {
-  MPU6050_struct MPU6050;
+Axis_struct getMPU6050GyRaw() {
+  Axis_struct gy;
+
+  gy.x  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
+  gy.y  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_YOUT_H);
+  gy.z  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOUT_H);
   
-  MPU6050.accAxis.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
-  MPU6050.accAxis.y = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOUT_H);
-  MPU6050.accAxis.z = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOUT_H);
-  MPU6050.gyAxis.x  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
-  MPU6050.gyAxis.y  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_YOUT_H);
-  MPU6050.gyAxis.z  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOUT_H);
-  MPU6050.Temp =      (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
-  
-  return MPU6050;
+  return gy;
 }
 
-MPU6050_struct getMPU6050Norm(){
-  MPU6050_struct MPU6050 = getMPU6050Raw();
+Axis_struct getMPU6050AccRaw() {
+  Axis_struct acc;
+  
+  acc.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
+  acc.y = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOUT_H);
+  acc.z = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOUT_H);
+  
+  return acc;
+}
+float getMPU6050TempRaw(){
+    return (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
+}
+
+float getMPU6050TempNorm(){
+     return getMPU6050TempRaw()/340 + 36.53;
+}
+
+Axis_struct getMPU6050AccNorm(){
+  Axis_struct acc = getMPU6050AccRaw();
+  
   MPU6050.accAxis.x = MPU6050.accAxis.x * rangePerDigit * 9.80665f; 
   MPU6050.accAxis.y = MPU6050.accAxis.y * rangePerDigit * 9.80665f; 
   MPU6050.accAxis.z = MPU6050.accAxis.z * rangePerDigit * 9.80665f; 
   
-  MPU6050.gyAxis.x = (MPU6050.gyAxis.x-gyAxisOffset.x) * dpsPerDigit; 
-  MPU6050.gyAxis.y = (MPU6050.gyAxis.y-gyAxisOffset.y) * dpsPerDigit; 
-  MPU6050.gyAxis.z = (MPU6050.gyAxis.z-gyAxisOffset.z) * dpsPerDigit;
+  return acc;
+}
+
+Axis_struct getMPU6050GyNorm(){
+  Axis_struct gy = getMPU6050GyRaw();
   
-  if(abs(MPU6050.gyAxis.x) < gyAxisthreshold.x) MPU6050.gyAxis.x = 0; 
-  if(abs(MPU6050.gyAxis.y) < gyAxisthreshold.y) MPU6050.gyAxis.y = 0; 
-  if(abs(MPU6050.gyAxis.z) < gyAxisthreshold.z) MPU6050.gyAxis.z = 0; 
+  gy.x = (gy.x-callibrate.MPU6050GyOffsetAxis.x) * dpsPerDigit; 
+  gy.y = (gy.y-callibrate.MPU6050GyOffsetAxis.y) * dpsPerDigit; 
+  gy.z = (gy.z-callibrate.MPU6050GyOffsetAxis.z) * dpsPerDigit;
   
-  MPU6050.Temp = MPU6050.Temp/340 + 36.53;
-  return MPU6050;   
+  if(abs(gy.x) < callibrate.MPU6050GyThresholdAxis.x) gy.x = 0; 
+  if(abs(gy.y) < callibrate.MPU6050GyThresholdAxis.y) gy.y = 0; 
+  if(abs(gy.z) < callibrate.MPU6050GyThresholdAxis.z) gy.z = 0; 
+  
+  return gy;   
 }
 
 float dist(float a, float b) {
@@ -1366,9 +1392,30 @@ float getSpeedFromDistance(float distance,float dt) {
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
   float v = (deltaSpeedL+deltaSpeedR)/2;
   robotSensors.robotPosition.angle.radian+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
-  robotSensors.robotPosition.angle.degree = robotSensors.robotPosition.angle.radian*(360/(2*M_PI));
+  robotSensors.robotPosition.angle.degree = robotSensors.robotPosition.angle.radian*(180/(M_PI));
   robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle.radian)*dt;
   robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angle.radian)*dt;
+}
+
+Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy,float dt){
+  Angle3d_struct angle3d;
+  
+  Angle2d_struct roll;
+  roll.radian = gy.x*dt;
+  roll.degree = roll.radian*(180/(M_PI));
+  angle3d.roll = roll;
+  
+  Angle2d_struct pitch;
+  pitch.radian = gy.y*dt;
+  pitch.degree = pitch.radian*(180/(M_PI));
+  angle3d.pitch = pitch;
+  
+  Angle2d_struct yaw;
+  yaw.radian = gy.z*dt;
+  yaw.degree = yaw.radian*(180/(M_PI));
+  angle3d.yaw = yaw;
+  
+  retrun angle3d;
 }
 
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
@@ -1413,13 +1460,16 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       bool refreshPositionCheck = (REFRESH_POSITION / REFRESH_MODULE) <= pocetPosition;
       bool refreshMotorsCheck = (REFRESH_MOTORS / REFRESH_MODULE) <= pocetMotors;
       bool refreshBatteryCheck = (REFRESH_BATTERY / REFRESH_MODULE) <= pocetBattery;
-      bool refreshMPU6050Check = (REFRESH_MPU6050 / REFRESH_MODULE) <= pocetMPU6050;
       bool refreshBMP180Check = (REFRESH_BMP180 / REFRESH_MODULE) <= pocetBMP180;
       bool refreshHMC5883LCheck = (REFRESH_HMC5883L / REFRESH_MODULE) <= pocetHMC5883L;
       bool refreshLedsCheck = (REFRESH_LEDS / REFRESH_MODULE) <= pocetLeds;
       bool refreshAmpCheck = (REFRESH_AMP / REFRESH_MODULE) <= pocetAmp;
       bool refreshUltrasonicCheck = (REFRESH_ULTRASONIC / REFRESH_MODULE) <= pocetUltrasonic;   
       bool refreshCameraCheck = (REFRESH_CAMERA / REFRESH_MODULE) <= pocetCamera;
+            
+      bool refreshAccCheck = (REFRESH_ACC / REFRESH_MODULE) <= pocetMPU6050;
+      bool refreshGyCheck = (REFRESH_GY / REFRESH_MODULE) <= pocetMPU6050;
+      bool refreshTempCheck = (REFRESH_TEMP / REFRESH_MODULE) <= pocetMPU6050;
       
       float pomocnaZmenaOtackomera = 0;
       float deltaDistanceL;
@@ -1488,16 +1538,37 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
 
       if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
-	robotSensors.HMC5883L = getHMC5883LNorm(); 
+	      robotSensors.HMC5883L = getHMC5883LNorm(); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
       }
       
-      if (refreshMPU6050Check) {
+      if (refreshAccCheck) {
         semWait(sem_id, 0);
-        robotSensors.MPU6050 = getMPU6050Norm();
+        robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
         semPost(sem_id, 0);
-        pocetMPU6050 = 0;
+        pocetAcc = 0;
+      }
+      
+      if (refreshGyCheck) {
+        semWait(sem_id, 0);
+        robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
+        Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,REFRESH_GY / REFRESH_MODULE);
+        robotSensors.MPU6050.gyAngle.pitch.radian = robotSensors.MPU6050.gyAngle.pitch.radian + deltaAngle3d.pitch.radian;
+        robotSensors.MPU6050.gyAngle.pitch.degree = robotSensors.MPU6050.gyAngle.pitch.degree + deltaAngle3d.pitch.degree;
+        robotSensors.MPU6050.gyAngle.roll.radian = robotSensors.MPU6050.gyAngle.roll.radian + deltaAngle3d.roll.radian;
+        robotSensors.MPU6050.gyAngle.roll.degree = robotSensors.MPU6050.gyAngle.roll.degree + deltaAngle3d.roll.degree;
+        robotSensors.MPU6050.gyAngle.yaw.radian = robotSensors.MPU6050.gyAngle.yaw.radian + deltaAngle3d.yaw.radian;
+        robotSensors.MPU6050.gyAngle.yaw.degree = robotSensors.MPU6050.gyAngle.yaw.degree + deltaAngle3d.yaw.degree;
+        semPost(sem_id, 0);
+        pocetGy = 0;
+      }
+      
+      if (refreshTempCheck) {
+        semWait(sem_id, 0);
+        robotSensors.MPU6050.temperature = getMPU6050TempNorm();
+        semPost(sem_id, 0);
+        pocetTemp = 0;
       }
 
       if (refreshPositionCheck) {
@@ -1689,11 +1760,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       pocetPosition++;
       pocetMotors++;
       pocetBattery++;
-      pocetMPU6050++;
       pocetLeds++;
       pocetAmp++;
       pocetUltrasonic++;
       pocetCamera++;
+      
+      pocetAcc++;
+      pocetGy++;
+      pocetTemp++;
       break;
   }
 }

@@ -54,7 +54,9 @@ extern "C" {
 #define REFRESH_MOTORS     REFRESH_MODULE*10
 #define REFRESH_HMC5883L   REFRESH_MODULE*3
 #define REFRESH_BMP180     REFRESH_MODULE*10
-#define REFRESH_MPU6050    REFRESH_MODULE*10
+#define REFRESH_ACC        REFRESH_MODULE*10
+#define REFRESH_GY         REFRESH_MODULE*10
+#define REFRESH_TEMP       REFRESH_MODULE*10
 #define REFRESH_LEDS       REFRESH_MODULE*10
 #define REFRESH_POSITION   REFRESH_MODULE*10
 #define REFRESH_AMP        REFRESH_MODULE*200
@@ -301,24 +303,30 @@ struct Axis_struct{
   float z;
 };
 
-struct Angle_struct{
+struct Angle2d_struct{
   float radian;
   float degree;
 };
+
+struct Angle3d_struct{
+  Angle2d_struct roll;
+  Angle2d_struct pitch;
+  Angle2d_struct yaw;
+};
+
 
 //MPU6050
 struct MPU6050_struct {
   Axis_struct accAxis;
   Axis_struct gyAxis;
-  Angle_struct Roll;
-  Angle_struct Pitch;
-  Angle_struct Yaw;
-  float Temp;
+  Angle3d_struct accAngle;
+  Angle3d_struct gyAngle;
+  float temperature;
 };
 
 struct HMC5883L_struct {
   Axis_struct compassAxis;
-  Angle_struct angle;
+  Angle2d_struct angle;
 };
 //-----------------------
 
@@ -479,6 +487,7 @@ struct Buttons_struct {
 struct Callibrate {
   Axis_struct HMC5883LOffsetAxis;
   Axis_struct MPU6050AccOffsetAxis;
+  Axis_struct MPU6050GyThresholdAxis;
   Axis_struct MPU6050GyOffsetAxis;
 };
 
@@ -499,7 +508,7 @@ struct RobotPosition_struct {
   float speedL;
   float speedR;
   float speed;
-  Angle_struct angle;
+  Angle2d_struct angle;
 };
 
 struct Camera_struct {
@@ -615,8 +624,14 @@ bool getMPU6050I2CMasterModeEnabledSetting(void);
 void setMPU6050I2CMasterModeEnabledSetting(bool state);
 void setMPU6050I2CBypassEnabledSetting(bool state);
 bool getMPU6050I2CBypassEnabledSetting(void);
-MPU6050_struct getMPU6050Raw();
-MPU6050_struct getMPU6050Norm();
+
+Axis_struct getMPU6050GyRaw();
+Axis_struct getMPU6050AccRaw();
+Axis_struct getMPU6050GyNorm();
+Axis_struct getMPU6050AccNorm();
+float getMPU6050TempRaw();
+float getMPU6050TempNorm();
+
 float dist(float a, float b);
 float getSpeedFromDistance(float distance,float dt);
 
