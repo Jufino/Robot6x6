@@ -109,7 +109,7 @@ extern "C" {
 #define HMC5883L_REG_IDENT_C          (0x0C)
 
 //MPU6050
-https://github.com/jarzebski/Arduino-MPU6050/
+//https://github.com/jarzebski/Arduino-MPU6050/
 #define MPU6050_REG_ACCEL_XOFFS_H     (0x06)
 #define MPU6050_REG_ACCEL_XOFFS_L     (0x07)
 #define MPU6050_REG_ACCEL_YOFFS_H     (0x08)
@@ -299,12 +299,12 @@ struct Axis_struct{
   float x;
   float y;
   float z;
-}
+};
 
 struct Angle_struct{
   float radian;
   float degree;
-}
+};
 
 //MPU6050
 struct MPU6050_struct {
@@ -510,7 +510,7 @@ struct Camera_struct {
 struct Voltage_struct{
   float volts;
   float capacityPercent;
-} 
+}; 
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
   GPS_struct gps;                     //gps
@@ -570,7 +570,7 @@ unsigned int getUltrasonicRaw();
 float getUltrasonic();
 int getVoltageRaw();
 float getVoltage();
-float getVoltagePercent();
+float calcVoltagePercent(float volt);
 int getAmpRaw();
 float getAmpVolt();
 float getAmp();
@@ -591,7 +591,7 @@ hmc5883l_dataRate_t getHMC5883LSampleSetting();
 void setHMC5883LSampleSetting(hmc5883l_samples_t sample);
 hmc5883l_dataRate_t getHMC5883LRateSetting();
 void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate);
-hmc5883l_range_t getHMC5883LReadModeSetting();
+hmc5883l_range_t getHMC5883LRangeSetting();
 void setHMC5883LRangeSetting(hmc5883l_range_t range);
 hmc5883l_mode_t getHMC5883LReadModeSetting();
 void setHMC5883LReadModeSetting(hmc5883l_mode_t mode);
@@ -599,6 +599,8 @@ bool getHMC5883LHighI2CSpeedSetting(bool status);
 void setHMC5883LHighI2CSpeedSetting(bool status);
 HMC5883L_struct getHMC5883LRaw();
 HMC5883L_struct getHMC5883LNorm();
+
+void callibrateMPU6050Gyroscope(int samples);
 void setMPU6050ScaleSetting(mpu6050_dps_t scale);
 mpu6050_dps_t getMPU6050ScaleSetting();
 void setMPU6050RangeSetting(mpu6050_range_t range);
@@ -613,8 +615,8 @@ bool getMPU6050I2CMasterModeEnabledSetting(void);
 void setMPU6050I2CMasterModeEnabledSetting(bool state);
 void setMPU6050I2CBypassEnabledSetting(bool state);
 bool getMPU6050I2CBypassEnabledSetting(void);
-MPU6050_struct getRawMPU6050();
-MPU6050_struct getNormMPU6050();
+MPU6050_struct getMPU6050Raw();
+MPU6050_struct getMPU6050Norm();
 float dist(float a, float b);
 float getSpeedFromDistance(float distance,float dt);
 

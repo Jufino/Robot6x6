@@ -50,10 +50,12 @@ void initRobot() {
 
   setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
   setMPU6050RangeSetting(MPU6050_RANGE_2G);
-  setMPU6050I2CMasterModeEnabled(false);
-  setMPU6050I2CBypassEnabled(true) ;
-  setMPU6050SleepEnabled(false);
-  
+  setMPU6050I2CMasterModeEnabledSetting(false);
+  setMPU6050I2CBypassEnabledSetting(true) ;
+  setMPU6050SleepEnabledSetting(false);
+
+  callibrateMPU6050Gyroscope(50);
+ 
   if(!HMC5883LTestConnection()){
     errorLedBlink();
     closeI2C();
@@ -556,8 +558,8 @@ float getVoltage() {
   return (float)getVoltageRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION) * ((R1 + R2) / R2);
 }
 
-float getVoltagePercent() {
-  return (float)getVoltage() * (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) - (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) * MIN_BATTERY_VOLTAGE;
+float calcVoltagePercent(float volt) {
+  return (float)volt * (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) - (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) * MIN_BATTERY_VOLTAGE;
 }
 
 int getAmpRaw() {
@@ -1068,7 +1070,7 @@ void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate){
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(datarate<<2));
 }
 
-hmc5883l_range_t getHMC5883LReadModeSetting(){  
+hmc5883l_range_t getHMC5883LRangeSetting(){  
   return (hmc5883l_range_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B) & 0b11100000)>>5);
 }
 
@@ -1126,14 +1128,14 @@ HMC5883L_struct getHMC5883LRaw() {
   HMC5883L_struct HMC5883L;
   
   HMC5883L.compassAxis.x = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
-  HMC5883L.compassAxis.Y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
+  HMC5883L.compassAxis.y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
   HMC5883L.compassAxis.z = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
   
   return HMC5883L;
 }
 
 HMC5883L_struct getHMC5883LNorm() {
-  HMC5883L_struct HMC5883L = getRawHMC5883L();
+  HMC5883L_struct HMC5883L = getHMC5883LRaw();
   
   if(CALLIBRATE_DATA_CALCULATE){
     if (HMC5883L.compassAxis.x < minAxis.x) minAxis.x = HMC5883L.compassAxis.x;
@@ -1152,19 +1154,51 @@ HMC5883L_struct getHMC5883LNorm() {
   HMC5883L.compassAxis.z = (HMC5883L.compassAxis.z-HMC5883L_OFFSET_Z) * mgPerDigit;
 
   float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
-  HMC5883L.angleRad = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
+  HMC5883L.angle.radian = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
   
-  if(HMC5883L.angleRad < 0){
-    HMC5883L.angleRad+= 2*M_PI;
+  if(HMC5883L.angle.radian < 0){
+    HMC5883L.angle.radian+= 2*M_PI;
   }
-  else if(HMC5883L.angleRad > 2*M_PI){
-    HMC5883L.angleRad-=2*M_PI;
+  else if(HMC5883L.angle.radian > 2*M_PI){
+    HMC5883L.angle.radian-=2*M_PI;
   }
 
-  HMC5883L.angleDeg = HMC5883L.angleRad*(180/M_PI);
+  HMC5883L.angle.degree = HMC5883L.angle.radian*(180/M_PI);
   return HMC5883L;
 }
 
+
+void callibrateMPU6050Gyroscope(int samples){
+    float sumX = 0;
+    float sumY = 0;
+    float sumZ = 0;
+
+    float sigmaX = 0;
+    float sigmaY = 0;
+    float sigmaZ = 0;
+
+    for (unsigned char i = 0; i < samples; ++i)
+    {
+	MPU6050_struct MPU6050 = getMPU6050Raw();
+	sumX += MPU6050.gyAxis.x;
+	sumY += MPU6050.gyAxis.y;
+	sumZ += MPU6050.gyAxis.z;
+
+	sigmaX += MPU6050.gyAxis.x * MPU6050.gyAxis.x;
+	sigmaY += MPU6050.gyAxis.y * MPU6050.gyAxis.y;
+	sigmaZ += MPU6050.gyAxis.z * MPU6050.gyAxis.z;	
+
+	usleep(5);
+    }
+
+    gyAxisOffset.x = sumX / samples;
+    gyAxisOffset.y = sumY / samples;
+    gyAxisOffset.z = sumZ / samples;
+
+    gyAxisthreshold.x = sqrt((sigmaX / samples) - (gyAxisOffset.x * gyAxisOffset.x));
+    gyAxisthreshold.y = sqrt((sigmaY / samples) - (gyAxisOffset.y * gyAxisOffset.y));
+    gyAxisthreshold.z = sqrt((sigmaZ / samples) - (gyAxisOffset.z * gyAxisOffset.z));
+}
 
 void setMPU6050ScaleSetting(mpu6050_dps_t scale)
 {
@@ -1250,7 +1284,7 @@ mpu6050_clockSource_t getMPU6050ClockSourceSetting(void)
 
 bool getMPU6050SleepEnabledSetting(void)
 {
-  return readRegisterBit(MPU6050_REG_PWR_MGMT_1, 6);
+  return readRegisterBit(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1, 6);
 }
 
 void setMPU6050SleepEnabledSetting(bool state)
@@ -1287,7 +1321,7 @@ bool getMPU6050I2CBypassEnabledSetting(void)
   return readRegisterBit(MPU6050_ADDRESS,MPU6050_REG_INT_PIN_CFG,1);
 }
 
-MPU6050_struct getRawMPU6050() {
+MPU6050_struct getMPU6050Raw() {
   MPU6050_struct MPU6050;
   
   MPU6050.accAxis.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
@@ -1301,8 +1335,8 @@ MPU6050_struct getRawMPU6050() {
   return MPU6050;
 }
 
-MPU6050_struct getNormMPU6050(){
-  MPU6050_struct MPU6050 = getRawMPU6050();
+MPU6050_struct getMPU6050Norm(){
+  MPU6050_struct MPU6050 = getMPU6050Raw();
   MPU6050.accAxis.x = MPU6050.accAxis.x * rangePerDigit * 9.80665f; 
   MPU6050.accAxis.y = MPU6050.accAxis.y * rangePerDigit * 9.80665f; 
   MPU6050.accAxis.z = MPU6050.accAxis.z * rangePerDigit * 9.80665f; 
@@ -1331,10 +1365,10 @@ float getSpeedFromDistance(float distance,float dt) {
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
   float v = (deltaSpeedL+deltaSpeedR)/2;
-  robotSensors.robotPosition.angleRad+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
-  robotSensors.robotPosition.angleDeg = robotSensors.robotPosition.angleRad*(360/(2*M_PI));
-  robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angleRad)*dt;
-  robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angleRad)*dt;
+  robotSensors.robotPosition.angle.radian+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
+  robotSensors.robotPosition.angle.degree = robotSensors.robotPosition.angle.radian*(360/(2*M_PI));
+  robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle.radian)*dt;
+  robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angle.radian)*dt;
 }
 
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
@@ -1454,14 +1488,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
 
       if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
-	      robotSensors.HMC5883L = getNormHMC5883L(); 
+	robotSensors.HMC5883L = getHMC5883LNorm(); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
       }
       
       if (refreshMPU6050Check) {
         semWait(sem_id, 0);
-        robotSensors.MPU6050 = getNormMPU6050();
+        robotSensors.MPU6050 = getMPU6050Norm();
         semPost(sem_id, 0);
         pocetMPU6050 = 0;
       }
@@ -1634,12 +1668,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.buttons.buttonUp =     getButton(POSITION_UP);
       
       if (refreshBatteryCheck) {
-        robotSensors.voltage = getVoltage();
-        robotSensors.voltagePercent = getVoltagePercent();
+        robotSensors.voltage.volts = getVoltage();
+        robotSensors.voltage.capacityPercent = calcVoltagePercent(robotSensors.voltage.volts);
         if (BATTERY_LED_INDICATING == 1) {
-          if (robotSensors.voltagePercent > 60)           setLed(POSITION_DOWN, COLOR_GREEN);
-          else if (robotSensors.voltagePercent > 20)      setLed(POSITION_DOWN, COLOR_ORANGE);
-          else                                            setLed(POSITION_DOWN, COLOR_RED);
+          if (robotSensors.voltage.capacityPercent > 60)           setLed(POSITION_DOWN, COLOR_GREEN);
+          else if (robotSensors.voltage.capacityPercent > 20)      setLed(POSITION_DOWN, COLOR_ORANGE);
+          else                                            	setLed(POSITION_DOWN, COLOR_RED);
         }
       }
       if (refreshAmpCheck)    robotSensors.amper = getAmp();

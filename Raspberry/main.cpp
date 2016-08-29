@@ -31,8 +31,11 @@ int main(void){
   while(1){
 	RobotSensors robotSensors = getRobotSensors();
     	Callibrate callibrate = getCallibrate();
-	printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f",robotSensors.HMC5883L.X,robotSensors.HMC5883L.Y,robotSensors.HMC5883L.Z,robotSensors.HMC5883L.angleRad,robotSensors.HMC5883L.angleDeg);
-	printf(" calibX%f,calibY:%f\n",callibrate.HMC5883LOffsetX,callibrate.HMC5883LOffsetY); 
+//	printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f",robotSensors.HMC5883L.compassAxis.x,robotSensors.HMC5883L.compassAxis.y,robotSensors.HMC5883L.compassAxis.z,robotSensors.HMC5883L.angle.radian,robotSensors.HMC5883L.angle.degree);
+//	printf(" calibX%f,calibY:%f\n",callibrate.HMC5883LOffsetAxis.x,callibrate.HMC5883LOffsetAxis.y); 
+	printf("Acc.X:%f,Acc.Y:%f,Acc.Z:%f,Gy.X:%f,Gy.Y:%f,Gy.Z:%f\n",robotSensors.MPU6050.accAxis.x,robotSensors.MPU6050.accAxis.y,robotSensors.MPU6050.accAxis.z,
+									robotSensors.MPU6050.gyAxis.x,robotSensors.MPU6050.gyAxis.y,robotSensors.MPU6050.gyAxis.z);
+
   	usleep(100000);
    }
    closeRobot();
