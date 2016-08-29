@@ -24,19 +24,12 @@ RobotSensors robotSensors;
 Callibrate callibrate;
 
 timer_t casovac;
-float mgPerDigit = 0.92f;
+float mgPerDigit = 0.92f;    
+float rangePerDigit = 0.0f;
+float dpsPerDigit = 0.0f;
 
-float AccX_offset = 0;
-float AccY_offset = 0;
-float AccZ_offset = 0;
-float GyX_offset = 0;
-float GyY_offset = 0;
-float GyZ_offset = 0;
-float AccScale = 16384;
-float GyScale = 131;
-float Pitch = 0;
-float Roll = 0;
-float Yaw = 0;
+Axis_struct gyAxisOffset;
+Axis_struct gyAxisthreshold;
 
 int pocetPosition = 100;
 int pocetMotors = 100;
@@ -49,21 +42,18 @@ int pocetAmp = 100;
 int pocetUltrasonic = 100;
 int pocetCamera = 100;
 
-float minX = 0;
-float minY = 0;
-float maxX = 0;
-float maxY = 0;
+Axis_struct minAxis;
+Axis_struct maxAxis;
 
 void initRobot() {
   initI2C();
 
-  MPU6050WakeUp();
-  setMPU6050Sensitivity(1,1);
-  setMPU6050DLPF(6,6);
-  MPU6050CalibrateOffset(20);
-  MPU6050DisableAsMaster();
-  MPU6050WakeUp();
-  (/
+  setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
+  setMPU6050RangeSetting(MPU6050_RANGE_2G);
+  setMPU6050I2CMasterModeEnabled(false);
+  setMPU6050I2CBypassEnabled(true) ;
+  setMPU6050SleepEnabled(false);
+  
   if(!HMC5883LTestConnection()){
     errorLedBlink();
     closeI2C();
@@ -71,12 +61,12 @@ void initRobot() {
     exit(0);
   }
 
-  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
-  HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
-  HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
-  HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
-  HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
-  HMC5883LHighI2CSpeedSetting(false);
+  setHMC5883LMeasurementSetting(HMC5883L_NORMAL);
+  setHMC5883LSampleSetting(HMC5883L_SAMPLES_8);
+  setHMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
+  setHMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
+  setHMC5883LReadModeSetting(HMC5883L_CONTINOUS);
+  setHMC5883LHighI2CSpeedSetting(false);
 
   if(!blueTestConnection()){
     errorLedBlink();
@@ -196,13 +186,6 @@ void initRobot() {
   }
     
   resetDistanceAll();
-
-  HMC5883LMeasurementSetting(HMC5883L_NORMAL);
-  HMC5883LSampleSetting(HMC5883L_SAMPLES_8);
-  HMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
-  HMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
-  HMC5883LReadModeSetting(HMC5883L_CONTINOUS);
-  HMC5883LHighI2CSpeedSetting(false);
     
   setMotorPowerSupply(true);//potom zmenit na true
     
@@ -343,6 +326,10 @@ unsigned char readRegister8(unsigned char addr, unsigned char reg) {
   else{
 	return 0;
   }
+}
+
+bool readRegisterBit(unsigned char addr, unsigned char reg, char pin){
+  return (readRegister8(addr,reg) & (1<<pin)) && (1<<pin);
 }
 
 void sendMatImage(Mat img, int quality) {
@@ -1054,22 +1041,38 @@ bool HMC5883LTestConnection(){
    return identA=='H' && identB=='4' && identC=='3';
 }
 
-void HMC5883LMeasurementSetting(hmc5883l_measurement_t measurement){
+hmc5883l_measurement_t getHMC5883LMeasurementSetting(){  
+  return (hmc5883l_measurement_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b00000011));
+}
+
+void setHMC5883LMeasurementSetting(hmc5883l_measurement_t measurement){
   char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b00000011;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(measurement));
 }
 
-void HMC5883LSampleSetting(hmc5883l_samples_t sample){
+hmc5883l_dataRate_t getHMC5883LSampleSetting(){  
+  return (hmc5883l_dataRate_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b11100011)>>2);
+}
+
+void setHMC5883LSampleSetting(hmc5883l_samples_t sample){
   char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b00011111;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(sample<<5)|0b10000000);
 }
 
-void HMC5883LRateSetting(hmc5883l_dataRate_t datarate){
+hmc5883l_dataRate_t getHMC5883LRateSetting(){  
+  return (hmc5883l_dataRate_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b11100011)>>2);
+}
+
+void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate){
   char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A) & 0b11100011;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_A,oldRegister|(datarate<<2));
 }
 
-void HMC5883LRangeSetting(hmc5883l_range_t range){
+hmc5883l_range_t getHMC5883LReadModeSetting(){  
+  return (hmc5883l_range_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B) & 0b11100000)>>5);
+}
+
+void setHMC5883LRangeSetting(hmc5883l_range_t range){
   switch(range){
     case HMC5883L_RANGE_0_88GA:
             mgPerDigit = 0.73f;
@@ -1099,12 +1102,20 @@ void HMC5883LRangeSetting(hmc5883l_range_t range){
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,range<<5);
 }
 
-void HMC5883LReadModeSetting(hmc5883l_mode_t mode){
+hmc5883l_mode_t getHMC5883LReadModeSetting(){  
+  return (hmc5883l_mode_t)((readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_MODE) & 0b00011000)>>3);
+}
+
+void setHMC5883LReadModeSetting(hmc5883l_mode_t mode){
   char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_MODE) & 0b10000000;
   writeRegister(HMC5883L_ADDRESS,HMC5883L_REG_MODE,oldRegister | mode);
 }
 
-void HMC5883LHighI2CSpeedSetting(bool status){
+bool getHMC5883LHighI2CSpeedSetting(bool status){
+  return readRegisterBit(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B,7);
+}
+
+void setHMC5883LHighI2CSpeedSetting(bool status){
   char oldRegister = readRegister8(HMC5883L_ADDRESS,HMC5883L_REG_CONFIG_B) & 0b00000011;
   if(status)
     oldRegister |= 0x80;
@@ -1113,29 +1124,35 @@ void HMC5883LHighI2CSpeedSetting(bool status){
 
 HMC5883L_struct getHMC5883LRaw() {
   HMC5883L_struct HMC5883L;
-  HMC5883L.X = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
-  HMC5883L.Y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
-  HMC5883L.Z = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
+  
+  HMC5883L.compassAxis.x = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
+  HMC5883L.compassAxis.Y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
+  HMC5883L.compassAxis.z = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
+  
   return HMC5883L;
 }
 
-void calibrateOffsetHMC5883L(HMC5883L_struct HMC5883L){
- if (HMC5883L.X < minX) minX = HMC5883L.X;
- if (HMC5883L.X > maxX) maxX = HMC5883L.X;
- if (HMC5883L.Y < minY) minY = HMC5883L.Y;
- if (HMC5883L.Y > maxY) maxY = HMC5883L.Y;
- callibrate.HMC5883LOffsetX = (maxX + minX)/2;
- callibrate.HMC5883LOffsetY = (maxY + minY)/2; 
-}
-
-HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L) {
+HMC5883L_struct getHMC5883LNorm() {
+  HMC5883L_struct HMC5883L = getRawHMC5883L();
   
-  HMC5883L.X = (HMC5883L.X-HMC5883L_OFFSET_X) * mgPerDigit;
-  HMC5883L.Y = (HMC5883L.Y-HMC5883L_OFFSET_Y) * mgPerDigit;
-  HMC5883L.Z = HMC5883L.Z * mgPerDigit;
+  if(CALLIBRATE_DATA_CALCULATE){
+    if (HMC5883L.compassAxis.x < minAxis.x) minAxis.x = HMC5883L.compassAxis.x;
+    if (HMC5883L.compassAxis.x > maxAxis.x) maxAxis.x = HMC5883L.compassAxis.x;
+    if (HMC5883L.compassAxis.y < maxAxis.y) maxAxis.y = HMC5883L.compassAxis.y;
+    if (HMC5883L.compassAxis.y > maxAxis.y) maxAxis.y = HMC5883L.compassAxis.y;
+    if (HMC5883L.compassAxis.z < maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
+    if (HMC5883L.compassAxis.z > maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
+    callibrate.HMC5883LOffsetAxis.x = (maxAxis.x + minAxis.x)/2;
+    callibrate.HMC5883LOffsetAxis.y = (maxAxis.y + minAxis.y)/2; 
+    callibrate.HMC5883LOffsetAxis.z = (maxAxis.z + minAxis.z)/2; 
+  }
+  
+  HMC5883L.compassAxis.x = (HMC5883L.compassAxis.x-HMC5883L_OFFSET_X) * mgPerDigit;
+  HMC5883L.compassAxis.y = (HMC5883L.compassAxis.y-HMC5883L_OFFSET_Y) * mgPerDigit;
+  HMC5883L.compassAxis.z = (HMC5883L.compassAxis.z-HMC5883L_OFFSET_Z) * mgPerDigit;
 
-//  float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun podla zemepisnej sirky a dlzky
-  HMC5883L.angleRad = atan2(HMC5883L.Y,HMC5883L.X); //+ declinationAngle; 
+  float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
+  HMC5883L.angleRad = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
   
   if(HMC5883L.angleRad < 0){
     HMC5883L.angleRad+= 2*M_PI;
@@ -1148,105 +1165,162 @@ HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L) {
   return HMC5883L;
 }
 
-void MPU6050ResetPRY() {
-  Pitch = 0;
-  Roll = 0;
-  Yaw = 0;
-}
 
-void MPU6050ResetOffset() {
-  AccX_offset = 0;
-  AccY_offset = 0;
-  AccZ_offset = 0;
-  GyX_offset = 0;
-  GyY_offset = 0;
-  GyZ_offset = 0;
-}
-
-void MPU6050WakeUp() {
-  writeRegister(MPU6050_ADDRESS, 0x6B, readRegister8(MPU6050_ADDRESS,0x6B)&(!(1<<6)));
-}
-
-void MPU6050DisableAsMaster(){
-   writeRegister(MPU6050_ADDRESS, 0x6A, readRegister8(MPU6050_ADDRESS,0x6A)&(!(1<<5|1<<4)));
-   writeRegister(MPU6050_ADDRESS, 0x37, readRegister8(MPU6050_ADDRESS,0x37)|(1<<1));
-}
-
-MPU6050_struct getMPU6050Raw() {
-  MPU6050_struct MPU6050;
-  MPU6050.AccX = (float)readRegister16s(MPU6050_ADDRESS, 0x3B);
-  MPU6050.AccY = (float)readRegister16s(MPU6050_ADDRESS, 0x3D);
-  MPU6050.AccZ = (float)readRegister16s(MPU6050_ADDRESS, 0x3F);
-  MPU6050.Temp = (float)readRegister16s(MPU6050_ADDRESS, 0x41);
-  MPU6050.GyX  = (float)readRegister16s(MPU6050_ADDRESS, 0x43);
-  MPU6050.GyY  = (float)readRegister16s(MPU6050_ADDRESS, 0x45);
-  MPU6050.GyZ  = (float)readRegister16s(MPU6050_ADDRESS, 0x47);
-  return MPU6050;
-}
-
-MPU6050_struct getMPU6050() {
-  MPU6050_struct MPU6050;
-  MPU6050.AccX = (float)readRegister16s(MPU6050_ADDRESS, 0x3B) / AccScale - AccX_offset;
-  MPU6050.AccY = (float)readRegister16s(MPU6050_ADDRESS, 0x3D) / AccScale - AccY_offset;
-  MPU6050.AccZ = (float)readRegister16s(MPU6050_ADDRESS, 0x3F) / AccScale - AccZ_offset;
-  MPU6050.Temp = (float)readRegister16s(MPU6050_ADDRESS, 0x41) / 340 + 36.53;
-  MPU6050.GyX  = (float)readRegister16s(MPU6050_ADDRESS, 0x43) / GyScale - GyX_offset;
-  MPU6050.GyY  = (float)readRegister16s(MPU6050_ADDRESS, 0x45) / GyScale - GyY_offset;
-  MPU6050.GyZ  = (float)readRegister16s(MPU6050_ADDRESS, 0x47) / GyScale - GyZ_offset;
-  return MPU6050;
-}
-
-void MPU6050CalibrateOffset(int pocet) {
-  float acc_x = 0, acc_y = 0, acc_z = 0;
-  float gy_x = 0, gy_y = 0, gy_z = 0;
-  MPU6050_struct MPU6050;
-  for (int i = 0; i < pocet; i++) {
-    MPU6050 = getMPU6050();
-    acc_x += MPU6050.AccX;
-    acc_y += MPU6050.AccY;
-    acc_z += MPU6050.AccZ;
-    gy_x += MPU6050.GyX;
-    gy_y += MPU6050.GyY;
-    gy_z += MPU6050.GyZ;
+void setMPU6050ScaleSetting(mpu6050_dps_t scale)
+{
+  switch (scale){
+    case MPU6050_SCALE_250DPS:
+      dpsPerDigit = .007633f;
+      break;
+    case MPU6050_SCALE_500DPS:
+	    dpsPerDigit = .015267f;
+	    break;
+    case MPU6050_SCALE_1000DPS:
+      dpsPerDigit = .030487f;
+      break;
+    case MPU6050_SCALE_2000DPS:
+      dpsPerDigit = .060975f;
+      break;
+	  default:
+      break;
   }
-  AccX_offset = acc_x / pocet;
-  AccY_offset = acc_y / pocet;
-  AccZ_offset = acc_z / pocet + 1;
+    
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_GYRO_CONFIG) & 0b11100111;
+  oldRegister |= (scale << 3);
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_GYRO_CONFIG, oldRegister);  
+}
 
-  GyX_offset = gy_x / pocet;
-  GyY_offset = gy_y / pocet;
-  GyZ_offset = gy_z / pocet;
+mpu6050_dps_t getMPU6050ScaleSetting(){  
+  return (mpu6050_dps_t)(readRegister8(MPU6050_ADDRESS,MPU6050_REG_GYRO_CONFIG) & 0b00011000);
+}
+
+void setMPU6050RangeSetting(mpu6050_range_t range){
+  switch (range){
+    case MPU6050_RANGE_2G:
+	   rangePerDigit = .000061f;
+	   break;
+    case MPU6050_RANGE_4G:
+	   rangePerDigit = .000122f;
+	   break;
+    case MPU6050_RANGE_8G:
+	   rangePerDigit = .000244f;
+	   break;
+    case MPU6050_RANGE_16G:
+	   rangePerDigit = .0004882f;
+	   break;
+    default:
+    break;
+  }
+
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_ACCEL_CONFIG) & 0b11100111;
+  oldRegister |= (range << 3);
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_ACCEL_CONFIG, oldRegister);  
+}
+
+mpu6050_range_t getMPU6050RangeSetting(void)
+{
+  return (mpu6050_range_t)((readRegister8(MPU6050_ADDRESS,MPU6050_REG_ACCEL_CONFIG) & 0b00011000)>>3);
+}
+
+void setMPU6050DHPFModeSetting(mpu6050_dhpf_t dhpf)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_ACCEL_CONFIG) & 0b11111000;
+  oldRegister |= dhpf;
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_ACCEL_CONFIG, oldRegister);  
+}
+
+void setMPU6050DLPFModeSetting(mpu6050_dlpf_t dlpf)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_CONFIG) & 0b11111000;
+  oldRegister |= dlpf;
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_CONFIG, oldRegister);  
+}
+
+void setMPU6050ClockSourceSetting(mpu6050_clockSource_t source)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1) & 0b11111000;
+  oldRegister |= source;
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1, oldRegister);
+}
+
+mpu6050_clockSource_t getMPU6050ClockSourceSetting(void)
+{
+  return (mpu6050_clockSource_t)(readRegister8(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1) & 0b00000111);
+}
+
+bool getMPU6050SleepEnabledSetting(void)
+{
+  return readRegisterBit(MPU6050_REG_PWR_MGMT_1, 6);
+}
+
+void setMPU6050SleepEnabledSetting(bool state)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1) & !(1<<6);
+  if(state)
+    oldRegister |= (1<<6);
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_PWR_MGMT_1, oldRegister);
+}
+
+bool getMPU6050I2CMasterModeEnabledSetting(void)
+{                            
+  return readRegisterBit(MPU6050_ADDRESS,MPU6050_REG_USER_CTRL, 5);
+}
+
+void setMPU6050I2CMasterModeEnabledSetting(bool state)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_USER_CTRL) & !(1<<5);
+  if(state)
+    oldRegister |= (1<<5);
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_USER_CTRL, oldRegister);
+}
+
+void setMPU6050I2CBypassEnabledSetting(bool state)
+{
+  char oldRegister = readRegister8(MPU6050_ADDRESS,MPU6050_REG_INT_PIN_CFG) & !(1<<1);
+  if(state)
+    oldRegister |= (1<<1);
+  writeRegister(MPU6050_ADDRESS,MPU6050_REG_INT_PIN_CFG, oldRegister);
+}
+
+bool getMPU6050I2CBypassEnabledSetting(void)
+{
+  return readRegisterBit(MPU6050_ADDRESS,MPU6050_REG_INT_PIN_CFG,1);
+}
+
+MPU6050_struct getRawMPU6050() {
+  MPU6050_struct MPU6050;
+  
+  MPU6050.accAxis.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
+  MPU6050.accAxis.y = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOUT_H);
+  MPU6050.accAxis.z = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOUT_H);
+  MPU6050.gyAxis.x  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
+  MPU6050.gyAxis.y  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_YOUT_H);
+  MPU6050.gyAxis.z  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOUT_H);
+  MPU6050.Temp =      (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
+  
+  return MPU6050;
+}
+
+MPU6050_struct getNormMPU6050(){
+  MPU6050_struct MPU6050 = getRawMPU6050();
+  MPU6050.accAxis.x = MPU6050.accAxis.x * rangePerDigit * 9.80665f; 
+  MPU6050.accAxis.y = MPU6050.accAxis.y * rangePerDigit * 9.80665f; 
+  MPU6050.accAxis.z = MPU6050.accAxis.z * rangePerDigit * 9.80665f; 
+  
+  MPU6050.gyAxis.x = (MPU6050.gyAxis.x-gyAxisOffset.x) * dpsPerDigit; 
+  MPU6050.gyAxis.y = (MPU6050.gyAxis.y-gyAxisOffset.y) * dpsPerDigit; 
+  MPU6050.gyAxis.z = (MPU6050.gyAxis.z-gyAxisOffset.z) * dpsPerDigit;
+  
+  if(abs(MPU6050.gyAxis.x) < gyAxisthreshold.x) MPU6050.gyAxis.x = 0; 
+  if(abs(MPU6050.gyAxis.y) < gyAxisthreshold.y) MPU6050.gyAxis.y = 0; 
+  if(abs(MPU6050.gyAxis.z) < gyAxisthreshold.z) MPU6050.gyAxis.z = 0; 
+  
+  MPU6050.Temp = MPU6050.Temp/340 + 36.53;
+  return MPU6050;   
 }
 
 float dist(float a, float b) {
   return sqrt(a * a + b * b);
-}
-
-void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens) {
-  switch (acc_sens) {
-    case 0: AccScale = 16384; break;    //2g
-    case 1: AccScale = 8192;  break;    //4g
-    case 2: AccScale = 4096;  break;    //8g
-    case 3: AccScale = 2048;  break;    //16g
-  }
-
-  switch (gy_sens) {
-    case 0: GyScale = 131;        break;          //250 stup/s
-    case 1: GyScale = 65.5;       break;          //500 stup/s
-    case 2: GyScale = 32.75;      break;          //1000 stup/s
-    case 3: GyScale = 16.375;     break;          //2000 stup/s
-  }
-  writeRegister(MPU6050_ADDRESS, 0x1B, (gy_sens << 3) | 0xE0);
-  writeRegister(MPU6050_ADDRESS, 0x1C, (acc_sens << 3) | 0xE0);
-}
-
-void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf) {
-  writeRegister(MPU6050_ADDRESS, 0x1A, acc_dlpf | (5 << 3));
-  writeRegister(MPU6050_ADDRESS, 0x1A, acc_dlpf | (6 << 3));
-  writeRegister(MPU6050_ADDRESS, 0x1A, acc_dlpf | (7 << 3));
-  writeRegister(MPU6050_ADDRESS, 0x1A, gy_dlpf | (2 << 3));
-  writeRegister(MPU6050_ADDRESS, 0x1A, gy_dlpf | (3 << 3));
-  writeRegister(MPU6050_ADDRESS, 0x1A, gy_dlpf | (4 << 3));
 }
 
 float getSpeedFromDistance(float distance,float dt) {
@@ -1380,18 +1454,14 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
 
       if (refreshHMC5883LCheck) {
         semWait(sem_id, 0);
-        robotSensors.HMC5883L = getHMC5883LRaw();
-        if(CALLIBRATE_DATA_CALCULATE){
-          calibrateOffsetHMC5883L(robotSensors.HMC5883L);
-        }
-	robotSensors.HMC5883L = normHMC5883L(robotSensors.HMC5883L); 
+	      robotSensors.HMC5883L = getNormHMC5883L(); 
         semPost(sem_id, 0);
         pocetHMC5883L = 0;
       }
       
       if (refreshMPU6050Check) {
         semWait(sem_id, 0);
-        robotSensors.MPU6050 = getMPU6050();
+        robotSensors.MPU6050 = getNormMPU6050();
         semPost(sem_id, 0);
         pocetMPU6050 = 0;
       }

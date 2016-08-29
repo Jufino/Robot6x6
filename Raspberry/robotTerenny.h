@@ -79,6 +79,7 @@ extern "C" {
 
 #define HMC5883L_OFFSET_X -345.0f
 #define HMC5883L_OFFSET_Y -540.0f
+#define HMC5883L_OFFSET_Z    0.0f
 
 // zavisle na zemepisnej sirke: http://magnetic-declination.com/  
 #define HMC5883L_DEGREE 4.0f
@@ -92,7 +93,7 @@ extern "C" {
 #define INDEX_CAMERA_RIGHT 1
 
 //HMC5883L
-//https://github.com/jarzebski/Arduino-HMC5883L/blob/master/HMC5883L_compass_MPU6050/HMC5883L_compass_MPU6050.ino
+//https://github.com/jarzebski/Arduino-HMC5883L/
 #define HMC5883L_REG_CONFIG_A         (0x00)
 #define HMC5883L_REG_CONFIG_B         (0x01)
 #define HMC5883L_REG_MODE             (0x02)
@@ -108,8 +109,150 @@ extern "C" {
 #define HMC5883L_REG_IDENT_C          (0x0C)
 
 //MPU6050
+https://github.com/jarzebski/Arduino-MPU6050/
+#define MPU6050_REG_ACCEL_XOFFS_H     (0x06)
+#define MPU6050_REG_ACCEL_XOFFS_L     (0x07)
+#define MPU6050_REG_ACCEL_YOFFS_H     (0x08)
+#define MPU6050_REG_ACCEL_YOFFS_L     (0x09)
+#define MPU6050_REG_ACCEL_ZOFFS_H     (0x0A)
+#define MPU6050_REG_ACCEL_ZOFFS_L     (0x0B)
+#define MPU6050_REG_GYRO_XOFFS_H      (0x13)
+#define MPU6050_REG_GYRO_XOFFS_L      (0x14)
+#define MPU6050_REG_GYRO_YOFFS_H      (0x15)
+#define MPU6050_REG_GYRO_YOFFS_L      (0x16)
+#define MPU6050_REG_GYRO_ZOFFS_H      (0x17)
+#define MPU6050_REG_GYRO_ZOFFS_L      (0x18)
+#define MPU6050_REG_CONFIG            (0x1A)
+#define MPU6050_REG_GYRO_CONFIG       (0x1B) // Gyroscope Configuration
+#define MPU6050_REG_ACCEL_CONFIG      (0x1C) // Accelerometer Configuration
+#define MPU6050_REG_FF_THRESHOLD      (0x1D)
+#define MPU6050_REG_FF_DURATION       (0x1E)
+#define MPU6050_REG_MOT_THRESHOLD     (0x1F)
+#define MPU6050_REG_MOT_DURATION      (0x20)
+#define MPU6050_REG_ZMOT_THRESHOLD    (0x21)
+#define MPU6050_REG_ZMOT_DURATION     (0x22)
+#define MPU6050_REG_INT_PIN_CFG       (0x37) // INT Pin. Bypass Enable Configuration
+#define MPU6050_REG_INT_ENABLE        (0x38) // INT Enable
+#define MPU6050_REG_INT_STATUS        (0x3A)
+#define MPU6050_REG_ACCEL_XOUT_H      (0x3B)
+#define MPU6050_REG_ACCEL_XOUT_L      (0x3C)
+#define MPU6050_REG_ACCEL_YOUT_H      (0x3D)
+#define MPU6050_REG_ACCEL_YOUT_L      (0x3E)
+#define MPU6050_REG_ACCEL_ZOUT_H      (0x3F)
+#define MPU6050_REG_ACCEL_ZOUT_L      (0x40)
+#define MPU6050_REG_TEMP_OUT_H        (0x41)
+#define MPU6050_REG_TEMP_OUT_L        (0x42)
+#define MPU6050_REG_GYRO_XOUT_H       (0x43)
+#define MPU6050_REG_GYRO_XOUT_L       (0x44)
+#define MPU6050_REG_GYRO_YOUT_H       (0x45)
+#define MPU6050_REG_GYRO_YOUT_L       (0x46)
+#define MPU6050_REG_GYRO_ZOUT_H       (0x47)
+#define MPU6050_REG_GYRO_ZOUT_L       (0x48)
+#define MPU6050_REG_MOT_DETECT_STATUS (0x61)
+#define MPU6050_REG_MOT_DETECT_CTRL   (0x69)
+#define MPU6050_REG_USER_CTRL         (0x6A) // User Control
+#define MPU6050_REG_PWR_MGMT_1        (0x6B) // Power Management 1
+#define MPU6050_REG_WHO_AM_I          (0x75) // Who Am I
 
+//MPU6050
+typedef enum
+{
+    MPU6050_CLOCK_KEEP_RESET      = 0b111,
+    MPU6050_CLOCK_EXTERNAL_19MHZ  = 0b101,
+    MPU6050_CLOCK_EXTERNAL_32KHZ  = 0b100,
+    MPU6050_CLOCK_PLL_ZGYRO       = 0b011,
+    MPU6050_CLOCK_PLL_YGYRO       = 0b010,
+    MPU6050_CLOCK_PLL_XGYRO       = 0b001,
+    MPU6050_CLOCK_INTERNAL_8MHZ   = 0b000
+} mpu6050_clockSource_t;
 
+typedef enum
+{
+    MPU6050_SCALE_2000DPS         = 0b11,
+    MPU6050_SCALE_1000DPS         = 0b10,
+    MPU6050_SCALE_500DPS          = 0b01,
+    MPU6050_SCALE_250DPS          = 0b00
+} mpu6050_dps_t;
+
+typedef enum
+{
+    MPU6050_RANGE_16G             = 0b11,
+    MPU6050_RANGE_8G              = 0b10,
+    MPU6050_RANGE_4G              = 0b01,
+    MPU6050_RANGE_2G              = 0b00,
+} mpu6050_range_t;
+
+typedef enum
+{
+    MPU6050_DELAY_3MS             = 0b11,
+    MPU6050_DELAY_2MS             = 0b10,
+    MPU6050_DELAY_1MS             = 0b01,
+    MPU6050_NO_DELAY              = 0b00,
+} mpu6050_onDelay_t;
+
+typedef enum
+{
+    MPU6050_DHPF_HOLD             = 0b111,
+    MPU6050_DHPF_0_63HZ           = 0b100,
+    MPU6050_DHPF_1_25HZ           = 0b011,
+    MPU6050_DHPF_2_5HZ            = 0b010,
+    MPU6050_DHPF_5HZ              = 0b001,
+    MPU6050_DHPF_RESET            = 0b000,
+} mpu6050_dhpf_t;
+
+typedef enum
+{
+    MPU6050_DLPF_6                = 0b110,
+    MPU6050_DLPF_5                = 0b101,
+    MPU6050_DLPF_4                = 0b100,
+    MPU6050_DLPF_3                = 0b011,
+    MPU6050_DLPF_2                = 0b010,
+    MPU6050_DLPF_1                = 0b001,
+    MPU6050_DLPF_0                = 0b000,
+} mpu6050_dlpf_t;
+//--------------------------------------------
+//HMC5883L
+typedef enum{
+    HMC5883L_SAMPLES_8     = 0b11,
+    HMC5883L_SAMPLES_4     = 0b10,
+    HMC5883L_SAMPLES_2     = 0b01,
+    HMC5883L_SAMPLES_1     = 0b00
+} hmc5883l_samples_t;
+
+typedef enum{
+    HMC5883L_DATARATE_75HZ       = 0b110,
+    HMC5883L_DATARATE_30HZ       = 0b101,
+    HMC5883L_DATARATE_15HZ       = 0b100,
+    HMC5883L_DATARATE_7_5HZ      = 0b011,
+    HMC5883L_DATARATE_3HZ        = 0b010,
+    HMC5883L_DATARATE_1_5HZ      = 0b001,
+    HMC5883L_DATARATE_0_75_HZ    = 0b000
+} hmc5883l_dataRate_t;
+
+typedef enum{
+    HMC5883L_RANGE_8_1GA     = 0b111,
+    HMC5883L_RANGE_5_6GA     = 0b110,
+    HMC5883L_RANGE_4_7GA     = 0b101,
+    HMC5883L_RANGE_4GA       = 0b100,
+    HMC5883L_RANGE_2_5GA     = 0b011,
+    HMC5883L_RANGE_1_9GA     = 0b010,
+    HMC5883L_RANGE_1_3GA     = 0b001,
+    HMC5883L_RANGE_0_88GA    = 0b000
+} hmc5883l_range_t;
+
+typedef enum{
+    HMC5883L_IDLE          = 0b10,
+    HMC5883L_SINGLE        = 0b01,
+    HMC5883L_CONTINOUS     = 0b00
+} hmc5883l_mode_t;
+
+typedef enum{
+    HMC5883L_NORMAL          = 0b00,
+    HMC5883L_POSITIVE_BIAS   = 0b01,
+    HMC5883L_NEGATIVE_BIAS   = 0b10
+} hmc5883l_measurement_t;
+//--------------------------------------------
+//ostatne
 typedef enum{
     COLOR_GREEN,
     COLOR_RED,
@@ -150,67 +293,32 @@ typedef enum{
     POSITION_UP_LEFT,
     POSITION_UP_RIGHT,
 } position6_t;
+//--------------------------------------------
+
+struct Axis_struct{
+  float x;
+  float y;
+  float z;
+}
+
+struct Angle_struct{
+  float radian;
+  float degree;
+}
 
 //MPU6050
 struct MPU6050_struct {
-  float AccX;
-  float AccY;
-  float AccZ;
+  Axis_struct accAxis;
+  Axis_struct gyAxis;
+  Angle_struct Roll;
+  Angle_struct Pitch;
+  Angle_struct Yaw;
   float Temp;
-  float GyX;
-  float GyY;
-  float GyZ;
-  float Roll;
-  float Pitch;
-  float Yaw;
 };
 
-typedef enum{
-    HMC5883L_SAMPLES_8     = 0b11,
-    HMC5883L_SAMPLES_4     = 0b10,
-    HMC5883L_SAMPLES_2     = 0b01,
-    HMC5883L_SAMPLES_1     = 0b00
-} hmc5883l_samples_t;
-
-typedef enum{
-    HMC5883L_DATARATE_75HZ       = 0b110,
-    HMC5883L_DATARATE_30HZ       = 0b101,
-    HMC5883L_DATARATE_15HZ       = 0b100,
-    HMC5883L_DATARATE_7_5HZ      = 0b011,
-    HMC5883L_DATARATE_3HZ        = 0b010,
-    HMC5883L_DATARATE_1_5HZ      = 0b001,
-    HMC5883L_DATARATE_0_75_HZ    = 0b000
-} hmc5883l_dataRate_t;
-
-typedef enum{
-    HMC5883L_RANGE_8_1GA     = 0b111,
-    HMC5883L_RANGE_5_6GA     = 0b110,
-    HMC5883L_RANGE_4_7GA     = 0b101,
-    HMC5883L_RANGE_4GA       = 0b100,
-    HMC5883L_RANGE_2_5GA     = 0b011,
-    HMC5883L_RANGE_1_9GA     = 0b010,
-    HMC5883L_RANGE_1_3GA     = 0b001,
-    HMC5883L_RANGE_0_88GA    = 0b000
-} hmc5883l_range_t;
-
-typedef enum{
-    HMC5883L_IDLE          = 0b10,
-    HMC5883L_SINGLE        = 0b01,
-    HMC5883L_CONTINOUS     = 0b00
-} hmc5883l_mode_t;
-
-typedef enum{
-    HMC5883L_NORMAL          = 0b00,
-    HMC5883L_POSITIVE_BIAS   = 0b01,
-    HMC5883L_NEGATIVE_BIAS   = 0b10
-} hmc5883l_measurement_t;
-
 struct HMC5883L_struct {
-  float X;
-  float Y;
-  float Z;
-  float angleRad;
-  float angleDeg;
+  Axis_struct compassAxis;
+  Angle_struct angle;
 };
 //-----------------------
 
@@ -363,14 +471,15 @@ struct MotorsSensor_struct {
 };
 
 struct Buttons_struct {
-  char buttonDown;
-  char buttonMiddle;
-  char buttonUp;
+  bool buttonDown;
+  bool buttonMiddle;
+  bool buttonUp;
 };
 
 struct Callibrate {
-  float HMC5883LOffsetX;
-  float HMC5883LOffsetY;
+  Axis_struct HMC5883LOffsetAxis;
+  Axis_struct MPU6050AccOffsetAxis;
+  Axis_struct MPU6050GyOffsetAxis;
 };
 
 struct Leds_struct {
@@ -382,8 +491,6 @@ struct Leds_struct {
 struct RobotPosition_struct {
   float x;
   float y;
-  float angleRad;
-  float angleDeg;
   
   float distanceL;
   float distanceR;
@@ -392,12 +499,18 @@ struct RobotPosition_struct {
   float speedL;
   float speedR;
   float speed;
+  Angle_struct angle;
 };
 
 struct Camera_struct {
   Mat imgLeft;
   Mat imgRight;
 };
+
+struct Voltage_struct{
+  float volts;
+  float capacityPercent;
+} 
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
   GPS_struct gps;                     //gps
@@ -407,25 +520,28 @@ struct RobotSensors {                 //struktura pre snimace aktualizovane s ca
   MotorsSensor_struct motors;         //meranie s otackomerov
   Buttons_struct buttons;             //tlacidla
   RobotPosition_struct robotPosition; //prepocitana pozicia
+  Voltage_struct voltage;
   float ultrasonic;                   //udaje z ultrazvuku
-  float voltage;                      //napatie na bateriach
-  float voltagePercent;               //napetie na bateriach(%)
   float amper;                        //prud odoberany z baterii
 };
 
 struct RobotAcculators {              //struktura pre riadiace veliciny s casom refresh podla jednotlivych hodnot pre riadenie
   MotorsAcculator_struct motors;
-  Buttons_struct buttons;
   Leds_struct leds;
   int servoAngle;
+  bool motorPowerSupply;
 };
 
 void initRobot();
 void closeRobot();
-
 void initI2C();
 void closeI2C();
 void errorLedBlink();
+void setDevice(unsigned char addr);
+void writeRegister(unsigned char addr, unsigned char reg, unsigned char value);
+unsigned int readRegister16(unsigned char addr, unsigned char reg);
+signed int readRegister16s(unsigned char addr, unsigned char reg);
+unsigned char readRegister8(unsigned char addr, unsigned char reg);
 void sendMatImage(Mat img, int quality);
 void *getImgL(void *arg);
 void *getImgR(void *arg);
@@ -437,7 +553,6 @@ RobotAcculators getRobotAcculators();
 void setRobotAcculators(RobotAcculators temp);
 RobotSensors getRobotSensors();
 Callibrate getCallibrate();
-
 int getCameraClientsock();
 int getSensorsClientsock();
 bool blueTestConnection();
@@ -469,29 +584,40 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
 void setMove(direction_t direction,unsigned char speed,bool onReg);
 int getKbhit(void);
 GPS_struct getGPS();
-
 bool HMC5883LTestConnection();
-void HMC5883LMeasurementSetting(hmc5883l_measurement_t measurement);
-void HMC5883LSampleSetting(hmc5883l_samples_t sample);
-void HMC5883LRateSetting(hmc5883l_dataRate_t datarate);
-void HMC5883LRangeSetting(hmc5883l_range_t range);
-void HMC5883LReadModeSetting(hmc5883l_mode_t mode);
-void HMC5883LHighI2CSpeedSetting(bool status);
+hmc5883l_measurement_t getHMC5883LMeasurementSetting();
+void setHMC5883LMeasurementSetting(hmc5883l_measurement_t measurement);
+hmc5883l_dataRate_t getHMC5883LSampleSetting();
+void setHMC5883LSampleSetting(hmc5883l_samples_t sample);
+hmc5883l_dataRate_t getHMC5883LRateSetting();
+void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate);
+hmc5883l_range_t getHMC5883LReadModeSetting();
+void setHMC5883LRangeSetting(hmc5883l_range_t range);
+hmc5883l_mode_t getHMC5883LReadModeSetting();
+void setHMC5883LReadModeSetting(hmc5883l_mode_t mode);
+bool getHMC5883LHighI2CSpeedSetting(bool status);
+void setHMC5883LHighI2CSpeedSetting(bool status);
 HMC5883L_struct getHMC5883LRaw();
-void calibrateOffsetHMC5883L(HMC5883L_struct HMC5883L);
-HMC5883L_struct normHMC5883L(HMC5883L_struct HMC5883L);    
-
-void MPU6050ResetPRY();
-void MPU6050ResetOffset();
-void MPU6050WakeUp();
-void MPU6050DisableAsMaster();
-MPU6050_struct getMPU6050Raw();
-MPU6050_struct getMPU6050();
-void MPU6050CalibrateOffset(int pocet);
+HMC5883L_struct getHMC5883LNorm();
+void setMPU6050ScaleSetting(mpu6050_dps_t scale);
+mpu6050_dps_t getMPU6050ScaleSetting();
+void setMPU6050RangeSetting(mpu6050_range_t range);
+mpu6050_range_t getMPU6050RangeSetting(void);
+void setMPU6050DHPFModeSetting(mpu6050_dhpf_t dhpf);
+void setMPU6050DLPFModeSetting(mpu6050_dlpf_t dlpf);
+void setMPU6050ClockSourceSetting(mpu6050_clockSource_t source);
+mpu6050_clockSource_t getMPU6050ClockSourceSetting(void);
+bool getMPU6050SleepEnabledSetting(void);
+void setMPU6050SleepEnabledSetting(bool state);
+bool getMPU6050I2CMasterModeEnabledSetting(void);
+void setMPU6050I2CMasterModeEnabledSetting(bool state);
+void setMPU6050I2CBypassEnabledSetting(bool state);
+bool getMPU6050I2CBypassEnabledSetting(void);
+MPU6050_struct getRawMPU6050();
+MPU6050_struct getNormMPU6050();
 float dist(float a, float b);
-void setMPU6050Sensitivity(unsigned char acc_sens, unsigned char gy_sens);
-void setMPU6050DLPF(unsigned char acc_dlpf, unsigned char gy_dlpf);
 float getSpeedFromDistance(float distance,float dt);
+
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);
