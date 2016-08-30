@@ -1383,12 +1383,58 @@ float dist(float a, float b) {
   return sqrt(a * a + b * b);
 }
 
+
+
+Kalman_struct kalman[1];
+// acc = angle measured with atan2 using the accelerometer
+// gy = angle measured using the gyro
+//http://blog.tkjelectronics.dk/2012/09/a-practical-approach-to-kalman-filter-and-how-to-implement-it/comment-page-1/
+//http://robottini.altervista.org/kalman-filter-vs-complementary-filter
+float kalmanCalculate(int indexKalman, float acc, float gy, float dt)
+{
+  kalman[indexKalman].x_angle += dt * (gy - kalman[indexKalman].x_bias);
+  kalman[indexKalman].P_00 +=  - dt * (kalman[indexKalman].P_10 + kalman[indexKalman].P_01) + kalman[indexKalman].Q_angle * dt;
+  kalman[indexKalman].P_01 +=  - dt * kalman[indexKalman].P_11;
+  kalman[indexKalman].P_10 +=  - dt * kalman[indexKalman].P_11;
+  kalman[indexKalman].P_11 +=  + kalman[indexKalman].Q_gyro * dt;
+  
+  kalman[indexKalman].y = acc - kalman[indexKalman].x_angle;
+  kalman[indexKalman].S = kalman[indexKalman].P_00 + kalman[indexKalman].R_angle;
+  kalman[indexKalman].K_0 = kalman[indexKalman].P_00 / kalman[indexKalman].S;
+  kalman[indexKalman].K_1 = kalman[indexKalman].P_10 / kalman[indexKalman].S;
+  
+  kalman[indexKalman].x_angle +=  kalman[indexKalman].K_0 * kalman[indexKalman].y;
+  kalman[indexKalman].x_bias  +=  kalman[indexKalman].K_1 * kalman[indexKalman].y;
+  kalman[indexKalman].P_00 -= kalman[indexKalman].K_0 * kalman[indexKalman].P_00;
+  kalman[indexKalman].P_01 -= kalman[indexKalman].K_0 * kalman[indexKalman].P_01;
+  kalman[indexKalman].P_10 -= kalman[indexKalman].K_1 * kalman[indexKalman].P_00;
+  kalman[indexKalman].P_11 -= kalman[indexKalman].K_1 * kalman[indexKalman].P_01;
+  
+  return kalman[indexKalman].x_angle;
+}
+
+// Tilt compensation
+Angle3d_struct tiltCompensate(Axis_struct magAxis, float pitch, float roll)
+{
+  Angle3d_struct comnpensateAngles;
+  
+  float xh = magAxis.x*cos(roll) + magAxis.y*sin(roll)*sin(pitch) + magAxis.z*sin(beta)*cos(pitch);
+  float yh = magAxis.y*cos(pitch)+magAxis.z*sin(pitch);
+  comnpensateAngles.roll = roll; 
+  comnpensateAngles.pitch = pitch; 
+  comnpensateAngles.yaw = atan2(-yh,xh);
+  
+  return comnpensateAngles;
+}
+
+
 float getSpeedFromDistance(float distance,float dt) {
   return distance / dt;
 }
 
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
+//http://franciscoraulortega.com/pubs/Algo3DFusionsMems.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
   float v = (deltaSpeedL+deltaSpeedR)/2;
   robotSensors.robotPosition.angle.radian+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
@@ -1416,6 +1462,22 @@ Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy,float dt){
   angle3d.yaw = yaw;
   
   retrun angle3d;
+}
+
+Angle3d_struct calcAccAngle3d(Axis_struct acc){
+  Angle3d_struct angle3d;
+  
+  Angle2d_struct pitch;
+  pitch.radian = -atan2(acc.x, sqrt(acc.y*acc.y + acc.z*acc.z));
+  pitch.degree =  (pitch.radian*180.0)/M_PI
+  angle3d.pitch = pitch;
+  
+  Angle2d_struct roll;
+  roll.radian = atan2(acc.y, acc.z);
+  roll.degree =  (roll.radian*180.0)/M_PI;
+  angle3d.roll = roll;
+  
+  return angle3d;
 }
 
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor) {
@@ -1545,7 +1607,10 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       
       if (refreshAccCheck) {
         semWait(sem_id, 0);
+        
         robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
+        robotSensors.MPU6050.accAngle = calcAccAngle3d(robotSensors.MPU6050.accAxis);
+        
         semPost(sem_id, 0);
         pocetAcc = 0;
       }
@@ -1553,6 +1618,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       if (refreshGyCheck) {
         semWait(sem_id, 0);
         robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
+        
         Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,(REFRESH_GY / REFRESH_MODULE)/1000);
         robotSensors.MPU6050.gyAngle.pitch.radian = robotSensors.MPU6050.gyAngle.pitch.radian + deltaAngle3d.pitch.radian;
         robotSensors.MPU6050.gyAngle.pitch.degree = robotSensors.MPU6050.gyAngle.pitch.degree + deltaAngle3d.pitch.degree;
@@ -1560,6 +1626,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.MPU6050.gyAngle.roll.degree = robotSensors.MPU6050.gyAngle.roll.degree + deltaAngle3d.roll.degree;
         robotSensors.MPU6050.gyAngle.yaw.radian = robotSensors.MPU6050.gyAngle.yaw.radian + deltaAngle3d.yaw.radian;
         robotSensors.MPU6050.gyAngle.yaw.degree = robotSensors.MPU6050.gyAngle.yaw.degree + deltaAngle3d.yaw.degree;
+        
         semPost(sem_id, 0);
         pocetGy = 0;
       }
@@ -1728,6 +1795,13 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
           deltaDistanceR = (deltaDistanceUpRight+deltaDistanceDownRight)/2;
       	robotSensors.robotPosition.distanceR+= deltaDistanceR;      
         robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR,(float)REFRESH_POSITION / 1000);
+        
+        robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0,robotSensors.MPU6050.accAngle.roll,robotSensors.MPU6050.gyAngle.roll,(float)REFRESH_POSITION / 1000);
+        robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(0,robotSensors.MPU6050.accAngle.pitch,robotSensors.MPU6050.gyAngle.pitch,(float)REFRESH_POSITION / 1000);
+        robotSensors.robotPosition.imuAngle.yaw = tiltCompensate(
+                                                    robotSensors.HMC5883L.compassAxis,
+                                                    robotSensors.robotPosition.imuAngle.pitch,
+                                                    robotSensors.robotPosition.imuAngle.roll);
         
         calcRobotPosition(robotSensors.robotPosition.speedL,robotSensors.robotPosition.speedR,(float)REFRESH_POSITION / 1000);
         

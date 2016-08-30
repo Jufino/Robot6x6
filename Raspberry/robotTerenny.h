@@ -156,6 +156,26 @@ extern "C" {
 #define MPU6050_REG_PWR_MGMT_1        (0x6B) // Power Management 1
 #define MPU6050_REG_WHO_AM_I          (0x75) // Who Am I
 
+//BMP 180
+#define	BMP180_REG_CONTROL 0xF4
+#define	BMP180_REG_RESULT 0xF6
+#define	BMP180_COMMAND_TEMPERATURE 0x2E
+#define	BMP180_COMMAND_PRESSURE0 0x34
+#define	BMP180_COMMAND_PRESSURE1 0x74
+#define	BMP180_COMMAND_PRESSURE2 0xB4
+#define	BMP180_COMMAND_PRESSURE3 0xF4
+
+#define Q_angle  0.01
+#define Q_gyro   0.0003
+#define R_angle  0.01
+
+struct Kalman_struct{
+  float x_bias = 0;
+  float P_00 = 0, P_01 = 0, P_10 = 0, P_11 = 0;
+  float  y, S;
+  float K_0, K_1;
+}
+
 //MPU6050
 typedef enum
 {
@@ -509,6 +529,7 @@ struct RobotPosition_struct {
   float speedR;
   float speed;
   Angle2d_struct angle;
+  Angle3d_struct imuAngle;
 };
 
 struct Camera_struct {
