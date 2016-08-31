@@ -1159,16 +1159,15 @@ HMC5883L_struct getHMC5883LNorm() {
   HMC5883L.compassAxis.z = (HMC5883L.compassAxis.z-HMC5883L_OFFSET_Z) * mgPerDigit;
 
   float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
-  HMC5883L.angle.radian = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
+  HMC5883L.angle = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
   
-  if(HMC5883L.angle.radian < 0){
-    HMC5883L.angle.radian+= 2*M_PI;
+  if(HMC5883L.angle < 0){
+    HMC5883L.angle+= 2*M_PI;
   }
-  else if(HMC5883L.angle.radian > 2*M_PI){
-    HMC5883L.angle.radian-=2*M_PI;
+  else if(HMC5883L.angle > 2*M_PI){
+    HMC5883L.angle-=2*M_PI;
   }
 
-  HMC5883L.angle.degree = HMC5883L.angle.radian*(180/M_PI);
   return HMC5883L;
 }
 
@@ -1431,29 +1430,25 @@ float getSpeedFromDistance(float distance,float dt) {
 //http://franciscoraulortega.com/pubs/Algo3DFusionsMems.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
   float v = (deltaSpeedL+deltaSpeedR)/2;
-  robotSensors.robotPosition.angle.radian+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
-  robotSensors.robotPosition.angle.degree = robotSensors.robotPosition.angle.radian*(180/(M_PI));
-  robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angle.radian)*dt;
-  robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angle.radian)*dt;
+  robotSensors.robotPosition.angleEncoder+= ((deltaSpeedR-deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL)*dt;
+  robotSensors.robotPosition.x +=  v*cos(robotSensors.robotPosition.angleEncoder)*dt;
+  robotSensors.robotPosition.y +=  v*sin(robotSensors.robotPosition.angleEncoder)*dt;
+}
+
+float rad2Deg(float angle){
+  return angle*(M_PI/180);
+}
+
+float deg2Rad(float angle){
+  return angle*(180/M_PI);
 }
 
 Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy,float dt){
   Angle3d_struct angle3d;
-  
-  Angle2d_struct roll;
-  roll.radian = gy.x*dt;
-  roll.degree = roll.radian*(180/(M_PI));
-  angle3d.roll = roll;
-  
-  Angle2d_struct pitch;
-  pitch.radian = gy.y*dt;
-  pitch.degree = pitch.radian*(180/(M_PI));
-  angle3d.pitch = pitch;
-  
-  Angle2d_struct yaw;
-  yaw.radian = gy.z*dt;
-  yaw.degree = yaw.radian*(180/(M_PI));
-  angle3d.yaw = yaw;
+
+  angle3d.roll =  gy.x*dt;
+  angle3d.pitch = gy.y*dt;
+  angle3d.yaw =   gy.z*dt;
   
   return angle3d;
 }
@@ -1461,15 +1456,9 @@ Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy,float dt){
 Angle3d_struct calcAccAngle3d(Axis_struct acc){
   Angle3d_struct angle3d;
   
-  Angle2d_struct pitch;
-  pitch.radian = -atan2(acc.x, sqrt(acc.y*acc.y + acc.z*acc.z));
-  pitch.degree =  (pitch.radian*180.0)/M_PI;
-  angle3d.pitch = pitch;
-  
-  Angle2d_struct roll;
-  roll.radian = atan2(acc.y, acc.z);
-  roll.degree =  (roll.radian*180.0)/M_PI;
-  angle3d.roll = roll;
+  angle3d.pitch = -atan2(acc.x, sqrt(acc.y*acc.y + acc.z*acc.z));
+  angle3d.roll = atan2(acc.y, acc.z);
+  angle3d.yaw = -1;
   
   return angle3d;
 }
@@ -1614,12 +1603,9 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
         
         Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,(REFRESH_GY / REFRESH_MODULE)/1000);
-        robotSensors.MPU6050.gyAngle.pitch.radian = robotSensors.MPU6050.gyAngle.pitch.radian + deltaAngle3d.pitch.radian;
-        robotSensors.MPU6050.gyAngle.pitch.degree = robotSensors.MPU6050.gyAngle.pitch.degree + deltaAngle3d.pitch.degree;
-        robotSensors.MPU6050.gyAngle.roll.radian = robotSensors.MPU6050.gyAngle.roll.radian + deltaAngle3d.roll.radian;
-        robotSensors.MPU6050.gyAngle.roll.degree = robotSensors.MPU6050.gyAngle.roll.degree + deltaAngle3d.roll.degree;
-        robotSensors.MPU6050.gyAngle.yaw.radian = robotSensors.MPU6050.gyAngle.yaw.radian + deltaAngle3d.yaw.radian;
-        robotSensors.MPU6050.gyAngle.yaw.degree = robotSensors.MPU6050.gyAngle.yaw.degree + deltaAngle3d.yaw.degree;
+        robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
+        robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
+        robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
         
         semPost(sem_id, 0);
         pocetGy = 0;
@@ -1790,12 +1776,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       	robotSensors.robotPosition.distanceR+= deltaDistanceR;      
         robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR,(float)REFRESH_POSITION / 1000);
         
-        robotSensors.robotPosition.imuAngle.roll.radian =  kalmanCalculate(0,robotSensors.MPU6050.accAngle.roll.radian,robotSensors.MPU6050.gyAngle.roll.radian,(float)REFRESH_POSITION / 1000);
-        robotSensors.robotPosition.imuAngle.pitch.radian = kalmanCalculate(1,robotSensors.MPU6050.accAngle.pitch.radian,robotSensors.MPU6050.gyAngle.pitch.radian,(float)REFRESH_POSITION / 1000);
-        robotSensors.robotPosition.imuAngle.yaw.radian = tiltCompensate(
+        robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0,robotSensors.MPU6050.accAngle.roll,robotSensors.MPU6050.gyAngle.roll,(float)REFRESH_POSITION / 1000);
+        robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(1,robotSensors.MPU6050.accAngle.pitch,robotSensors.MPU6050.gyAngle.pitch,(float)REFRESH_POSITION / 1000);
+        robotSensors.robotPosition.imuAngle.yaw = tiltCompensate(
                                                     robotSensors.HMC5883L.compassAxis,
-                                                    robotSensors.robotPosition.imuAngle.pitch.radian,
-                                                    robotSensors.robotPosition.imuAngle.roll.radian);
+                                                    robotSensors.robotPosition.imuAngle.pitch,
+                                                    robotSensors.robotPosition.imuAngle.roll);
         
         calcRobotPosition(robotSensors.robotPosition.speedL,robotSensors.robotPosition.speedR,(float)REFRESH_POSITION / 1000);
         

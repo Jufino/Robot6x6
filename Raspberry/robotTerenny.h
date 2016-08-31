@@ -329,15 +329,10 @@ struct Axis_struct{
   float z;
 };
 
-struct Angle2d_struct{
-  float radian;
-  float degree;
-};
-
 struct Angle3d_struct{
-  Angle2d_struct roll;
-  Angle2d_struct pitch;
-  Angle2d_struct yaw;
+  float roll;
+  float pitch;
+  float yaw;
 };
 
 
@@ -352,7 +347,7 @@ struct MPU6050_struct {
 
 struct HMC5883L_struct {
   Axis_struct compassAxis;
-  Angle2d_struct angle;
+  float yaw;
 };
 //-----------------------
 
@@ -534,7 +529,7 @@ struct RobotPosition_struct {
   float speedL;
   float speedR;
   float speed;
-  Angle2d_struct angle;
+  float angleEncoder;
   Angle3d_struct imuAngle;
 };
 
@@ -661,6 +656,8 @@ float getMPU6050TempNorm();
 
 float dist(float a, float b);
 float getSpeedFromDistance(float distance,float dt);
+float rad2Deg(float angle);
+float deg2Rad(float angle);
 
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
