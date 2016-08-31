@@ -39,7 +39,7 @@ int main(void){
             rad2Deg(robotSensors.HMC5883L.yaw),
             rad2Deg(robotSensors.robotPosition.imuAngle.pitch), rad2Deg(robotSensors.robotPosition.imuAngle.roll),rad2Deg(robotSensors.robotPosition.imuAngle.yaw));
 
-  	usleep(100000);
+  	usleep(1000000);
    }
    closeRobot();
    return 0;

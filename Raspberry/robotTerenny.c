@@ -56,6 +56,7 @@ void initRobot() {
   setMPU6050SleepEnabledSetting(false);
 
   callibrateMPU6050Gyroscope(50);
+//  callibrateMPU6050Accelerometer(50);
  
   if(!HMC5883LTestConnection()){
     errorLedBlink();
@@ -1206,6 +1207,30 @@ void callibrateMPU6050Gyroscope(int samples){
     semPost(sem_id, 8);
 }
 
+void callibrateMPU6050Accelerometer(int samples){
+    float sumX = 0;
+    float sumY = 0;
+    float sumZ = 0;
+
+    for (unsigned char i = 0; i < samples; ++i)
+    {
+        Axis_struct accAxis = getMPU6050AccRaw();
+
+        sumX += accAxis.x;
+        sumY += accAxis.y;
+        sumZ += accAxis.z;
+
+        usleep(100);
+    }
+
+    semWait(sem_id, 8);
+    callibrate.MPU6050AccOffsetAxis.x = sumX / samples;
+    callibrate.MPU6050AccOffsetAxis.y = sumY / samples;
+    callibrate.MPU6050AccOffsetAxis.z = sumZ / samples;
+    semPost(sem_id, 8);
+}
+
+
 void setMPU6050ScaleSetting(mpu6050_dps_t scale)
 {
   switch (scale){
@@ -1357,9 +1382,9 @@ float getMPU6050TempNorm(){
 Axis_struct getMPU6050AccNorm(){
   Axis_struct acc = getMPU6050AccRaw();
   
-  acc.x = acc.x * rangePerDigit * 9.80665f; 
-  acc.y = acc.y * rangePerDigit * 9.80665f; 
-  acc.z = acc.z * rangePerDigit * 9.80665f; 
+  acc.x = (acc.x-callibrate.MPU6050AccOffsetAxis.x) * rangePerDigit * 9.80665f; 
+  acc.y = (acc.y-callibrate.MPU6050AccOffsetAxis.y) * rangePerDigit * 9.80665f; 
+  acc.z = (acc.z-callibrate.MPU6050AccOffsetAxis.z) * rangePerDigit * 9.80665f; 
   
   return acc;
 }
@@ -1413,7 +1438,7 @@ float kalmanCalculate(int indexKalman, float acc, float gy, float dt)
 }
 
 // Tilt compensation
-float tiltCompensate(Axis_struct magAxis, float pitch, float roll)
+float tiltCompensate(Axis_struct magAxis, float roll, float pitch)
 {
   float xh = magAxis.x*cos(roll) + magAxis.y*sin(roll)*sin(pitch) + magAxis.z*sin(roll)*cos(pitch);
   float yh = magAxis.y*cos(pitch)+magAxis.z*sin(pitch);
@@ -1436,14 +1461,14 @@ void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt) {
 }
 
 float rad2Deg(float angle){
-  return angle*(M_PI/180);
-}
-
-float deg2Rad(float angle){
   return angle*(180/M_PI);
 }
 
-Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy,float dt){
+float deg2Rad(float angle){
+  return angle*(M_PI/180);
+}
+
+Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy, float dt){
   Angle3d_struct angle3d;
 
   angle3d.roll =  gy.x*dt;
@@ -1475,9 +1500,9 @@ void initRefresh(){
       timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac);
       struct itimerspec cas;
       cas.it_value.tv_sec = 0;
-      cas.it_value.tv_nsec = 100 * 1000 * 1000;
+      cas.it_value.tv_nsec = 10L * 1000L * 1000L;
       cas.it_interval.tv_sec = 0;
-      cas.it_interval.tv_nsec = 100 * 1000 * 1000;
+      cas.it_interval.tv_nsec = 10L * 1000L * 1000L;
       timer_settime(casovac, CLOCK_REALTIME, &cas, NULL);
       sigset_t signalSet;
       struct sigaction CasovacSignalAction;
@@ -1496,6 +1521,8 @@ void stopRefresh(){
   cas.it_interval.tv_nsec = 0;
   timer_settime(casovac, CLOCK_REALTIME, &cas, NULL);
 }
+
+Axis_struct lastGy;
 
 void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
@@ -1601,13 +1628,19 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       if (refreshGyCheck) {
         semWait(sem_id, 0);
         robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
-        
-        Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,(REFRESH_GY / REFRESH_MODULE)/1000);
-        robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
-        robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
-        robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
-        
-        semPost(sem_id, 0);
+	semPost(sem_id, 0);
+
+	if(lastGy.x != robotSensors.MPU6050.gyAxis.x && lastGy.y != robotSensors.MPU6050.gyAxis.y && lastGy.z != robotSensors.MPU6050.gyAxis.z){
+        	Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis,(float)REFRESH_GY/1000);
+
+		semWait(sem_id, 0);
+        	robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
+        	robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
+        	robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
+        	semPost(sem_id, 0);
+
+		lastGy = robotSensors.MPU6050.gyAxis;
+	}
         pocetGy = 0;
       }
       
@@ -1615,6 +1648,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         semWait(sem_id, 0);
         robotSensors.MPU6050.temperature = getMPU6050TempNorm();
         semPost(sem_id, 0);
+
         pocetTemp = 0;
       }
 
@@ -1782,7 +1816,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
                                                     robotSensors.HMC5883L.compassAxis,
                                                     robotSensors.robotPosition.imuAngle.pitch,
                                                     robotSensors.robotPosition.imuAngle.roll);
-        
+       
         calcRobotPosition(robotSensors.robotPosition.speedL,robotSensors.robotPosition.speedR,(float)REFRESH_POSITION / 1000);
         
       }

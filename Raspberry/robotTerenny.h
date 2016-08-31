@@ -49,19 +49,19 @@ extern "C" {
 #define SENSORS_PORT 1213
 
 #define REFRESH_STATUS     1 //zap alebo vyp autorefresh
-#define REFRESH_MODULE     10 //v ms
-#define REFRESH_BATTERY    REFRESH_MODULE*200
-#define REFRESH_MOTORS     REFRESH_MODULE*10
-#define REFRESH_HMC5883L   REFRESH_MODULE*3
-#define REFRESH_BMP180     REFRESH_MODULE*10
-#define REFRESH_ACC        REFRESH_MODULE*10
-#define REFRESH_GY         REFRESH_MODULE*10
-#define REFRESH_TEMP       REFRESH_MODULE*10
-#define REFRESH_LEDS       REFRESH_MODULE*10
-#define REFRESH_POSITION   REFRESH_MODULE*10
-#define REFRESH_AMP        REFRESH_MODULE*200
-#define REFRESH_ULTRASONIC REFRESH_MODULE*10   
-#define REFRESH_CAMERA     REFRESH_MODULE*33  
+#define REFRESH_MODULE     10.0f //v ms
+#define REFRESH_BATTERY    REFRESH_MODULE*200.0f
+#define REFRESH_MOTORS     REFRESH_MODULE*10.0f
+#define REFRESH_HMC5883L   REFRESH_MODULE*3.f
+#define REFRESH_BMP180     REFRESH_MODULE*10.0f
+#define REFRESH_ACC        REFRESH_MODULE*10.0f
+#define REFRESH_GY         REFRESH_MODULE*2.0f
+#define REFRESH_TEMP       REFRESH_MODULE*10.0f
+#define REFRESH_LEDS       REFRESH_MODULE*10.0f
+#define REFRESH_POSITION   REFRESH_MODULE*10.0f
+#define REFRESH_AMP        REFRESH_MODULE*200.0f
+#define REFRESH_ULTRASONIC REFRESH_MODULE*10.0f
+#define REFRESH_CAMERA     REFRESH_MODULE*33.0f
 
 #define R2 5.3f
 #define R1 31.4f
@@ -632,6 +632,8 @@ HMC5883L_struct getHMC5883LRaw();
 HMC5883L_struct getHMC5883LNorm();
 
 void callibrateMPU6050Gyroscope(int samples);
+void callibrateMPU6050Accelerometer(int samples);
+
 void setMPU6050ScaleSetting(mpu6050_dps_t scale);
 mpu6050_dps_t getMPU6050ScaleSetting();
 void setMPU6050RangeSetting(mpu6050_range_t range);
