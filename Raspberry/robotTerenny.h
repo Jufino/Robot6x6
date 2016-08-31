@@ -170,11 +170,17 @@ extern "C" {
 #define R_angle  0.01
 
 struct Kalman_struct{
-  float x_bias = 0;
-  float P_00 = 0, P_01 = 0, P_10 = 0, P_11 = 0;
-  float  y, S;
-  float K_0, K_1;
-}
+  float x_angle;
+  float x_bias;
+  float P_00;
+  float P_01;
+  float P_10;
+  float P_11;
+  float y;
+  float S;
+  float K_0;
+  float K_1;
+};
 
 //MPU6050
 typedef enum
