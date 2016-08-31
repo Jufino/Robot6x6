@@ -33,10 +33,7 @@ int main(void){
     	Callibrate callibrate = getCallibrate();
 //	printf("HMC.X:%f,HMC.Y:%f,HMC.Z:%f,angle rad:%f,angle deg:%f",robotSensors.HMC5883L.compassAxis.x,robotSensors.HMC5883L.compassAxis.y,robotSensors.HMC5883L.compassAxis.z,robotSensors.HMC5883L.angle.radian,robotSensors.HMC5883L.angle.degree);
 //	printf(" calibX%f,calibY:%f\n",callibrate.HMC5883LOffsetAxis.x,callibrate.HMC5883LOffsetAxis.y); 
-	printf("acc.pitch:%f,acc.roll:%f,acc.yaw:%f,
-		gy.pitch:%f,gy.roll:%f,gy.yaw:%f,
-		compass.yaw,
-		pitch:%f,roll:%f,yaw:%f\n",
+	printf("acc.pitch:%f,acc.roll:%f,acc.yaw:%f,gy.pitch:%f,gy.roll:%f,gy.yaw:%f,compass.yaw:%f,pitch:%f,roll:%f,yaw:%f\n",
 		        rad2Deg(robotSensors.MPU6050.accAngle.pitch),rad2Deg(robotSensors.MPU6050.accAngle.roll),rad2Deg(robotSensors.MPU6050.accAngle.yaw),
 						rad2Deg(robotSensors.MPU6050.gyAngle.pitch),rad2Deg(robotSensors.MPU6050.gyAngle.roll),rad2Deg(robotSensors.MPU6050.gyAngle.yaw),
             rad2Deg(robotSensors.HMC5883L.yaw),

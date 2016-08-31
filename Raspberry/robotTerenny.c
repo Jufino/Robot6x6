@@ -1159,13 +1159,13 @@ HMC5883L_struct getHMC5883LNorm() {
   HMC5883L.compassAxis.z = (HMC5883L.compassAxis.z-HMC5883L_OFFSET_Z) * mgPerDigit;
 
   float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
-  HMC5883L.angle = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
+  HMC5883L.yaw = atan2(HMC5883L.compassAxis.y,HMC5883L.compassAxis.x) + declinationAngle; 
   
-  if(HMC5883L.angle < 0){
-    HMC5883L.angle+= 2*M_PI;
+  if(HMC5883L.yaw < 0){
+    HMC5883L.yaw+= 2*M_PI;
   }
-  else if(HMC5883L.angle > 2*M_PI){
-    HMC5883L.angle-=2*M_PI;
+  else if(HMC5883L.yaw > 2*M_PI){
+    HMC5883L.yaw-=2*M_PI;
   }
 
   return HMC5883L;
