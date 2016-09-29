@@ -43,7 +43,7 @@ extern "C" {
 #define YELLOW_ADDRESS    (9)
 #define ORANGE_ADDRESS    (10)
 
-#define BATTERY_LED_INDICATING 1
+#define BATTERY_LED_INDICATING 0
 
 #define SENSORS_WIFI 0
 #define SENSORS_PORT 1213
@@ -563,6 +563,9 @@ struct RobotAcculators {              //struktura pre riadiace veliciny s casom 
   bool motorPowerSupply;
 };
 
+void sigctrl(int param);
+void sigpipe(int param);
+
 void initRobot();
 void closeRobot();
 void initI2C();
@@ -634,6 +637,7 @@ HMC5883L_struct getHMC5883LNorm();
 void callibrateMPU6050Gyroscope(int samples);
 void callibrateMPU6050Accelerometer(int samples);
 
+bool MPU6050TestConnection();
 void setMPU6050ScaleSetting(mpu6050_dps_t scale);
 mpu6050_dps_t getMPU6050ScaleSetting();
 void setMPU6050RangeSetting(mpu6050_range_t range);

@@ -20,14 +20,8 @@ extern "C" {
   #include "semafor.h"
 }
 
-void sigctrl(int param);
-void sigpipe(int param);
-
 int main(void){
-  initRobot();
-//  signal(SIGINT, sigctrl);
-  //signal(SIGPIPE, sigpipe);
- 
+  initRobot(); 
   while(1){
 	RobotSensors robotSensors = getRobotSensors();
     	Callibrate callibrate = getCallibrate();
@@ -44,13 +38,3 @@ int main(void){
    closeRobot();
    return 0;
 }
-
-void sigctrl(int param){
-	closeRobot();
-  	exit(param);
-}
-void sigpipe(int param){
-  	closeRobot();
-  	exit(param);
-}
-

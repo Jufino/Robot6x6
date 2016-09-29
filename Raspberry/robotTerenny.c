@@ -54,9 +54,14 @@ void initRobot() {
   setMPU6050I2CMasterModeEnabledSetting(false);
   setMPU6050I2CBypassEnabledSetting(true) ;
   setMPU6050SleepEnabledSetting(false);
-
   callibrateMPU6050Gyroscope(50);
-//  callibrateMPU6050Accelerometer(50);
+
+  if(!MPU6050TestConnection()){
+    errorLedBlink();
+    closeI2C();
+    printf("MPU6050 problem s konektivitou");
+    exit(0);
+  }
  
   if(!HMC5883LTestConnection()){
     errorLedBlink();
@@ -105,9 +110,9 @@ void initRobot() {
   semInit(sem_id, 1, 1);
   semInit(sem_id, 2, 1);
   semInit(sem_id, 3, 1);
-	semInit(sem_id, 4, 1);
+  semInit(sem_id, 4, 1);
   semInit(sem_id, 5, 1);
-	semInit(sem_id, 6, 1);
+  semInit(sem_id, 6, 1);
   semInit(sem_id, 7, 1);
   semInit(sem_id, 8, 1);
     
@@ -206,6 +211,17 @@ void initRobot() {
     pthread_t vlaknoImgR;
     pthread_create(&vlaknoImgR,NULL,&getImgR,NULL);
   }
+  signal(SIGINT, sigctrl);
+  signal(SIGPIPE, sigpipe);
+}
+
+void sigctrl(int param){
+	closeRobot();
+  	exit(param);
+}
+void sigpipe(int param){
+  	closeRobot();
+  	exit(param);
 }
 
 void closeRobot() {
@@ -1172,6 +1188,9 @@ HMC5883L_struct getHMC5883LNorm() {
   return HMC5883L;
 }
 
+bool MPU6050TestConnection(){
+	return readRegister8(MPU6050_ADDRESS, MPU6050_REG_WHO_AM_I) && MPU6050_ADDRESS;
+}
 
 void callibrateMPU6050Gyroscope(int samples){
     float sumX = 0;
