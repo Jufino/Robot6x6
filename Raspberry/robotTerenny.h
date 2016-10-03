@@ -21,6 +21,9 @@
 #include <opencv2/opencv.hpp>
 #include <signal.h>
 #include <time.h>
+#include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 using namespace std;
 using namespace cv;
@@ -30,7 +33,6 @@ using namespace cv;
 #include <arpa/inet.h>
 #include <serial.h>
 extern "C" {
-  #include "semafor.h"
   #include <gpio.h>
 }
 
@@ -49,19 +51,19 @@ extern "C" {
 #define SENSORS_PORT 1213
 
 #define REFRESH_STATUS     1 //zap alebo vyp autorefresh
-#define REFRESH_MODULE     10.0f //v ms
-#define REFRESH_BATTERY    REFRESH_MODULE*200.0f
-#define REFRESH_MOTORS     REFRESH_MODULE*10.0f
-#define REFRESH_HMC5883L   REFRESH_MODULE*3.f
-#define REFRESH_BMP180     REFRESH_MODULE*10.0f
-#define REFRESH_ACC        REFRESH_MODULE*10.0f
-#define REFRESH_GY         REFRESH_MODULE*2.0f
-#define REFRESH_TEMP       REFRESH_MODULE*10.0f
-#define REFRESH_LEDS       REFRESH_MODULE*10.0f
-#define REFRESH_POSITION   REFRESH_MODULE*10.0f
-#define REFRESH_AMP        REFRESH_MODULE*200.0f
-#define REFRESH_ULTRASONIC REFRESH_MODULE*10.0f
-#define REFRESH_CAMERA     REFRESH_MODULE*33.0f
+#define REFRESH_MODULE     20.0f //v ms
+#define REFRESH_BATTERY    REFRESH_MODULE*100.0f
+#define REFRESH_MOTORS     REFRESH_MODULE*5.0f
+#define REFRESH_HMC5883L   REFRESH_MODULE*2.f
+#define REFRESH_BMP180     REFRESH_MODULE*5.0f
+#define REFRESH_ACC        REFRESH_MODULE*5.0f
+#define REFRESH_GY         REFRESH_MODULE*1.0f
+#define REFRESH_TEMP       REFRESH_MODULE*5.0f
+#define REFRESH_LEDS       REFRESH_MODULE*5.0f
+#define REFRESH_POSITION   REFRESH_MODULE*5.0f
+#define REFRESH_AMP        REFRESH_MODULE*100.0f
+#define REFRESH_ULTRASONIC REFRESH_MODULE*5.0f
+#define REFRESH_CAMERA     REFRESH_MODULE*15.0f
 
 #define R2 5.3f
 #define R1 31.4f
@@ -170,14 +172,16 @@ extern "C" {
 #define R_angle  0.01
 
 typedef enum{
-  Camera_variableL,
-  Camera_imageL_1,
-  Camera_imageL_2,
-  Camera_variable2,
-  Camera_imageR_1,
-  Camera_imageR_2,
-  RobotSensors,
-  RobotAcculators
+  CAMERA_VARIABLE_L,
+  CAMERA_IMAGE_L1,
+  CAMERA_IMAGE_L2,
+  CAMERA_VARIABLE_R,
+  CAMERA_IMAGE_R1,
+  CAMERA_IMAGE_R2,
+  ROBOTSENSORS,
+  ROBOTACCULATORS,
+  CALLIBRATE,
+  REFRESH_LOCK
 } semafor_name_t;
 
 struct Kalman_struct{
@@ -574,83 +578,91 @@ struct RobotAcculators {              //struktura pre riadiace veliciny s casom 
   bool motorPowerSupply;
 };
 
+int semInit(int sem_id, int sem_num, int val);
+int semCreate(key_t key, int poc);
+int semWait(int sem_id, semafor_name_t sem_num);
+int semPost(int sem_id, semafor_name_t sem_num);
+void semRem(int sem_id);
+
 void sigctrl(int param);
 void sigpipe(int param);
 
-void initRobot();
-void closeRobot();
-void initI2C();
-void closeI2C();
-void errorLedBlink();
-void setDevice(unsigned char addr);
-void writeRegister(unsigned char addr, unsigned char reg, unsigned char value);
+void *cameraNetworkConnection(void *arg);
+void *sensorsNetworkConnection(void *arg);
+
+void initRobot(void);
+void closeRobot(void);
+void initI2C(void);
+void closeI2C(void);
+char setDevice(unsigned char addr);
+char writeRegisterValue(unsigned char addr, unsigned char reg, unsigned char value);
+char writeRegister(unsigned char addr, unsigned char reg);
 unsigned int readRegister16(unsigned char addr, unsigned char reg);
 signed int readRegister16s(unsigned char addr, unsigned char reg);
 unsigned char readRegister8(unsigned char addr, unsigned char reg);
 void sendMatImage(Mat img, int quality);
 void *getImgL(void *arg);
 void *getImgR(void *arg);
-void wifiCamera();
 void initButton(position3_t pos);
 void closeButton(position3_t pos);
 unsigned char getButton(position3_t pos);
 RobotAcculators getRobotAcculators();
 void setRobotAcculators(RobotAcculators temp);
-RobotSensors getRobotSensors();
-Callibrate getCallibrate();
-int getCameraClientsock();
-int getSensorsClientsock();
-bool blueTestConnection();
-bool yellowTestConnection();
-bool orangeTestConnection();
+RobotSensors getRobotSensors(void);
+Callibrate getCallibrate(void);
+int getCameraClientsock(void);
+int getSensorsClientsock(void);
+bool blueTestConnection(void);
+bool yellowTestConnection(void);
+bool orangeTestConnection(void);
 int getDistanceRaw(position6_t pos);
 int getDeltaDistanceRaw(position6_t pos);
 void resetDistance(position6_t pos);
-void resetDistanceAll();
+void resetDistanceAll(void);
 float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov);
 float getDistance(position6_t pos);
 float getDeltaDistance(position6_t pos);
 void setServo(int angle);
-unsigned int getUltrasonicRaw();
-float getUltrasonic();
-int getVoltageRaw();
-float getVoltage();
+unsigned int getUltrasonicRaw(void);
+float getUltrasonic(void);
+int getVoltageRaw(void);
+float getVoltage(void);
 float calcVoltagePercent(float volt);
-int getAmpRaw();
-float getAmpVolt();
-float getAmp();
+int getAmpRaw(void);
+float getAmpVolt(void);
+float getAmp(void);
 void setLed(position3_t pos, color_t color);
-void initMotorPowerSupply();
+void initMotorPowerSupply(void);
 void setMotorPowerSupply(bool state);
-void closeMotorPowerSupply();
+void closeMotorPowerSupply(void);
 void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg);
-void stopAllMotors();
+void stopAllMotors(void);
 void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
 void setMove(direction_t direction,unsigned char speed,bool onReg);
 int getKbhit(void);
-GPS_struct getGPS();
-bool HMC5883LTestConnection();
-hmc5883l_measurement_t getHMC5883LMeasurementSetting();
+GPS_struct getGPS(void);
+bool HMC5883LTestConnection(void);
+hmc5883l_measurement_t getHMC5883LMeasurementSetting(void);
 void setHMC5883LMeasurementSetting(hmc5883l_measurement_t measurement);
-hmc5883l_dataRate_t getHMC5883LSampleSetting();
+hmc5883l_dataRate_t getHMC5883LSampleSetting(void);
 void setHMC5883LSampleSetting(hmc5883l_samples_t sample);
-hmc5883l_dataRate_t getHMC5883LRateSetting();
+hmc5883l_dataRate_t getHMC5883LRateSetting(void);
 void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate);
-hmc5883l_range_t getHMC5883LRangeSetting();
+hmc5883l_range_t getHMC5883LRangeSetting(void);
 void setHMC5883LRangeSetting(hmc5883l_range_t range);
 hmc5883l_mode_t getHMC5883LReadModeSetting();
 void setHMC5883LReadModeSetting(hmc5883l_mode_t mode);
 bool getHMC5883LHighI2CSpeedSetting(bool status);
 void setHMC5883LHighI2CSpeedSetting(bool status);
-HMC5883L_struct getHMC5883LRaw();
-HMC5883L_struct getHMC5883LNorm();
+HMC5883L_struct getHMC5883LRaw(void);
+HMC5883L_struct getHMC5883LNorm(void);
 
 void callibrateMPU6050Gyroscope(int samples);
 void callibrateMPU6050Accelerometer(int samples);
 
-bool MPU6050TestConnection();
+bool MPU6050TestConnection(void);
 void setMPU6050ScaleSetting(mpu6050_dps_t scale);
-mpu6050_dps_t getMPU6050ScaleSetting();
+mpu6050_dps_t getMPU6050ScaleSetting(void);
 void setMPU6050RangeSetting(mpu6050_range_t range);
 mpu6050_range_t getMPU6050RangeSetting(void);
 void setMPU6050DHPFModeSetting(mpu6050_dhpf_t dhpf);
@@ -664,12 +676,12 @@ void setMPU6050I2CMasterModeEnabledSetting(bool state);
 void setMPU6050I2CBypassEnabledSetting(bool state);
 bool getMPU6050I2CBypassEnabledSetting(void);
 
-Axis_struct getMPU6050GyRaw();
-Axis_struct getMPU6050AccRaw();
-Axis_struct getMPU6050GyNorm();
-Axis_struct getMPU6050AccNorm();
-float getMPU6050TempRaw();
-float getMPU6050TempNorm();
+Axis_struct getMPU6050GyRaw(void);
+Axis_struct getMPU6050AccRaw(void);
+Axis_struct getMPU6050GyNorm(void);
+Axis_struct getMPU6050AccNorm(void);
+float getMPU6050TempRaw(void);
+float getMPU6050TempNorm(void);
 
 float dist(float a, float b);
 float getSpeedFromDistance(float distance,float dt);
@@ -680,9 +692,7 @@ float deg2Rad(float angle);
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
-void initRefresh();
-void stopRefresh();
+void initRefresh(void);
+void stopRefresh(void);
 void syncModules(int signal , siginfo_t * siginfo, void * ptr);
-
 #endif
-

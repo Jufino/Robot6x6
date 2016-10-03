@@ -7,6 +7,8 @@ int sensorsClientsock, cameraClientsock;
 int portHandle;
 int sem_id;
 bool onAllThreads = true;
+bool onWifiCameraStill = true;
+bool onWifiSensorStill = true;
 
 CvCapture* cameraL;
 char imageChooseL = 0;
@@ -47,52 +49,50 @@ Axis_struct maxAxis;
 Axis_struct lastGy;
 
 typedef union {
-    int val; /* Value for SETVAL */
-    struct semid_ds *buf; /* Buffer for IPC_STAT, IPC_SET */
-    unsigned short *array; /* Array for GETALL, SETALL */
-    struct seminfo *__buf; /* Buffer for IPC_INFO
+  int val; /* Value for SETVAL */
+  struct semid_ds *buf; /* Buffer for IPC_STAT, IPC_SET */
+  unsigned short *array; /* Array for GETALL, SETALL */
+  struct seminfo *__buf; /* Buffer for IPC_INFO
                                            (Linux-specific) */
 } semun;
 
 int semInit(int sem_id, int sem_num, int val) {
-    semun un;
-    un.val = val;
-    semctl(sem_id, sem_num, SETVAL, un);
+  semun un;
+  un.val = val;
+  return semctl(sem_id, sem_num, SETVAL, un);
 }
+
 int semCreate(key_t key, int poc) {
-    int sem_id = 0;
-    if ((sem_id = semget(key, poc, 0666 | IPC_CREAT)) < 0) {
-        printf("Chyba\n");
-        exit(-2);
-    }
-    return sem_id;
+  int sem_id = 0;
+  if ((sem_id = semget(key, poc, 0666 | IPC_CREAT)) < 0) {
+    printf("Chyba\n");
+    exit(-2);
+  }
+  return sem_id;
 }
 int semWait(int sem_id, semafor_name_t sem_num) {
-    struct sembuf my;
-    my.sem_num = sem_num;
-    my.sem_op = -1;
-    my.sem_flg = 0;
+  struct sembuf my;
+  my.sem_num = sem_num;
+  my.sem_op = -1;
+  my.sem_flg = 0;
 
-    return semop(sem_id, &my, 1);
+  return semop(sem_id, &my, 1);
 }
 
-/*
- *POST zvysuje hodnotu semafora
- */
 int semPost(int sem_id, semafor_name_t sem_num) {
-    struct sembuf my;
-    my.sem_num = sem_num;
-    my.sem_op = 1;
-    my.sem_flg = 0;
+  struct sembuf my;
+  my.sem_num = sem_num;
+  my.sem_op = 1;
+  my.sem_flg = 0;
 
-    return semop(sem_id, &my, 1);
+  return semop(sem_id, &my, 1);
 }
 void semRem(int sem_id) {
-    semctl(sem_id, 0, IPC_RMID, NULL);
+  semctl(sem_id, 0, IPC_RMID, NULL);
 }
 
 
-void initRobot() {
+void initRobot(void) {
   initI2C();
 
   setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
@@ -166,15 +166,17 @@ void initRobot() {
 
   stopAllMotors();
 
-  sem_id = semCreate(getpid(), 8);
-  semInit(sem_id, Camera_variable_1, 1);
-  semInit(sem_id, Camera_image1_1, 1);
-  semInit(sem_id, Camera_image1_2, 1);
-  semInit(sem_id, Camera_variable_2, 1);
-  semInit(sem_id, Camera_image2_1, 1);
-  semInit(sem_id, Camera_image2_1, 1);
-  semInit(sem_id, RobotSensors, 1);
-  semInit(sem_id, RobotAcculators, 1);
+  sem_id = semCreate(getpid(), 10);
+  semInit(sem_id, CAMERA_VARIABLE_L, 1);
+  semInit(sem_id, CAMERA_IMAGE_L1, 1);
+  semInit(sem_id, CAMERA_IMAGE_L2, 1);
+  semInit(sem_id, CAMERA_VARIABLE_R, 1);
+  semInit(sem_id, CAMERA_IMAGE_R1, 1);
+  semInit(sem_id, CAMERA_IMAGE_R2, 1);
+  semInit(sem_id, ROBOTSENSORS, 1);
+  semInit(sem_id, ROBOTACCULATORS, 1);
+  semInit(sem_id, REFRESH_LOCK, 1);
+  semInit(sem_id, CALLIBRATE, 1);
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
@@ -187,7 +189,6 @@ void initRobot() {
     cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
     cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
   }
-
 
   usleep(100000);
   setLed(POSITION_DOWN, COLOR_RED);
@@ -226,7 +227,10 @@ void initRobot() {
       exit(1);
     }
     printf("Spojenie na porte %d ok.\n", SENSORS_PORT);
+    pthread_t vlaknoSensors;
+    pthread_create(&vlaknoSensors, NULL, &sensorsNetworkConnection, NULL);
   }
+
   if (CAMERA_WIFI == 1) {
     struct sockaddr_in server1;
     if ((cameraServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -251,26 +255,30 @@ void initRobot() {
       exit(1);
     }
     printf("Spojenie na porte %d ok.\n", CAMERA_PORT);
+    pthread_t vlaknoCamera;
+    pthread_create(&vlaknoCamera, NULL, &cameraNetworkConnection, NULL);
   }
+  if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
 
   resetDistanceAll();
 
   setMotorPowerSupply(true);//potom zmenit na true
 
-  if (REFRESH_STATUS == 1) {
-    initRefresh();
-  }
-
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     pthread_t vlaknoImgL;
     pthread_create(&vlaknoImgL, NULL, &getImgL, NULL);
   }
+
   if (NUMBER_OF_CAMERA == 2) {
     pthread_t vlaknoImgR;
     pthread_create(&vlaknoImgR, NULL, &getImgR, NULL);
   }
+
+  if (REFRESH_STATUS == 1) {
+    initRefresh();
+  }
+
   signal(SIGINT, sigctrl);
-  signal(SIGPIPE, sigpipe);
 }
 
 void sigctrl(int param) {
@@ -282,7 +290,17 @@ void sigpipe(int param) {
   exit(param);
 }
 
-void closeRobot() {
+void closeCameraConnection(void) {
+  close(cameraServersock);
+  close(cameraClientsock);
+}
+
+void closeSensorConnection(void) {
+  close(sensorsServersock);
+  close(sensorsClientsock);
+}
+
+void closeRobot(void) {
   onAllThreads = false;
 
   stopRefresh();
@@ -295,103 +313,98 @@ void closeRobot() {
   closeButton(POSITION_UP);
   closeMotorPowerSupply();
 
-  if (CAMERA_WIFI == 1) {
-    close(cameraServersock);
-    close(cameraClientsock);
-  }
-  if (SENSORS_WIFI == 1) {
-    close(sensorsServersock);
-    close(sensorsClientsock);
-  }
+  if (CAMERA_WIFI == 1 && onWifiCameraStill) closeCameraConnection();
+  if (SENSORS_WIFI == 1 && onWifiSensorStill) closeSensorConnection();
 
   stopAllMotors();
 }
 
-void initI2C() {
+void initI2C(void) {
   if ((i2cHandle = open(PORT_I2C, O_RDWR)) < 0) {
     perror("Problem s otvorenim portu.\n");
     exit(1);
   }
 }
 
-void closeI2C() {
+void closeI2C(void) {
   close(i2cHandle);
 }
 
-void setDevice(unsigned char addr) {
+char setDevice(unsigned char addr) {
   if (addr != lastAddr) {
     if (ioctl(i2cHandle, I2C_SLAVE, addr) < 0) {
       printf("Problem s vytvorenim spojenia so zariadenim s adresou:%d\n", addr);
-      exit(1);
+      return -1;
     }
     lastAddr = addr;
   }
+  return 0;
 }
 
-void writeRegister(unsigned char addr, unsigned char reg, unsigned char value) {
+char writeRegisterValue(unsigned char addr, unsigned char reg, unsigned char value) {
+  char errorTimeout = 0;
   unsigned char data[3];
   data[0] = reg;
   data[1] = value;
-  setDevice(addr);
-  if (write(i2cHandle, data, 2) != 2)
-    printf("addr:%i, write register %i,val %i\n", (int)addr, (int)reg, (int)value);
+  if (setDevice(addr) == 0) {
+    while (write(i2cHandle, data, 2) != 2) {
+      printf("addr:%i, write register %i,val %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)value, (int)errorTimeout);
+      if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
+    }
+    if (errorTimeout < I2C_WRITE_TIMEOUT)
+      return 0;
+    else
+      return -1;
+  }
+  else {
+    return -1;
+  }
+}
+
+char writeRegister(unsigned char addr, unsigned char reg) {
+  char errorTimeout = 0;
+  unsigned char data[3];
+  data[0] = reg;
+  if (setDevice(addr) == 0) {
+    while (write(i2cHandle, data, 1) != 1) {
+      printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)errorTimeout);
+      if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
+    }
+    if (errorTimeout < I2C_WRITE_TIMEOUT)
+      return 0;
+    else
+      return -1;
+  }
+  else {
+    return -1;
+  }
 }
 
 unsigned int readRegister16(unsigned char addr, unsigned char reg) {
-  char data[3];
-  char errorTimeout = 0;
-  data[0] = reg;
-  setDevice(addr);
-  while (write(i2cHandle, data, 1) != 1) {
-    printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)errorTimeout);
-    if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
-  }
-  if (errorTimeout < I2C_WRITE_TIMEOUT) {
-    if (read(i2cHandle, data, 2) != 2) {
-      printf("addr:%i, read register %i\n", (int)addr, (int)reg);
-    }
-    return (data[0] << 8) | (data[1] & 0xFF);
-  }
-  else {
-    return 0;
-  }
-}
-
-signed int readRegister16s(unsigned char addr, unsigned char reg) {
-  char wdata[2];
-  char errorTimeout = 0;
-  wdata[0] = reg;
-  setDevice(addr);
-  while (write(i2cHandle, wdata, 1) != 1) {
-    printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)errorTimeout);
-    if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
-  }
-  signed char data[3];
-  if (errorTimeout < I2C_WRITE_TIMEOUT) {
+  if (writeRegister(addr, reg) == 0) {
+    char data[3];
     if (read(i2cHandle, data, 2) != 2)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
     return (data[0] << 8) | (data[1] & 0xFF);
   }
-  else {
-    return 0;
+  else return 0;
+}
+
+signed int readRegister16s(unsigned char addr, unsigned char reg) {
+  if (writeRegister(addr, reg) == 0) {
+    signed char data[3];
+    if (read(i2cHandle, data, 2) != 2)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
+    return (data[0] << 8) | (data[1] & 0xFF);
   }
+  else return 0;
 }
 
 unsigned char readRegister8(unsigned char addr, unsigned char reg) {
-  char data[2];
-  char errorTimeout = 0;
-  data[0] = reg;
-  setDevice(addr);
-  while (write(i2cHandle, data, 1) != 1) {
-    printf("addr:%i, write register %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)errorTimeout);
-    if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
-  }
-  if (errorTimeout < I2C_WRITE_TIMEOUT) {
+  if (writeRegister(addr, reg) == 0) {
+    signed char data[2];
     if (read(i2cHandle, data, 1) != 1)   printf("addr:%i, read register %i\n", (int)addr, (int)reg);
     return data[0];
   }
-  else {
-    return 0;
-  }
+  else return 0;
 }
 
 bool readRegisterBit(unsigned char addr, unsigned char reg, char pin) {
@@ -414,19 +427,19 @@ void sendMatImage(Mat img, int quality) {
 void *getImgL(void *arg) {
   while (onAllThreads) {
     //nacitanie obrazka z lavej kamery
-    semWait(sem_id, Camera_imageL_1);
+    semWait(sem_id, CAMERA_IMAGE_L1);
     img1L = cvQueryFrame(cameraL);
-    semWait(sem_id, Camera_variableL);
+    semWait(sem_id, CAMERA_VARIABLE_L);
     imageChooseL = 1;
-    semPost(sem_id, Camera_variableL);
-    semPost(sem_id, Camera_imageL_1);
+    semPost(sem_id, CAMERA_VARIABLE_L);
+    semPost(sem_id, CAMERA_IMAGE_L1);
 
-    semWait(sem_id, Camera_imageL_2);
+    semWait(sem_id, CAMERA_IMAGE_L2);
     img2L = cvQueryFrame(cameraL);
-    semWait(sem_id, Camera_variableL);
+    semWait(sem_id, CAMERA_VARIABLE_L);
     imageChooseL = 2;
-    semPost(sem_id, Camera_variableL);
-    semPost(sem_id, Camera_imageL_2);
+    semPost(sem_id, CAMERA_VARIABLE_L);
+    semPost(sem_id, CAMERA_IMAGE_L2);
   }
   return 0;
 }
@@ -434,35 +447,57 @@ void *getImgL(void *arg) {
 void *getImgR(void *arg) {
   while (onAllThreads) {
     //nacitanie obrazka z pravej kamery
-    semWait(sem_id, Camera_imageR_1);
+    semWait(sem_id, CAMERA_IMAGE_R1);
     img1R = cvQueryFrame(cameraR);
-    semWait(sem_id, Camera_variableR);
+    semWait(sem_id, CAMERA_VARIABLE_R);
     imageChooseR = 1;
-    semPost(sem_id, Camera_variableR);
-    semPost(sem_id, Camera_imageR_1);
+    semPost(sem_id, CAMERA_VARIABLE_R);
+    semPost(sem_id, CAMERA_IMAGE_R1);
 
-    semWait(sem_id, Camera_imageR_2);
+    semWait(sem_id, CAMERA_IMAGE_R2);
     img2R = cvQueryFrame(cameraR);
-    semWait(sem_id, Camera_variableR);
+    semWait(sem_id, CAMERA_VARIABLE_R);
     imageChooseR = 2;
-    semPost(sem_id, Camera_variableR);
-    semPost(sem_id, Camera_imageR_2);
+    semPost(sem_id, CAMERA_VARIABLE_R);
+    semPost(sem_id, CAMERA_IMAGE_R2);
   }
   return 0;
 }
 
-void wifiCamera() {   //premenovat
-  char recvdata[30];
-  int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
-  if (bytes == 0) {
-    //closeRobot();
-    //exit(0);
+void *cameraNetworkConnection(void *arg) {
+  while (onWifiCameraStill) {
+    char recvdata[30];
+    int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
+    if (bytes == 0) {
+      onWifiCameraStill = false;
+      closeCameraConnection();
+      break;
+    }
+    if (strcmp(recvdata, "img\n") == 0) {
+      //semWait(sem_id, 1);
+      //sendMatImage(robotSensors.camera.imgLeft,80);
+      //semPost(sem_id, 1);
+    }
   }
-  if (strcmp(recvdata, "img\n") == 0) { //&& imgSendL.empty() != true){
-    semWait(sem_id, 1);
-    //sendMatImage(robotSensors.camera.imgLeft,80);
-    semPost(sem_id, 1);
+  return 0;
+}
+
+void *sensorsNetworkConnection(void *arg) {
+  while (onWifiSensorStill) {
+    char recvdata[30];
+    int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
+    if (bytes == 0) {
+      onWifiSensorStill = false;
+      closeSensorConnection();
+      break;
+    }
+    if (strcmp(recvdata, "sensor\n") == 0) {
+      //semWait(sem_id, 1);
+      //sendMatImage(robotSensors.camera.imgLeft,80);
+      //semPost(sem_id, 1);
+    }
   }
+    return 0;
 }
 
 void initButton(position3_t pos) {
@@ -490,53 +525,53 @@ unsigned char getButton(position3_t pos) {
   }
 }
 
-RobotAcculators getRobotAcculators() {
+RobotAcculators getRobotAcculators(void) {
   RobotAcculators temp;
-  semWait(sem_id, 1);
+  semWait(sem_id, ROBOTACCULATORS);
   memcpy(&temp, &robotAcculators, sizeof(RobotAcculators));
-  semPost(sem_id, 1);
+  semPost(sem_id, ROBOTACCULATORS);
   return temp;
 }
 
 void setRobotAcculators(RobotAcculators temp) {
-  semWait(sem_id, 1);
+  semWait(sem_id, ROBOTACCULATORS);
   memcpy(&robotAcculators, &temp, sizeof(RobotAcculators));
-  semPost(sem_id, 1);
+  semPost(sem_id, ROBOTACCULATORS);
 }
 
-RobotSensors getRobotSensors() {
+RobotSensors getRobotSensors(void) {
   RobotSensors temp;
-  semWait(sem_id, 0);
+  semWait(sem_id, ROBOTSENSORS);
   memcpy(&temp, &robotSensors, sizeof(RobotSensors));
-  semPost(sem_id, 0);
+  semPost(sem_id, ROBOTSENSORS);
   return temp;
 }
 
-Callibrate getCallibrate() {
+Callibrate getCallibrate(void) {
   Callibrate temp;
-  semWait(sem_id, 8);
+  semWait(sem_id, CALLIBRATE);
   memcpy(&temp, &callibrate, sizeof(Callibrate));
-  semPost(sem_id, 8);
+  semPost(sem_id, CALLIBRATE);
   return temp;
 }
 
-int getCameraClientsock() {
+int getCameraClientsock(void) {
   return cameraClientsock;
 }
 
-int getSensorsClientsock() {
+int getSensorsClientsock(void) {
   return sensorsClientsock;
 }
 
-bool blueTestConnection() {
+bool blueTestConnection(void) {
   return (300 == readRegister16(BLUE_ADDRESS, 127));
 }
 
-bool yellowTestConnection() {
+bool yellowTestConnection(void) {
   return (300 == readRegister16(YELLOW_ADDRESS, 127));
 }
 
-bool orangeTestConnection() {
+bool orangeTestConnection(void) {
   return (300 == readRegister16(ORANGE_ADDRESS, 127));
 }
 
@@ -566,16 +601,16 @@ int getDeltaDistanceRaw(position6_t pos) {
 
 void resetDistance(position6_t pos) {
   switch (pos) {
-  case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 100, 0);  break;
-  case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 100, 0);  break;
-  case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 99, 0);   break;
-  case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 99, 0);   break;
-  case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 99, 0);   break;
-  case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 100, 0);  break;
+  case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 100, 0);  break;
+  case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 100, 0);  break;
+  case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 99, 0);   break;
+  case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 99, 0);   break;
+  case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 99, 0);   break;
+  case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 100, 0);  break;
   }
 }
 
-void resetDistanceAll() {
+void resetDistanceAll(void) {
   resetDistance(POSITION_DOWN_RIGHT);
   resetDistance(POSITION_UP_LEFT);
   resetDistance(POSITION_MIDDLE_RIGHT);
@@ -597,24 +632,24 @@ float getDeltaDistance(position6_t pos) {
 }
 
 void setServo(int angle) {
-  if (angle + 91 < 1) writeRegister(ORANGE_ADDRESS, 84, 1);
-  else if (angle + 91 > 181) writeRegister(ORANGE_ADDRESS, 84, 181);
-  else writeRegister(0x0A, 84, angle + 91);
+  if (angle + 91 < 1) writeRegisterValue(ORANGE_ADDRESS, 84, 1);
+  else if (angle + 91 > 181) writeRegisterValue(ORANGE_ADDRESS, 84, 181);
+  else writeRegisterValue(0x0A, 84, angle + 91);
 }
 
-unsigned int getUltrasonicRaw() {
+unsigned int getUltrasonicRaw(void) {
   return readRegister16(ORANGE_ADDRESS, 6);
 }
 
-float getUltrasonic() {
+float getUltrasonic(void) {
   return (float)readRegister16(ORANGE_ADDRESS, 6) / CONST_ULTRASONIC;
 }
 
-int getVoltageRaw() {
+int getVoltageRaw(void) {
   return readRegister16(BLUE_ADDRESS, 5);
 }
 
-float getVoltage() {
+float getVoltage(void) {
   return (float)getVoltageRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION) * ((R1 + R2) / R2);
 }
 
@@ -622,76 +657,76 @@ float calcVoltagePercent(float volt) {
   return (float)volt * (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) - (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) * MIN_BATTERY_VOLTAGE;
 }
 
-int getAmpRaw() {
+int getAmpRaw(void) {
   return readRegister16(BLUE_ADDRESS, 6);
 }
 
-float getAmpVolt() {
+float getAmpVolt(void) {
   return (float)getAmpRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION);
 }
 
-float getAmp() {
+float getAmp(void) {
   return ((float)getAmpVolt() - ADC_MAXIMUM_VOLTAGE / 2) / CONST_AMP;
 }
 
 void setLed(position3_t pos, color_t color) {
   if (pos == POSITION_DOWN) {
     if (color == COLOR_GREEN) {
-      writeRegister(BLUE_ADDRESS, 96, 0);
-      writeRegister(BLUE_ADDRESS, 97, 1);
+      writeRegisterValue(BLUE_ADDRESS, 96, 0);
+      writeRegisterValue(BLUE_ADDRESS, 97, 1);
     }
     else if (color == COLOR_RED) {
-      writeRegister(BLUE_ADDRESS, 97, 0);
-      writeRegister(BLUE_ADDRESS, 96, 1);
+      writeRegisterValue(BLUE_ADDRESS, 97, 0);
+      writeRegisterValue(BLUE_ADDRESS, 96, 1);
     }
     else if (color == COLOR_ORANGE) {
-      writeRegister(BLUE_ADDRESS, 97, 1);
-      writeRegister(BLUE_ADDRESS, 96, 1);
+      writeRegisterValue(BLUE_ADDRESS, 97, 1);
+      writeRegisterValue(BLUE_ADDRESS, 96, 1);
     }
     else if (color == COLOR_OFF) {
-      writeRegister(BLUE_ADDRESS, 97, 0);
-      writeRegister(BLUE_ADDRESS, 96, 0);
+      writeRegisterValue(BLUE_ADDRESS, 97, 0);
+      writeRegisterValue(BLUE_ADDRESS, 96, 0);
     }
   }
   else if (pos == POSITION_MIDDLE) {
     if (color == COLOR_GREEN) {
-      writeRegister(YELLOW_ADDRESS, 96, 0);
-      writeRegister(YELLOW_ADDRESS, 97, 1);
+      writeRegisterValue(YELLOW_ADDRESS, 96, 0);
+      writeRegisterValue(YELLOW_ADDRESS, 97, 1);
     }
     else if (color == COLOR_RED) {
-      writeRegister(YELLOW_ADDRESS, 97, 0);
-      writeRegister(YELLOW_ADDRESS, 96, 1);
+      writeRegisterValue(YELLOW_ADDRESS, 97, 0);
+      writeRegisterValue(YELLOW_ADDRESS, 96, 1);
     }
     else if (color == COLOR_ORANGE) {
-      writeRegister(YELLOW_ADDRESS, 97, 1);
-      writeRegister(YELLOW_ADDRESS, 96, 1);
+      writeRegisterValue(YELLOW_ADDRESS, 97, 1);
+      writeRegisterValue(YELLOW_ADDRESS, 96, 1);
     }
     else if (color == COLOR_OFF) {
-      writeRegister(YELLOW_ADDRESS, 97, 0);
-      writeRegister(YELLOW_ADDRESS, 96, 0);
+      writeRegisterValue(YELLOW_ADDRESS, 97, 0);
+      writeRegisterValue(YELLOW_ADDRESS, 96, 0);
     }
   }
   else if (pos == POSITION_UP) {
     if (color == COLOR_GREEN) {
-      writeRegister(ORANGE_ADDRESS, 96, 0);
-      writeRegister(ORANGE_ADDRESS, 97, 1);
+      writeRegisterValue(ORANGE_ADDRESS, 96, 0);
+      writeRegisterValue(ORANGE_ADDRESS, 97, 1);
     }
     else if (color == COLOR_RED) {
-      writeRegister(ORANGE_ADDRESS, 97, 0);
-      writeRegister(ORANGE_ADDRESS, 96, 1);
+      writeRegisterValue(ORANGE_ADDRESS, 97, 0);
+      writeRegisterValue(ORANGE_ADDRESS, 96, 1);
     }
     else if (color == COLOR_ORANGE) {
-      writeRegister(ORANGE_ADDRESS, 97, 1);
-      writeRegister(ORANGE_ADDRESS, 96, 1);
+      writeRegisterValue(ORANGE_ADDRESS, 97, 1);
+      writeRegisterValue(ORANGE_ADDRESS, 96, 1);
     }
     else if (color == COLOR_OFF) {
-      writeRegister(ORANGE_ADDRESS, 97, 0);
-      writeRegister(ORANGE_ADDRESS, 96, 0);
+      writeRegisterValue(ORANGE_ADDRESS, 97, 0);
+      writeRegisterValue(ORANGE_ADDRESS, 96, 0);
     }
   }
 }
 
-void initMotorPowerSupply() {
+void initMotorPowerSupply(void) {
   gpio_open(26, 1);
 }
 
@@ -700,7 +735,7 @@ void setMotorPowerSupply(bool state) {
   else                 gpio_write(26, 0);
 }
 
-void closeMotorPowerSupply() {
+void closeMotorPowerSupply(void) {
   gpio_close(26);
 }
 
@@ -708,32 +743,32 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
   if (onReg == true) {
     if (rotate == ROTATE_CLOCKWISE) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 94, speed); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 89, speed); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 94, speed); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 89, speed); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 89, speed); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 94, speed); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 94, speed); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 89, speed); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 94, speed); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 89, speed); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 89, speed); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 94, speed); break;
       }
     }
     else if (rotate == ROTATE_ANTICLOCKWISE) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 93, speed); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 88, speed); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 93, speed); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 88, speed); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 88, speed); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 93, speed); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 93, speed); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 88, speed); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 93, speed); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 88, speed); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 88, speed); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 93, speed); break;
       }
     }
     else if (rotate == ROTATE_STOP) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 93, 0); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 88, 0); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 93, 0); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 88, 0); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 88, 0); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 93, 0); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 93, 0); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 88, 0); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 93, 0); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 88, 0); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 88, 0); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 93, 0); break;
       }
 
     }
@@ -741,38 +776,38 @@ void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg)
   else {
     if (rotate == ROTATE_CLOCKWISE) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 92, speed); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 87, speed); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 92, speed); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 87, speed); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 87, speed); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 92, speed); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 92, speed); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 87, speed); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 92, speed); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 87, speed); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 87, speed); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 92, speed); break;
       }
     }
     else if (ROTATE_STOP == 0) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 91, speed); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 86, speed); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 91, speed); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 86, speed); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 86, speed); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 91, speed); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 91, speed); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 86, speed); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 91, speed); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 86, speed); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 86, speed); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 91, speed); break;
       }
     }
     else if (rotate == ROTATE_ANTICLOCKWISE) {
       switch (pos) {
-      case POSITION_DOWN_RIGHT: writeRegister(BLUE_ADDRESS, 90, speed); break;
-      case POSITION_MIDDLE_RIGHT: writeRegister(ORANGE_ADDRESS, 85, speed); break;
-      case POSITION_UP_RIGHT: writeRegister(ORANGE_ADDRESS, 90, speed); break;
-      case POSITION_UP_LEFT: writeRegister(BLUE_ADDRESS, 85, speed); break;
-      case POSITION_MIDDLE_LEFT: writeRegister(YELLOW_ADDRESS, 85, speed); break;
-      case POSITION_DOWN_LEFT: writeRegister(YELLOW_ADDRESS, 90, speed); break;
+      case POSITION_DOWN_RIGHT: writeRegisterValue(BLUE_ADDRESS, 90, speed); break;
+      case POSITION_MIDDLE_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 85, speed); break;
+      case POSITION_UP_RIGHT: writeRegisterValue(ORANGE_ADDRESS, 90, speed); break;
+      case POSITION_UP_LEFT: writeRegisterValue(BLUE_ADDRESS, 85, speed); break;
+      case POSITION_MIDDLE_LEFT: writeRegisterValue(YELLOW_ADDRESS, 85, speed); break;
+      case POSITION_DOWN_LEFT: writeRegisterValue(YELLOW_ADDRESS, 90, speed); break;
       }
     }
   }
 }
 
-void stopAllMotors() {
+void stopAllMotors(void) {
   setMotor(POSITION_DOWN_RIGHT, ROTATE_STOP, 0, false);
   setMotor(POSITION_UP_LEFT, ROTATE_STOP, 0, false);
   setMotor(POSITION_MIDDLE_RIGHT, ROTATE_STOP, 0, false);
@@ -809,7 +844,7 @@ void setMotors(side_t side, rotate_t rotate, unsigned char speed, bool onReg) {
 }
 
 void setMove(direction_t direction, unsigned char speed, bool onReg) {
-  semWait(sem_id, 1);
+  semWait(sem_id, ROBOTACCULATORS);
   if (direction == DIRECTION_FRONT) {
     setMotors(SIDE_LEFT, ROTATE_CLOCKWISE, speed, onReg);
     setMotors(SIDE_RIGHT, ROTATE_CLOCKWISE, speed, onReg);
@@ -830,7 +865,7 @@ void setMove(direction_t direction, unsigned char speed, bool onReg) {
     setMotors(SIDE_LEFT, ROTATE_STOP, speed, onReg);
     setMotors(SIDE_RIGHT, ROTATE_STOP, speed, onReg);
   }
-  semPost(sem_id, 1);
+  semPost(sem_id, ROBOTACCULATORS);
 }
 
 int getKbhit(void) {
@@ -854,7 +889,7 @@ int getKbhit(void) {
   return 0;
 }
 
-GPS_struct getGPS() {
+GPS_struct getGPS(void) {
   GPS_struct GPS;
   while (strcmp(SerialRead(portHandle, 1), "$") != 0);
   char *dataCMD = SerialRead(portHandle, 5);
@@ -1096,41 +1131,41 @@ GPS_struct getGPS() {
   return GPS;
 }
 
-bool HMC5883LTestConnection() {
+bool HMC5883LTestConnection(void) {
   char identA = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_IDENT_A);
   char identB = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_IDENT_B);
   char identC = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_IDENT_C);
   return identA == 'H' && identB == '4' && identC == '3';
 }
 
-hmc5883l_measurement_t getHMC5883LMeasurementSetting() {
+hmc5883l_measurement_t getHMC5883LMeasurementSetting(void) {
   return (hmc5883l_measurement_t)((readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b00000011));
 }
 
 void setHMC5883LMeasurementSetting(hmc5883l_measurement_t measurement) {
   char oldRegister = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b00000011;
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (measurement));
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (measurement));
 }
 
-hmc5883l_dataRate_t getHMC5883LSampleSetting() {
+hmc5883l_dataRate_t getHMC5883LSampleSetting(void) {
   return (hmc5883l_dataRate_t)((readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b11100011) >> 2);
 }
 
 void setHMC5883LSampleSetting(hmc5883l_samples_t sample) {
   char oldRegister = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b00011111;
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (sample << 5) | 0b10000000);
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (sample << 5) | 0b10000000);
 }
 
-hmc5883l_dataRate_t getHMC5883LRateSetting() {
+hmc5883l_dataRate_t getHMC5883LRateSetting(void) {
   return (hmc5883l_dataRate_t)((readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b11100011) >> 2);
 }
 
 void setHMC5883LRateSetting(hmc5883l_dataRate_t datarate) {
   char oldRegister = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b11100011;
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (datarate << 2));
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A, oldRegister | (datarate << 2));
 }
 
-hmc5883l_range_t getHMC5883LRangeSetting() {
+hmc5883l_range_t getHMC5883LRangeSetting(void) {
   return (hmc5883l_range_t)((readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B) & 0b11100000) >> 5);
 }
 
@@ -1161,16 +1196,16 @@ void setHMC5883LRangeSetting(hmc5883l_range_t range) {
     mgPerDigit = 4.35f;
     break;
   }
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B, range << 5);
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B, range << 5);
 }
 
-hmc5883l_mode_t getHMC5883LReadModeSetting() {
+hmc5883l_mode_t getHMC5883LReadModeSetting(void) {
   return (hmc5883l_mode_t)((readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_MODE) & 0b00011000) >> 3);
 }
 
 void setHMC5883LReadModeSetting(hmc5883l_mode_t mode) {
   char oldRegister = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_MODE) & 0b10000000;
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_MODE, oldRegister | mode);
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_MODE, oldRegister | mode);
 }
 
 bool getHMC5883LHighI2CSpeedSetting(bool status) {
@@ -1181,10 +1216,10 @@ void setHMC5883LHighI2CSpeedSetting(bool status) {
   char oldRegister = readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B) & 0b00000011;
   if (status)
     oldRegister |= 0x80;
-  writeRegister(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B, oldRegister);
+  writeRegisterValue(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B, oldRegister);
 }
 
-HMC5883L_struct getHMC5883LRaw() {
+HMC5883L_struct getHMC5883LRaw(void) {
   HMC5883L_struct HMC5883L;
 
   HMC5883L.compassAxis.x = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
@@ -1194,7 +1229,7 @@ HMC5883L_struct getHMC5883LRaw() {
   return HMC5883L;
 }
 
-HMC5883L_struct getHMC5883LNorm() {
+HMC5883L_struct getHMC5883LNorm(void) {
   HMC5883L_struct HMC5883L = getHMC5883LRaw();
 
   if (CALLIBRATE_DATA_CALCULATE) {
@@ -1205,11 +1240,11 @@ HMC5883L_struct getHMC5883LNorm() {
     if (HMC5883L.compassAxis.z < maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
     if (HMC5883L.compassAxis.z > maxAxis.z) maxAxis.z = HMC5883L.compassAxis.z;
 
-    semWait(sem_id, 8);
+    semWait(sem_id, CALLIBRATE);
     callibrate.HMC5883LOffsetAxis.x = (maxAxis.x + minAxis.x) / 2;
     callibrate.HMC5883LOffsetAxis.y = (maxAxis.y + minAxis.y) / 2;
     callibrate.HMC5883LOffsetAxis.z = (maxAxis.z + minAxis.z) / 2;
-    semPost(sem_id, 8);
+    semPost(sem_id, CALLIBRATE);
   }
 
   HMC5883L.compassAxis.x = (HMC5883L.compassAxis.x - HMC5883L_OFFSET_X) * mgPerDigit;
@@ -1229,7 +1264,7 @@ HMC5883L_struct getHMC5883LNorm() {
   return HMC5883L;
 }
 
-bool MPU6050TestConnection() {
+bool MPU6050TestConnection(void) {
   return readRegister8(MPU6050_ADDRESS, MPU6050_REG_WHO_AM_I) && MPU6050_ADDRESS;
 }
 
@@ -1256,7 +1291,7 @@ void callibrateMPU6050Gyroscope(int samples) {
     usleep(5);
   }
 
-  semWait(sem_id, 8);
+  semWait(sem_id, CALLIBRATE);
   callibrate.MPU6050GyOffsetAxis.x = sumX / samples;
   callibrate.MPU6050GyOffsetAxis.y = sumY / samples;
   callibrate.MPU6050GyOffsetAxis.z = sumZ / samples;
@@ -1264,7 +1299,7 @@ void callibrateMPU6050Gyroscope(int samples) {
   callibrate.MPU6050GyThresholdAxis.x = sqrt((sigmaX / samples) - (callibrate.MPU6050GyOffsetAxis.x * callibrate.MPU6050GyOffsetAxis.x));
   callibrate.MPU6050GyThresholdAxis.y = sqrt((sigmaY / samples) - (callibrate.MPU6050GyOffsetAxis.y * callibrate.MPU6050GyOffsetAxis.y));
   callibrate.MPU6050GyThresholdAxis.z = sqrt((sigmaZ / samples) - (callibrate.MPU6050GyOffsetAxis.z * callibrate.MPU6050GyOffsetAxis.z));
-  semPost(sem_id, 8);
+  semPost(sem_id, CALLIBRATE);
 }
 
 void callibrateMPU6050Accelerometer(int samples) {
@@ -1283,11 +1318,11 @@ void callibrateMPU6050Accelerometer(int samples) {
     usleep(100);
   }
 
-  semWait(sem_id, 8);
+  semWait(sem_id, CALLIBRATE);
   callibrate.MPU6050AccOffsetAxis.x = sumX / samples;
   callibrate.MPU6050AccOffsetAxis.y = sumY / samples;
   callibrate.MPU6050AccOffsetAxis.z = sumZ / samples;
-  semPost(sem_id, 8);
+  semPost(sem_id, CALLIBRATE);
 }
 
 
@@ -1309,13 +1344,13 @@ void setMPU6050ScaleSetting(mpu6050_dps_t scale)
   default:
     break;
   }
-  
+
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_GYRO_CONFIG) & 0b11100111;
   oldRegister |= (scale << 3);
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_GYRO_CONFIG, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_GYRO_CONFIG, oldRegister);
 }
 
-mpu6050_dps_t getMPU6050ScaleSetting() {
+mpu6050_dps_t getMPU6050ScaleSetting(void) {
   return (mpu6050_dps_t)(readRegister8(MPU6050_ADDRESS, MPU6050_REG_GYRO_CONFIG) & 0b00011000);
 }
 
@@ -1339,7 +1374,7 @@ void setMPU6050RangeSetting(mpu6050_range_t range) {
 
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG) & 0b11100111;
   oldRegister |= (range << 3);
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG, oldRegister);
 }
 
 mpu6050_range_t getMPU6050RangeSetting(void)
@@ -1351,21 +1386,21 @@ void setMPU6050DHPFModeSetting(mpu6050_dhpf_t dhpf)
 {
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG) & 0b11111000;
   oldRegister |= dhpf;
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG, oldRegister);
 }
 
 void setMPU6050DLPFModeSetting(mpu6050_dlpf_t dlpf)
 {
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_CONFIG) & 0b11111000;
   oldRegister |= dlpf;
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_CONFIG, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_CONFIG, oldRegister);
 }
 
 void setMPU6050ClockSourceSetting(mpu6050_clockSource_t source)
 {
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1) & 0b11111000;
   oldRegister |= source;
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1, oldRegister);
 }
 
 mpu6050_clockSource_t getMPU6050ClockSourceSetting(void)
@@ -1383,7 +1418,7 @@ void setMPU6050SleepEnabledSetting(bool state)
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1) & !(1 << 6);
   if (state)
     oldRegister |= (1 << 6);
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1, oldRegister);
 }
 
 bool getMPU6050I2CMasterModeEnabledSetting(void)
@@ -1396,7 +1431,7 @@ void setMPU6050I2CMasterModeEnabledSetting(bool state)
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_USER_CTRL) & !(1 << 5);
   if (state)
     oldRegister |= (1 << 5);
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_USER_CTRL, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_USER_CTRL, oldRegister);
 }
 
 void setMPU6050I2CBypassEnabledSetting(bool state)
@@ -1404,7 +1439,7 @@ void setMPU6050I2CBypassEnabledSetting(bool state)
   char oldRegister = readRegister8(MPU6050_ADDRESS, MPU6050_REG_INT_PIN_CFG) & !(1 << 1);
   if (state)
     oldRegister |= (1 << 1);
-  writeRegister(MPU6050_ADDRESS, MPU6050_REG_INT_PIN_CFG, oldRegister);
+  writeRegisterValue(MPU6050_ADDRESS, MPU6050_REG_INT_PIN_CFG, oldRegister);
 }
 
 bool getMPU6050I2CBypassEnabledSetting(void)
@@ -1412,7 +1447,7 @@ bool getMPU6050I2CBypassEnabledSetting(void)
   return readRegisterBit(MPU6050_ADDRESS, MPU6050_REG_INT_PIN_CFG, 1);
 }
 
-Axis_struct getMPU6050GyRaw() {
+Axis_struct getMPU6050GyRaw(void) {
   Axis_struct gy;
 
   gy.x  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
@@ -1422,7 +1457,7 @@ Axis_struct getMPU6050GyRaw() {
   return gy;
 }
 
-Axis_struct getMPU6050AccRaw() {
+Axis_struct getMPU6050AccRaw(void) {
   Axis_struct acc;
 
   acc.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
@@ -1431,15 +1466,15 @@ Axis_struct getMPU6050AccRaw() {
 
   return acc;
 }
-float getMPU6050TempRaw() {
+float getMPU6050TempRaw(void) {
   return (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
 }
 
-float getMPU6050TempNorm() {
+float getMPU6050TempNorm(void) {
   return getMPU6050TempRaw() / 340 + 36.53;
 }
 
-Axis_struct getMPU6050AccNorm() {
+Axis_struct getMPU6050AccNorm(void) {
   Axis_struct acc = getMPU6050AccRaw();
 
   acc.x = (acc.x - callibrate.MPU6050AccOffsetAxis.x) * rangePerDigit * 9.80665f;
@@ -1449,7 +1484,7 @@ Axis_struct getMPU6050AccNorm() {
   return acc;
 }
 
-Axis_struct getMPU6050GyNorm() {
+Axis_struct getMPU6050GyNorm(void) {
   Axis_struct gy = getMPU6050GyRaw();
 
   gy.x = (gy.x - callibrate.MPU6050GyOffsetAxis.x) * dpsPerDigit;
@@ -1467,9 +1502,7 @@ float dist(float a, float b) {
   return sqrt(a * a + b * b);
 }
 
-
-
-Kalman_struct kalman[1];
+Kalman_struct kalman[2];
 // acc = angle measured with atan2 using the accelerometer
 // gy = angle measured using the gyro
 //http://blog.tkjelectronics.dk/2012/09/a-practical-approach-to-kalman-filter-and-how-to-implement-it/comment-page-1/
@@ -1504,7 +1537,6 @@ float tiltCompensate(Axis_struct magAxis, float roll, float pitch)
   float yh = magAxis.y * cos(pitch) + magAxis.z * sin(pitch);
   return atan2(-yh, xh);
 }
-
 
 float getSpeedFromDistance(float distance, float dt) {
   return distance / dt;
@@ -1586,7 +1618,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   switch (signal)
   {
   case SIGUSR1:
-
+    semWait(sem_id, REFRESH_LOCK);
     bool refreshPositionCheck = (REFRESH_POSITION / REFRESH_MODULE) <= pocetPosition;
     bool refreshMotorsCheck = (REFRESH_MOTORS / REFRESH_MODULE) <= pocetMotors;
     bool refreshBatteryCheck = (REFRESH_BATTERY / REFRESH_MODULE) <= pocetBattery;
@@ -1614,44 +1646,44 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
 
     if (refreshCameraCheck) {
       if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
-        semWait(sem_id, Camera_variableL);
+        semWait(sem_id, CAMERA_VARIABLE_L);
         imageChooseMainL = imageChooseL;
-        semPost(sem_id, Camera_variableL);
+        semPost(sem_id, CAMERA_VARIABLE_L);
         if (imageChooseMainL != 0) {
           if (imageChooseMainL == 1) {
-            semWait(sem_id, Camera_imageL_1);
-            semWait(sem_id, RobotSensors);
+            semWait(sem_id, CAMERA_IMAGE_L1);
+            semWait(sem_id, ROBOTSENSORS);
             //cvarrToMat(img1L).copyTo(robotSensors.camera.imgLeft);
-            semPost(sem_id, RobotSensors);
-            semPost(sem_id, Camera_imageL_1);
+            semPost(sem_id, ROBOTSENSORS);
+            semPost(sem_id, CAMERA_IMAGE_L1);
           }
           else if (imageChooseMainL == 2) {
-            semWait(sem_id, Camera_imageL_2);
-            semWait(sem_id, RobotSensors);
+            semWait(sem_id, CAMERA_IMAGE_L2);
+            semWait(sem_id, ROBOTSENSORS);
             //cvarrToMat(img2L).copyTo(robotSensors.camera.imgLeft);
-            semPost(sem_id, RobotSensors);
-            semPost(sem_id, Camera_imageL_2);
+            semPost(sem_id, ROBOTSENSORS);
+            semPost(sem_id, CAMERA_IMAGE_L2);
           }
         }
       }
       if (NUMBER_OF_CAMERA == 2) {
-        semWait(sem_id, 6);
+        semWait(sem_id, CAMERA_VARIABLE_R);
         imageChooseMainR = imageChooseR;
-        semPost(sem_id, 6);
+        semPost(sem_id, CAMERA_VARIABLE_R);
         if (imageChooseMainR != 0) {
           if (imageChooseMainR == 1) {
-            semWait(sem_id, Camera_imageR_1);
-            semWait(sem_id, RobotSensors);
+            semWait(sem_id, CAMERA_IMAGE_R1);
+            semWait(sem_id, ROBOTSENSORS);
             //cvarrToMat(img1R).copyTo(robotSensors.camera.imgRight);
-            semPost(sem_id, RobotSensors);
-            semPost(sem_id, Camera_imageR_1);
+            semPost(sem_id, ROBOTSENSORS);
+            semPost(sem_id, CAMERA_IMAGE_R1);
           }
           else if (imageChooseMainR == 2) {
-            semWait(sem_id, Camera_imageR_2);
-            semWait(sem_id, RobotSensors);
+            semWait(sem_id, CAMERA_IMAGE_R2);
+            semWait(sem_id, ROBOTSENSORS);
             //cvarrToMat(img2R).copyTo(robotSensors.camera.imgRight);
-            semPost(sem_id, RobotSensors);
-            semPost(sem_id, Camera_imageR_2);
+            semPost(sem_id, ROBOTSENSORS);
+            semPost(sem_id, CAMERA_IMAGE_R2);
           }
         }
       }
@@ -1659,53 +1691,53 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     }
 
     if (refreshBMP180Check) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       //sem pojde BMO180
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetBMP180 = 0;
     }
 
     if (refreshHMC5883LCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       robotSensors.HMC5883L = getHMC5883LNorm();
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetHMC5883L = 0;
     }
 
     if (refreshAccCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
       robotSensors.MPU6050.accAngle = calcAccAngle3d(robotSensors.MPU6050.accAxis);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetAcc = 0;
     }
 
     if (refreshGyCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
 
       if (lastGy.x != robotSensors.MPU6050.gyAxis.x && lastGy.y != robotSensors.MPU6050.gyAxis.y && lastGy.z != robotSensors.MPU6050.gyAxis.z) {
+        semWait(sem_id, ROBOTSENSORS);
         Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis, (float)REFRESH_GY / 1000);
-        semWait(sem_id, RobotSensors);
         robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
         robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
         robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
-        semPost(sem_id, RobotSensors);
         lastGy = robotSensors.MPU6050.gyAxis;
+        semPost(sem_id, ROBOTSENSORS);
       }
       pocetGy = 0;
     }
 
     if (refreshTempCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       robotSensors.MPU6050.temperature = getMPU6050TempNorm();
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetTemp = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_DOWN_RIGHT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1713,19 +1745,19 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       deltaDistanceDownRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
       robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, (float)REFRESH_POSITION / 1000);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownRight, lastRobotAcculators.motors.motorDownRight)) {
-      semWait(sem_id, RobotAcculators);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_DOWN_RIGHT, robotAcculators.motors.motorDownRight.direction, robotAcculators.motors.motorDownRight.speed, robotAcculators.motors.motorDownRight.onRegulator);
-      semPost(sem_id, RobotAcculators);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_LEFT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1735,19 +1767,19 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorUpLeft.distance +=  deltaDistanceUpLeft;
       robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, (float)REFRESH_POSITION / 1000);
 
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpLeft, lastRobotAcculators.motors.motorUpLeft)) {
-      semWait(sem_id, RobotAcculators);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_UP_LEFT, robotAcculators.motors.motorUpLeft.direction, robotAcculators.motors.motorUpLeft.speed, robotAcculators.motors.motorUpLeft.onRegulator);
-      semPost(sem_id, RobotAcculators);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_MIDDLE_RIGHT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1756,26 +1788,26 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorMiddleRight.distance +=  deltaDistanceMiddleRight;
       robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, (float)REFRESH_POSITION / 1000);
 
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleRight, lastRobotAcculators.motors.motorMiddleRight)) {
-      semWait(sem_id, RobotAcculators);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_MIDDLE_RIGHT, robotAcculators.motors.motorMiddleRight.direction, robotAcculators.motors.motorMiddleRight.speed, robotAcculators.motors.motorMiddleRight.onRegulator);
-      semPost(sem_id, RobotAcculators);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshMotorsCheck || robotAcculators.servoAngle != lastRobotAcculators.servoAngle) {
-      semWait(sem_id, RobotAcculators);
+      semWait(sem_id, ROBOTACCULATORS);
       setServo(robotAcculators.servoAngle);
-      semPost(sem_id, RobotAcculators);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_RIGHT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1785,19 +1817,19 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
       robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (float)REFRESH_POSITION / 1000);
 
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpRight, lastRobotAcculators.motors.motorUpRight)) {
-      semWait(sem_id, RobotAcculators);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_UP_RIGHT, robotAcculators.motors.motorUpRight.direction, robotAcculators.motors.motorUpRight.speed, robotAcculators.motors.motorUpRight.onRegulator);
-      semPost(sem_id, RobotAcculators);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_MIDDLE_LEFT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1805,19 +1837,19 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       deltaDistanceMiddleLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
       robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, (float)REFRESH_POSITION / 1000);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleLeft, lastRobotAcculators.motors.motorMiddleLeft)) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_MIDDLE_LEFT, robotAcculators.motors.motorMiddleLeft.direction, robotAcculators.motors.motorMiddleLeft.speed, robotAcculators.motors.motorMiddleLeft.onRegulator);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTSENSORS);
       pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_DOWN_LEFT);
       if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
       else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
@@ -1825,23 +1857,23 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       deltaDistanceDownLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
       robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, (float)REFRESH_POSITION / 1000);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTSENSORS);
       pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownLeft, lastRobotAcculators.motors.motorDownLeft)) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_DOWN_LEFT, robotAcculators.motors.motorDownLeft.direction, robotAcculators.motors.motorDownLeft.speed, robotAcculators.motors.motorDownLeft.onRegulator);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTACCULATORS);
       pocetMotors = 0;
     }
 
     if (refreshLedsCheck) {
-      semWait(sem_id, RobotSensors);
+      semWait(sem_id, ROBOTACCULATORS);
       setLed(POSITION_UP, robotAcculators.leds.LedUp);
       setLed(POSITION_MIDDLE, robotAcculators.leds.LedMiddle);
       if (!BATTERY_LED_INDICATING) setLed(POSITION_DOWN, robotAcculators.leds.LedDown);
-      semPost(sem_id, RobotSensors);
+      semPost(sem_id, ROBOTACCULATORS);
     }
 
     if (refreshPositionCheck) {
@@ -1879,7 +1911,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       calcRobotPosition(robotSensors.robotPosition.speedL, robotSensors.robotPosition.speedR, (float)REFRESH_POSITION / 1000);
     }
 
-    semWait(sem_id, RobotSensors);
+    semWait(sem_id, ROBOTSENSORS);
     robotSensors.buttons.buttonDown =   getButton(POSITION_DOWN);
     robotSensors.buttons.buttonMiddle = getButton(POSITION_MIDDLE);
     robotSensors.buttons.buttonUp =     getButton(POSITION_UP);
@@ -1895,11 +1927,11 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     }
     if (refreshAmpCheck)    robotSensors.amper = getAmp();
     if (refreshUltrasonicCheck) robotSensors.ultrasonic = getUltrasonic();
-    semPost(sem_id, RobotSensors);
+    semPost(sem_id, ROBOTSENSORS);
 
-    semWait(sem_id, RobotAcculators);
+    semWait(sem_id, ROBOTACCULATORS);
     memcpy(&lastRobotAcculators, &robotAcculators, sizeof(RobotAcculators));
-    semPost(sem_id, RobotAcculators);
+    semPost(sem_id, ROBOTACCULATORS);
 
     pocetBMP180++;
     pocetHMC5883L++;
@@ -1913,7 +1945,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     pocetAcc++;
     pocetGy++;
     pocetTemp++;
-
+    semPost(sem_id, REFRESH_LOCK);
     break;
   }
 }
