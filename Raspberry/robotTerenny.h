@@ -169,6 +169,17 @@ extern "C" {
 #define Q_gyro   0.0003
 #define R_angle  0.01
 
+typedef enum{
+  Camera_variableL,
+  Camera_imageL_1,
+  Camera_imageL_2,
+  Camera_variable2,
+  Camera_imageR_1,
+  Camera_imageR_2,
+  RobotSensors,
+  RobotAcculators
+} semafor_name_t;
+
 struct Kalman_struct{
   float x_angle;
   float x_bias;
