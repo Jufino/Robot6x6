@@ -50,20 +50,26 @@ extern "C" {
 #define SENSORS_WIFI 0
 #define SENSORS_PORT 1213
 
-#define REFRESH_STATUS     1 //zap alebo vyp autorefresh
-#define REFRESH_MODULE     20.0f //v ms
-#define REFRESH_BATTERY    REFRESH_MODULE*100.0f
-#define REFRESH_MOTORS     REFRESH_MODULE*5.0f
-#define REFRESH_HMC5883L   REFRESH_MODULE*2.f
-#define REFRESH_BMP180     REFRESH_MODULE*5.0f
-#define REFRESH_ACC        REFRESH_MODULE*5.0f
-#define REFRESH_GY         REFRESH_MODULE*1.0f
-#define REFRESH_TEMP       REFRESH_MODULE*5.0f
-#define REFRESH_LEDS       REFRESH_MODULE*5.0f
-#define REFRESH_POSITION   REFRESH_MODULE*5.0f
-#define REFRESH_AMP        REFRESH_MODULE*100.0f
-#define REFRESH_ULTRASONIC REFRESH_MODULE*5.0f
-#define REFRESH_CAMERA     REFRESH_MODULE*15.0f
+#define REFRESH1_STATUS     1 //zap alebo vyp autorefresh
+#define REFRESH1_MODULE     20.0f //v ms
+#define REFRESH1_MOTORS     REFRESH1_MODULE*5.0f
+#define REFRESH1_HMC5883L   REFRESH1_MODULE*2.0f
+#define REFRESH1_BMP180     REFRESH1_MODULE*5.0f
+#define REFRESH1_ACC        REFRESH1_MODULE*5.0f
+#define REFRESH1_GY         REFRESH1_MODULE*1.0f
+#define REFRESH1_TEMP       REFRESH1_MODULE*5.0f
+#define REFRESH1_LEDS       REFRESH1_MODULE*5.0f
+#define REFRESH1_POSITION   REFRESH1_MODULE*5.0f
+#define REFRESH1_ULTRASONIC REFRESH1_MODULE*5.0f
+#define REFRESH1_VOLTAGE    REFRESH1_MODULE*100.0f
+#define REFRESH1_AMP        REFRESH1_MODULE*100.0f
+#define REFRESH1_BATTERY    REFRESH1_MODULE*100.0f
+#define REFRESH1_BUTTON     REFRESH1_MODULE*10.0f
+
+#define REFRESH2_STATUS     0 //zap alebo vyp autorefresh
+#define REFRESH2_MODULE     33.0f
+
+#define REFRESH_GPS_STATUS 0 
 
 #define R2 5.3f
 #define R1 31.4f
@@ -181,7 +187,8 @@ typedef enum{
   ROBOTSENSORS,
   ROBOTACCULATORS,
   CALLIBRATE,
-  REFRESH_LOCK
+  REFRESH1_LOCK,
+  REFRESH2_LOCK
 } semafor_name_t;
 
 struct Kalman_struct{
@@ -297,10 +304,10 @@ typedef enum{
 //--------------------------------------------
 //ostatne
 typedef enum{
+    COLOR_OFF,
     COLOR_GREEN,
     COLOR_RED,
-    COLOR_ORANGE,
-    COLOR_OFF
+    COLOR_ORANGE
 } color_t;
 
 typedef enum{
@@ -548,11 +555,6 @@ struct RobotPosition_struct {
   Angle3d_struct imuAngle;
 };
 
-struct Camera_struct {
-  Mat imgLeft;
-  Mat imgRight;
-};
-
 struct Voltage_struct{
   float volts;
   float capacityPercent;
@@ -641,6 +643,7 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
 void setMove(direction_t direction,unsigned char speed,bool onReg);
 int getKbhit(void);
 GPS_struct getGPS(void);
+
 bool HMC5883LTestConnection(void);
 hmc5883l_measurement_t getHMC5883LMeasurementSetting(void);
 void setHMC5883LMeasurementSetting(hmc5883l_measurement_t measurement);
@@ -688,11 +691,19 @@ float getSpeedFromDistance(float distance,float dt);
 float rad2Deg(float angle);
 float deg2Rad(float angle);
 
+Mat getImageLeft(void);
+Mat getImageRight(void);
+Mat getImage(void);
+
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
-void initRefresh(void);
-void stopRefresh(void);
+void initRefresh1(void);
+void stopRefresh1(void);
+void initRefresh2(void);
+void stopRefresh2(void);
+void initRefreshSignalAction(void);
+void *syncGPS(void *arg);
 void syncModules(int signal , siginfo_t * siginfo, void * ptr);
 #endif
