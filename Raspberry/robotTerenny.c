@@ -1,5 +1,8 @@
 #include "robotTerenny.h"
 
+freenect_context *ctx;  // pointer to the freenect context
+freenect_device *dev;  // pointer to the device
+
 int i2cHandle;
 unsigned char lastAddr = 0x00;
 int sensorsServersock, cameraServersock;
@@ -20,8 +23,6 @@ char imageChooseR = 0;
 IplImage *img1R;
 IplImage *img2R;
 
-Mat imgMatL, imgMatR;
-
 RobotAcculators robotAcculators;
 RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
@@ -41,7 +42,6 @@ unsigned char pocetHMC5883L = 100;
 unsigned char pocetLeds = 100;
 unsigned char pocetAmp = 100;
 unsigned char pocetUltrasonic = 100;
-unsigned char pocetCamera = 100;
 unsigned char pocetVoltage = 100;
 unsigned char pocetButtons = 100;
 unsigned char pocetAcc = 100;
@@ -110,6 +110,11 @@ void initRobot(void) {
   setLed(POSITION_DOWN, COLOR_GREEN);
   setLed(POSITION_MIDDLE, COLOR_GREEN);
   setLed(POSITION_UP, COLOR_GREEN);
+
+  if (!initKinect()) {
+    printf("Kinect problem s konektivitou");
+    exit(0);
+  }
 
   if (!MPU6050TestConnection()) {
     setLed(POSITION_DOWN, COLOR_RED);
@@ -267,7 +272,7 @@ void initRobot(void) {
 
   resetDistanceAll();
 
-  setMotorPowerSupply(true);//potom zmenit na true
+  setMotorPowerSupply(true);
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     pthread_t threadImgL;
@@ -288,6 +293,23 @@ void initRobot(void) {
   if (REFRESH2_STATUS == 1) initRefresh2();
 
   signal(SIGINT, sigctrl);
+}
+
+bool initKinect() {
+  if (freenect_init(&ctx, NULL) < 0) {
+    return false;
+  }
+
+// set the highest log level so we can see what is going on
+  freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
+
+// I only have one kinect so open device 0
+  if (freenect_open_device(ctx, &dev, 0) < 0)
+  {
+    freenect_shutdown(ctx);
+    return false;
+  }
+  return true;
 }
 
 void sigctrl(int param) {
@@ -314,6 +336,8 @@ void closeRobot(void) {
 
   if (REFRESH1_STATUS) stopRefresh1();
   if (REFRESH2_STATUS) stopRefresh2();
+
+  freenect_shutdown(ctx);
 
   closeI2C();
   SerialClose(portHandle);
@@ -532,6 +556,17 @@ unsigned char getButton(position3_t pos) {
   default: return 0;
   }
 }
+
+#define NUMBER_TICK_BOUNCE_DELETE 10
+bool getButtonWithoutBounce(position3_t pos) {
+  int buttonCounter = 0;
+  for (int i = 0; i < NUMBER_TICK_BOUNCE_DELETE; i++) {
+    if (getButton(pos)) buttonCounter++;
+    usleep(100);
+  }
+  if (buttonCounter > (int)(NUMBER_TICK_BOUNCE_DELETE / 2) return true;
+      else                  return false;
+  }
 
 RobotAcculators getRobotAcculators(void) {
   RobotAcculators temp;
@@ -1720,18 +1755,31 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
   if (signal == SIGUSR1) {
     semWait(sem_id, REFRESH1_LOCK);
     bool refreshPositionCheck = (REFRESH1_POSITION / REFRESH1_MODULE) <= pocetPosition;
+    if (refreshPositionCheck) pocetPosition = 0;
     bool refreshMotorsCheck = (REFRESH1_MOTORS / REFRESH1_MODULE) <= pocetMotors;
+    if (refreshMotorsCheck) pocetMotors = 0;
     bool refreshBatteryCheck = (REFRESH1_BATTERY / REFRESH1_MODULE) <= pocetBattery;
+    if (refreshBatteryCheck) pocetBattery = 0;
     bool refreshBMP180Check = (REFRESH1_BMP180 / REFRESH1_MODULE) <= pocetBMP180;
+    if (refreshBMP180Check) pocetBMP180 = 0;
     bool refreshHMC5883LCheck = (REFRESH1_HMC5883L / REFRESH1_MODULE) <= pocetHMC5883L;
+    if (refreshHMC5883LCheck) pocetHMC5883L = 0;
     bool refreshLedsCheck = (REFRESH1_LEDS / REFRESH1_MODULE) <= pocetLeds;
+    if (refreshLedsCheck) pocetLeds = 0;
     bool refreshAmpCheck = (REFRESH1_AMP / REFRESH1_MODULE) <= pocetAmp;
+    if (refreshAmpCheck) pocetAmp = 0;
     bool refreshUltrasonicCheck = (REFRESH1_ULTRASONIC / REFRESH1_MODULE) <= pocetUltrasonic;
+    if (refreshUltrasonicCheck) pocetUltrasonic = 0;
     bool refreshAccCheck = (REFRESH1_ACC / REFRESH1_MODULE) <= pocetAcc;
+    if (refreshAccCheck) pocetAcc = 0;
     bool refreshGyCheck = (REFRESH1_GY / REFRESH1_MODULE) <= pocetGy;
+    if (refreshGyCheck) pocetGy = 0;
     bool refreshTempCheck = (REFRESH1_TEMP / REFRESH1_MODULE) <= pocetTemp;
+    if (refreshTempCheck) pocetTemp = 0;
     bool refreshVoltageCheck = (REFRESH1_VOLTAGE / REFRESH1_MODULE) <= pocetVoltage;
+    if (refreshVoltageCheck) pocetVoltage = 0;
     bool refreshButtonsCheck = (REFRESH1_BUTTON / REFRESH1_MODULE) <= pocetButtons;
+    if (refreshButtonsCheck) pocetButtons = 0;
     float pomocnaZmenaOtackomera;
     float deltaDistanceL;
     float deltaDistanceR;
@@ -1741,19 +1789,18 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     float deltaDistanceUpLeft;
     float deltaDistanceMiddleLeft;
     float deltaDistanceDownLeft;
+    int buttonCounter;
 
     if (refreshBMP180Check) {
       semWait(sem_id, ROBOTSENSORS);
-      //sem pojde BMO180
+      //sem pojde BMP180
       semPost(sem_id, ROBOTSENSORS);
-      pocetBMP180 = 0;
     }
 
     if (refreshHMC5883LCheck) {
       semWait(sem_id, ROBOTSENSORS);
       robotSensors.HMC5883L = getHMC5883LNorm();
       semPost(sem_id, ROBOTSENSORS);
-      pocetHMC5883L = 0;
     }
 
     if (refreshAccCheck) {
@@ -1761,7 +1808,6 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
       robotSensors.MPU6050.accAngle = calcAccAngle3d(robotSensors.MPU6050.accAxis);
       semPost(sem_id, ROBOTSENSORS);
-      pocetAcc = 0;
     }
 
     if (refreshGyCheck) {
@@ -1772,15 +1818,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
       robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
       semPost(sem_id, ROBOTSENSORS);
-
-      pocetGy = 0;
     }
 
     if (refreshTempCheck) {
       semWait(sem_id, ROBOTSENSORS);
       robotSensors.MPU6050.temperature = getMPU6050TempNorm();
       semPost(sem_id, ROBOTSENSORS);
-      pocetTemp = 0;
     }
 
     if (refreshPositionCheck) {
@@ -1793,14 +1836,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
       robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, (float)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownRight, lastRobotAcculators.motors.motorDownRight)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_DOWN_RIGHT, robotAcculators.motors.motorDownRight.direction, robotAcculators.motors.motorDownRight.speed, robotAcculators.motors.motorDownRight.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
@@ -1815,14 +1856,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, (float)REFRESH1_POSITION / 1000);
 
       semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpLeft, lastRobotAcculators.motors.motorUpLeft)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_UP_LEFT, robotAcculators.motors.motorUpLeft.direction, robotAcculators.motors.motorUpLeft.speed, robotAcculators.motors.motorUpLeft.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
@@ -1836,43 +1875,45 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, (float)REFRESH1_POSITION / 1000);
 
       semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleRight, lastRobotAcculators.motors.motorMiddleRight)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_MIDDLE_RIGHT, robotAcculators.motors.motorMiddleRight.direction, robotAcculators.motors.motorMiddleRight.speed, robotAcculators.motors.motorMiddleRight.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
-    if (refreshMotorsCheck || robotAcculators.servoAngle != lastRobotAcculators.servoAngle) {
+    if (refreshMotorsCheck || robotAcculators.kinect.yaw != lastRobotAcculators.kinect.yaw) {
       semWait(sem_id, ROBOTACCULATORS);
-      setServo(robotAcculators.servoAngle);
+      setServo(robotAcculators.kinect.yaw);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_RIGHT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-
-      robotSensors.motors.motorUpRight.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
-      robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (float)REFRESH1_POSITION / 1000);
-
-      semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
+    if (refreshMotorsCheck || robotAcculators.kinect.roll != lastRobotAcculators.kinect.roll) {
+      semWait(sem_id, ROBOTACCULATORS);
+      freenect_set_tilt_degs(dev, kinect.roll);
+      semPost(sem_id, ROBOTACCULATORS);
     }
+
+    if (refreshMotorsCheck )
+      if (refreshPositionCheck) {
+        semWait(sem_id, ROBOTSENSORS);
+        pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_RIGHT);
+        if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
+        else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
+
+        robotSensors.motors.motorUpRight.distanceRaw += pomocnaZmenaOtackomera;
+        deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
+        robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
+        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (float)REFRESH1_POSITION / 1000);
+
+        semPost(sem_id, ROBOTSENSORS);
+      }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpRight, lastRobotAcculators.motors.motorUpRight)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_UP_RIGHT, robotAcculators.motors.motorUpRight.direction, robotAcculators.motors.motorUpRight.speed, robotAcculators.motors.motorUpRight.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
@@ -1885,14 +1926,12 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
       robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, (float)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleLeft, lastRobotAcculators.motors.motorMiddleLeft)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_MIDDLE_LEFT, robotAcculators.motors.motorMiddleLeft.direction, robotAcculators.motors.motorMiddleLeft.speed, robotAcculators.motors.motorMiddleLeft.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
     if (refreshPositionCheck) {
@@ -1905,22 +1944,49 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
       robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, (float)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
-      pocetPosition = 0;
     }
 
     if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownLeft, lastRobotAcculators.motors.motorDownLeft)) {
       semWait(sem_id, ROBOTACCULATORS);
       setMotor(POSITION_DOWN_LEFT, robotAcculators.motors.motorDownLeft.direction, robotAcculators.motors.motorDownLeft.speed, robotAcculators.motors.motorDownLeft.onRegulator);
       semPost(sem_id, ROBOTACCULATORS);
-      pocetMotors = 0;
     }
 
-    if (refreshLedsCheck) {
+    if (refreshLedsCheck || robotAcculators.leds.LedUp != lastRobotAcculators.leds.LedUp) {
       semWait(sem_id, ROBOTACCULATORS);
       setLed(POSITION_UP, robotAcculators.leds.LedUp);
-      setLed(POSITION_MIDDLE, robotAcculators.leds.LedMiddle);
-      if (!BATTERY_LED_INDICATING) setLed(POSITION_DOWN, robotAcculators.leds.LedDown);
       semPost(sem_id, ROBOTACCULATORS);
+    }
+
+    if (refreshLedsCheck || robotAcculators.leds.LedMiddle != lastRobotAcculators.leds.LedMiddle) {
+      semWait(sem_id, ROBOTACCULATORS);
+      setLed(POSITION_UP, robotAcculators.leds.LedMiddle);
+      semPost(sem_id, ROBOTACCULATORS);
+    }
+
+    if (refreshLedsCheck || robotAcculators.leds.LedDown != lastRobotAcculators.leds.LedDown) {
+      if (!BATTERY_LED_INDICATING) {
+        semWait(sem_id, ROBOTACCULATORS);
+        setLed(POSITION_DOWN, robotAcculators.leds.LedDown);
+        semPost(sem_id, ROBOTACCULATORS);
+      }
+    }
+
+    if (robotAcculators.leds.LedKinect != lastRobotAcculators.leds.LedKinect) {
+      semWait(sem_id, ROBOTACCULATORS);
+      freenect_set_led(dev, robotAcculators.leds.LedKinect);
+      semPost(sem_id, ROBOTACCULATORS);
+    }
+
+    if(refreshAccKinectCheck){
+      freenect_raw_tilt_state *state = 0;
+      // Get the raw accelerometer values and tilt data
+      state=freenect_get_tilt_state(dev);
+      semWait(sem_id, ROBOTSENSORS);
+      // Get the processed accelerometer values (calibrated to gravity)
+      freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
+      robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
+      semPost(sem_id, ROBOTSENSORS);
     }
 
     if (refreshPositionCheck) {
@@ -1963,56 +2029,22 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     if (refreshUltrasonicCheck) robotSensors.ultrasonic = getUltrasonic();
 
     if (refreshButtonsCheck) {
-      if (getButton(POSITION_UP)) {
-        usleep(1000);
-        if (getButton(POSITION_UP)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonUp = true;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
-      else {
-        usleep(1000);
-        if (!getButton(POSITION_UP)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonUp = false;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
+      bool buttonState;
 
-      if (getButton(POSITION_MIDDLE)) {
-        usleep(1000);
-        if (getButton(POSITION_UP)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonMiddle = true;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
-      else {
-        usleep(1000);
-        if (!getButton(POSITION_MIDDLE)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonMiddle = false;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
+      buttonState = getButtonWithoutBounce(POSITION_UP);
+      semWait(sem_id, ROBOTSENSORS);
+      robotSensors.buttons.buttonUp = buttonState;
+      semPost(sem_id, ROBOTSENSORS);
 
-      if (getButton(POSITION_UP)) {
-        usleep(1000);
-        if (getButton(POSITION_UP)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonDown = true;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
-      else {
-        usleep(1000);
-        if (!getButton(POSITION_UP)) {
-          semWait(sem_id, ROBOTSENSORS);
-          robotSensors.buttons.buttonDown = false;
-          semPost(sem_id, ROBOTSENSORS);
-        }
-      }
+      buttonState = getButtonWithoutBounce(POSITION_MIDDLE);
+      semWait(sem_id, ROBOTSENSORS);
+      robotSensors.buttons.buttonMiddle = buttonState;
+      semPost(sem_id, ROBOTSENSORS);
+
+      buttonState = getButtonWithoutBounce(POSITION_DOWN);
+      semWait(sem_id, ROBOTSENSORS);
+      robotSensors.buttons.buttonDown = buttonState;
+      semPost(sem_id, ROBOTSENSORS);
     }
 
     if (refreshVoltageCheck) {

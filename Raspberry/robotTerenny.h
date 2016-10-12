@@ -538,6 +538,7 @@ struct Leds_struct {
   color_t LedDown;
   color_t LedMiddle;
   color_t LedUp;
+  freenect_led_options LedKinect;
 };
 
 struct RobotPosition_struct {
@@ -560,9 +561,15 @@ struct Voltage_struct{
   float capacityPercent;
 }; 
 
+struct KinectSensor_struct{
+  Angle3d_struct accAngle;
+  Axis_struct accAxis; 
+}
+
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
   GPS_struct gps;                     //gps
   MPU6050_struct MPU6050;             //akcelerometer, gyroskop a teplomer
+  KinectSensor_struct kinect;         //kinect
   BMP180_struct BMP180;               //barometer, teplomer - zatial nie je implementovane
   HMC5883L_struct HMC5883L;           //kompas
   MotorsSensor_struct motors;         //meranie s otackomerov
@@ -576,7 +583,7 @@ struct RobotSensors {                 //struktura pre snimace aktualizovane s ca
 struct RobotAcculators {              //struktura pre riadiace veliciny s casom refresh podla jednotlivych hodnot pre riadenie
   MotorsAcculator_struct motors;
   Leds_struct leds;
-  int servoAngle;
+  Angle3d_struct kinect;
   bool motorPowerSupply;
 };
 
@@ -608,6 +615,7 @@ void *getImgR(void *arg);
 void initButton(position3_t pos);
 void closeButton(position3_t pos);
 unsigned char getButton(position3_t pos);
+bool getButtonWithoutBounce(position3_t pos);
 RobotAcculators getRobotAcculators();
 void setRobotAcculators(RobotAcculators temp);
 RobotSensors getRobotSensors(void);

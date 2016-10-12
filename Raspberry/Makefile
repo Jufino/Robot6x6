@@ -3,6 +3,8 @@ CPP=$(CROSS_COMPILE)g++ -Wall -g
 
 GFLAGS=`pkg-config --libs --cflags gtk+-2.0 gmodule-2.0`
 OFLAGS=`pkg-config --libs --cflags opencv`
+LDFLAGS=-L/home/pi/Kinect/libfreenect/build/lib/libfreenect.so.0.5 -lfreenect -L/home/pi/Kinect/libusb-1.0.20/ -lusb-1.0 -lgpio -lserial -lm
+
 
 all:main
 
@@ -12,7 +14,7 @@ main:main.cpp
 TARGET=robotTerenny
 
 robotTerenny:robotTerenny.c
-	$(CPP) -c robotTerenny.c -lgpio -lserial -lm $(OFLAGS)
+	$(CPP) -c robotTerenny.c $(LDFLAGS)  $(OFLAGS)
 
 install: $(TARGET)
 	$(CROSS_COMPILE)ar rcs lib$(TARGET).a robotTerenny.o
