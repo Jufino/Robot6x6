@@ -30,9 +30,9 @@ Callibrate callibrate;
 
 timer_t casovac1;
 timer_t casovac2;
-float mgPerDigit = 0.92f;
-float rangePerDigit = 0.0f;
-float dpsPerDigit = 0.0f;
+double mgPerDigit = 0.92f;
+double rangePerDigit = 0.0f;
+double dpsPerDigit = 0.0f;
 
 unsigned char pocetPosition = 100;
 unsigned char pocetMotors = 100;
@@ -47,6 +47,7 @@ unsigned char pocetButtons = 100;
 unsigned char pocetAcc = 100;
 unsigned char pocetGy = 100;
 unsigned char pocetTemp = 100;
+unsigned char pocetAccKinect = 100;
 
 Axis_struct minAxis;
 Axis_struct maxAxis;
@@ -564,9 +565,9 @@ bool getButtonWithoutBounce(position3_t pos) {
     if (getButton(pos)) buttonCounter++;
     usleep(100);
   }
-  if (buttonCounter > (int)(NUMBER_TICK_BOUNCE_DELETE / 2) return true;
-      else                  return false;
-  }
+  if (buttonCounter > (int)(NUMBER_TICK_BOUNCE_DELETE / 2)) return true;
+  else                  return false;
+}
 
 RobotAcculators getRobotAcculators(void) {
   RobotAcculators temp;
@@ -662,15 +663,15 @@ void resetDistanceAll(void) {
   resetDistance(POSITION_DOWN_LEFT);
 }
 
-float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov) {
-  return ((float)pocetTikov * ((M_PI * DIAMERER_WHEEL) / CONST_ENCODER));
+double prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov) {
+  return ((double)pocetTikov * ((M_PI * DIAMERER_WHEEL) / CONST_ENCODER));
 }
 
-float getDistance(position6_t pos) {
+double getDistance(position6_t pos) {
   return prepocetTikovOtackomeraDoVzdialenosti(getDistanceRaw(pos));
 }
 
-float getDeltaDistance(position6_t pos) {
+double getDeltaDistance(position6_t pos) {
   return prepocetTikovOtackomeraDoVzdialenosti(getDeltaDistanceRaw(pos));
 }
 
@@ -684,32 +685,32 @@ unsigned int getUltrasonicRaw(void) {
   return readRegister16(ORANGE_ADDRESS, 6);
 }
 
-float getUltrasonic(void) {
-  return (float)readRegister16(ORANGE_ADDRESS, 6) / CONST_ULTRASONIC;
+double getUltrasonic(void) {
+  return (double)readRegister16(ORANGE_ADDRESS, 6) / CONST_ULTRASONIC;
 }
 
 int getVoltageRaw(void) {
   return readRegister16(BLUE_ADDRESS, 5);
 }
 
-float getVoltage(void) {
-  return (float)getVoltageRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION) * ((R1 + R2) / R2);
+double getVoltage(void) {
+  return (double)getVoltageRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION) * ((R1 + R2) / R2);
 }
 
-float calcVoltagePercent(float volt) {
-  return (float)volt * (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) - (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) * MIN_BATTERY_VOLTAGE;
+double calcVoltagePercent(double volt) {
+  return (double)volt * (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) - (100 / (MAX_BATTERY_VOLTAGE - MIN_BATTERY_VOLTAGE)) * MIN_BATTERY_VOLTAGE;
 }
 
 int getAmpRaw(void) {
   return readRegister16(BLUE_ADDRESS, 6);
 }
 
-float getAmpVolt(void) {
-  return (float)getAmpRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION);
+double getAmpVolt(void) {
+  return (double)getAmpRaw() * (ADC_MAXIMUM_VOLTAGE / ADC_RESOLUTION);
 }
 
-float getAmp(void) {
-  return ((float)getAmpVolt() - ADC_MAXIMUM_VOLTAGE / 2) / CONST_AMP;
+double getAmp(void) {
+  return ((double)getAmpVolt() - ADC_MAXIMUM_VOLTAGE / 2) / CONST_AMP;
 }
 
 void setLed(position3_t pos, color_t color) {
@@ -1265,9 +1266,9 @@ void setHMC5883LHighI2CSpeedSetting(bool status) {
 HMC5883L_struct getHMC5883LRaw(void) {
   HMC5883L_struct HMC5883L;
 
-  HMC5883L.compassAxis.x = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
-  HMC5883L.compassAxis.y = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
-  HMC5883L.compassAxis.z = (float)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
+  HMC5883L.compassAxis.x = (double)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_X_M);
+  HMC5883L.compassAxis.y = (double)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Y_M);
+  HMC5883L.compassAxis.z = (double)readRegister16s(HMC5883L_ADDRESS, HMC5883L_REG_OUT_Z_M);
 
   return HMC5883L;
 }
@@ -1294,7 +1295,7 @@ HMC5883L_struct getHMC5883LNorm(void) {
   HMC5883L.compassAxis.y = (HMC5883L.compassAxis.y - HMC5883L_OFFSET_Y) * mgPerDigit;
   HMC5883L.compassAxis.z = (HMC5883L.compassAxis.z - HMC5883L_OFFSET_Z) * mgPerDigit;
 
-  float declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
+  double declinationAngle = (HMC5883L_DEGREE + (HMC5883L_MINUTES / 60.0)) / (180 / M_PI);   //posun magnetickeho pola podla zemepisnej sirky a dlzky
   HMC5883L.yaw = atan2(HMC5883L.compassAxis.y, HMC5883L.compassAxis.x) + declinationAngle;
 
   if (HMC5883L.yaw < 0) {
@@ -1312,13 +1313,13 @@ bool MPU6050TestConnection(void) {
 }
 
 void callibrateMPU6050Gyroscope(int samples) {
-  float sumX = 0;
-  float sumY = 0;
-  float sumZ = 0;
+  double sumX = 0;
+  double sumY = 0;
+  double sumZ = 0;
 
-  float sigmaX = 0;
-  float sigmaY = 0;
-  float sigmaZ = 0;
+  double sigmaX = 0;
+  double sigmaY = 0;
+  double sigmaZ = 0;
 
   for (unsigned char i = 0; i < samples; ++i)
   {
@@ -1346,9 +1347,9 @@ void callibrateMPU6050Gyroscope(int samples) {
 }
 
 void callibrateMPU6050Accelerometer(int samples) {
-  float sumX = 0;
-  float sumY = 0;
-  float sumZ = 0;
+  double sumX = 0;
+  double sumY = 0;
+  double sumZ = 0;
 
   for (unsigned char i = 0; i < samples; ++i)
   {
@@ -1493,9 +1494,9 @@ bool getMPU6050I2CBypassEnabledSetting(void)
 Axis_struct getMPU6050GyRaw(void) {
   Axis_struct gy;
 
-  gy.x  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
-  gy.y  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_YOUT_H);
-  gy.z  = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOUT_H);
+  gy.x  = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_XOUT_H);
+  gy.y  = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_YOUT_H);
+  gy.z  = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_GYRO_ZOUT_H);
 
   return gy;
 }
@@ -1503,17 +1504,17 @@ Axis_struct getMPU6050GyRaw(void) {
 Axis_struct getMPU6050AccRaw(void) {
   Axis_struct acc;
 
-  acc.x = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
-  acc.y = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOUT_H);
-  acc.z = (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOUT_H);
+  acc.x = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_XOUT_H);
+  acc.y = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_YOUT_H);
+  acc.z = (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_ACCEL_ZOUT_H);
 
   return acc;
 }
-float getMPU6050TempRaw(void) {
-  return (float)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
+double getMPU6050TempRaw(void) {
+  return (double)readRegister16s(MPU6050_ADDRESS, MPU6050_REG_TEMP_OUT_H);
 }
 
-float getMPU6050TempNorm(void) {
+double getMPU6050TempNorm(void) {
   return getMPU6050TempRaw() / 340 + 36.53;
 }
 
@@ -1541,7 +1542,7 @@ Axis_struct getMPU6050GyNorm(void) {
   return gy;
 }
 
-float dist(float a, float b) {
+double dist(double a, double b) {
   return sqrt(a * a + b * b);
 }
 
@@ -1550,7 +1551,7 @@ Kalman_struct kalman[2];
 // gy = angle measured using the gyro
 //http://blog.tkjelectronics.dk/2012/09/a-practical-approach-to-kalman-filter-and-how-to-implement-it/comment-page-1/
 //http://robottini.altervista.org/kalman-filter-vs-complementary-filter
-float kalmanCalculate(int indexKalman, float acc, float gy, float dt)
+double kalmanCalculate(int indexKalman, double acc, double gy, double dt)
 {
   kalman[indexKalman].x_angle += dt * (gy - kalman[indexKalman].x_bias);
   kalman[indexKalman].P_00 +=  - dt * (kalman[indexKalman].P_10 + kalman[indexKalman].P_01) + Q_angle * dt;
@@ -1574,22 +1575,22 @@ float kalmanCalculate(int indexKalman, float acc, float gy, float dt)
 }
 
 // Tilt compensation
-float tiltCompensate(Axis_struct magAxis, float roll, float pitch)
+double tiltCompensate(Axis_struct magAxis, double roll, double pitch)
 {
-  float xh = magAxis.x * cos(roll) + magAxis.y * sin(roll) * sin(pitch) + magAxis.z * sin(roll) * cos(pitch);
-  float yh = magAxis.y * cos(pitch) + magAxis.z * sin(pitch);
+  double xh = magAxis.x * cos(roll) + magAxis.y * sin(roll) * sin(pitch) + magAxis.z * sin(roll) * cos(pitch);
+  double yh = magAxis.y * cos(pitch) + magAxis.z * sin(pitch);
   return atan2(-yh, xh);
 }
 
-float getSpeedFromDistance(float distance, float dt) {
+double getSpeedFromDistance(double distance, double dt) {
   return distance / dt;
 }
 
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
 //http://franciscoraulortega.com/pubs/Algo3DFusionsMems.pdf
-void calcRobotPosition(float deltaSpeedL, float deltaSpeedR, float dt) {
-  float v = (deltaSpeedL + deltaSpeedR) / 2;
+void calcRobotPosition(double deltaSpeedL, double deltaSpeedR, double dt) {
+  double v = (deltaSpeedL + deltaSpeedR) / 2;
   robotSensors.robotPosition.angleEncoder += ((deltaSpeedR - deltaSpeedL) / LENGTH_BETWEEN_LEFT_AND_RIGHT_WHEEL) * dt;
   robotSensors.robotPosition.x +=  v * cos(robotSensors.robotPosition.angleEncoder) * dt;
   robotSensors.robotPosition.y +=  v * sin(robotSensors.robotPosition.angleEncoder) * dt;
@@ -1597,7 +1598,7 @@ void calcRobotPosition(float deltaSpeedL, float deltaSpeedR, float dt) {
 
 Mat getImageLeft(void) {
   Mat imgMatL;
-  float imageChooseMainL;
+  double imageChooseMainL;
   semWait(sem_id, CAMERA_VARIABLE_L);
   imageChooseMainL = imageChooseL;
   semPost(sem_id, CAMERA_VARIABLE_L);
@@ -1622,7 +1623,7 @@ Mat getImageLeft(void) {
 
 Mat getImageRight(void) {
   Mat imgMatR;
-  float imageChooseMainR;
+  double imageChooseMainR;
   semWait(sem_id, CAMERA_VARIABLE_R);
   imageChooseMainR = imageChooseR;
   semPost(sem_id, CAMERA_VARIABLE_R);
@@ -1649,15 +1650,15 @@ Mat getImage(void) {
   return getImageLeft();
 }
 
-float rad2Deg(float angle) {
+double rad2Deg(double angle) {
   return angle * (180 / M_PI);
 }
 
-float deg2Rad(float angle) {
+double deg2Rad(double angle) {
   return angle * (M_PI / 180);
 }
 
-Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy, float dt) {
+Angle3d_struct calcDeltaGyAngle3d(Axis_struct gy, double dt) {
   Angle3d_struct angle3d;
 
   angle3d.roll =  gy.x * dt;
@@ -1780,16 +1781,18 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     if (refreshVoltageCheck) pocetVoltage = 0;
     bool refreshButtonsCheck = (REFRESH1_BUTTON / REFRESH1_MODULE) <= pocetButtons;
     if (refreshButtonsCheck) pocetButtons = 0;
-    float pomocnaZmenaOtackomera;
-    float deltaDistanceL;
-    float deltaDistanceR;
-    float deltaDistanceDownRight;
-    float deltaDistanceMiddleRight;
-    float deltaDistanceUpRight;
-    float deltaDistanceUpLeft;
-    float deltaDistanceMiddleLeft;
-    float deltaDistanceDownLeft;
-    int buttonCounter;
+    bool refreshAccKinectCheck = (REFRESH1_ACC_KINECT / REFRESH1_MODULE) <= pocetAccKinect;
+    if (refreshAccKinectCheck) pocetAccKinect = 0;
+
+    double pomocnaZmenaOtackomera;
+    double deltaDistanceL;
+    double deltaDistanceR;
+    double deltaDistanceDownRight;
+    double deltaDistanceMiddleRight;
+    double deltaDistanceUpRight;
+    double deltaDistanceUpLeft;
+    double deltaDistanceMiddleLeft;
+    double deltaDistanceDownLeft;
 
     if (refreshBMP180Check) {
       semWait(sem_id, ROBOTSENSORS);
@@ -1813,7 +1816,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     if (refreshGyCheck) {
       semWait(sem_id, ROBOTSENSORS);
       robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
-      Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis, (float)REFRESH1_GY / 1000);
+      Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis, (double)REFRESH1_GY / 1000);
       robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
       robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
       robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
@@ -1834,7 +1837,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorDownRight.distanceRaw += pomocnaZmenaOtackomera;
       deltaDistanceDownRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
-      robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, (float)REFRESH1_POSITION / 1000);
+      robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, (double)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
     }
 
@@ -1853,7 +1856,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorUpLeft.distanceRaw += pomocnaZmenaOtackomera;
       deltaDistanceUpLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorUpLeft.distance +=  deltaDistanceUpLeft;
-      robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, (float)REFRESH1_POSITION / 1000);
+      robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, (double)REFRESH1_POSITION / 1000);
 
       semPost(sem_id, ROBOTSENSORS);
     }
@@ -1872,7 +1875,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorMiddleRight.distanceRaw += pomocnaZmenaOtackomera;
       deltaDistanceMiddleRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorMiddleRight.distance +=  deltaDistanceMiddleRight;
-      robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, (float)REFRESH1_POSITION / 1000);
+      robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, (double)REFRESH1_POSITION / 1000);
 
       semPost(sem_id, ROBOTSENSORS);
     }
@@ -1891,7 +1894,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
 
     if (refreshMotorsCheck || robotAcculators.kinect.roll != lastRobotAcculators.kinect.roll) {
       semWait(sem_id, ROBOTACCULATORS);
-      freenect_set_tilt_degs(dev, kinect.roll);
+      freenect_set_tilt_degs(dev, robotAcculators.kinect.roll);
       semPost(sem_id, ROBOTACCULATORS);
     }
 
@@ -1905,7 +1908,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
         robotSensors.motors.motorUpRight.distanceRaw += pomocnaZmenaOtackomera;
         deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
         robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
-        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (float)REFRESH1_POSITION / 1000);
+        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (double)REFRESH1_POSITION / 1000);
 
         semPost(sem_id, ROBOTSENSORS);
       }
@@ -1924,7 +1927,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorMiddleLeft.distanceRaw += pomocnaZmenaOtackomera;
       deltaDistanceMiddleLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
-      robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, (float)REFRESH1_POSITION / 1000);
+      robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, (double)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
     }
 
@@ -1942,7 +1945,7 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       robotSensors.motors.motorDownLeft.distanceRaw += pomocnaZmenaOtackomera;
       deltaDistanceDownLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
       robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
-      robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, (float)REFRESH1_POSITION / 1000);
+      robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, (double)REFRESH1_POSITION / 1000);
       semPost(sem_id, ROBOTSENSORS);
     }
 
@@ -1978,10 +1981,10 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       semPost(sem_id, ROBOTACCULATORS);
     }
 
-    if(refreshAccKinectCheck){
+    if (refreshAccKinectCheck) {
       freenect_raw_tilt_state *state = 0;
       // Get the raw accelerometer values and tilt data
-      state=freenect_get_tilt_state(dev);
+      state = freenect_get_tilt_state(dev);
       semWait(sem_id, ROBOTSENSORS);
       // Get the processed accelerometer values (calibrated to gravity)
       freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
@@ -1990,9 +1993,9 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
     }
 
     if (refreshPositionCheck) {
-      float diff1 = abs(deltaDistanceUpLeft - deltaDistanceMiddleLeft);
-      float diff2 = abs(deltaDistanceUpLeft - deltaDistanceDownLeft);
-      float diff3 = abs(deltaDistanceMiddleLeft - deltaDistanceDownLeft);
+      double diff1 = abs(deltaDistanceUpLeft - deltaDistanceMiddleLeft);
+      double diff2 = abs(deltaDistanceUpLeft - deltaDistanceDownLeft);
+      double diff3 = abs(deltaDistanceMiddleLeft - deltaDistanceDownLeft);
       if (diff1 < diff2 && diff1 < diff3)
         deltaDistanceL = (deltaDistanceUpLeft + deltaDistanceMiddleLeft) / 2;
       else if (diff2 < diff1 && diff2 < diff3)
@@ -2000,11 +2003,11 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       else
         deltaDistanceL = (deltaDistanceMiddleLeft + deltaDistanceDownLeft) / 2;
       robotSensors.robotPosition.distanceL += deltaDistanceL;
-      robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL, (float)REFRESH1_POSITION / 1000);
+      robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL, (double)REFRESH1_POSITION / 1000);
 
-      float diff4 = abs(deltaDistanceDownRight - deltaDistanceMiddleRight);
-      float diff5 = abs(deltaDistanceMiddleRight - deltaDistanceUpRight);
-      float diff6 = abs(deltaDistanceUpRight - deltaDistanceDownRight);
+      double diff4 = abs(deltaDistanceDownRight - deltaDistanceMiddleRight);
+      double diff5 = abs(deltaDistanceMiddleRight - deltaDistanceUpRight);
+      double diff6 = abs(deltaDistanceUpRight - deltaDistanceDownRight);
       if (diff4 < diff5 && diff4 < diff6)
         deltaDistanceR = (deltaDistanceDownRight + deltaDistanceMiddleRight) / 2;
       else if (diff5 < diff4 && diff5 < diff6)
@@ -2012,16 +2015,16 @@ void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
       else
         deltaDistanceR = (deltaDistanceUpRight + deltaDistanceDownRight) / 2;
       robotSensors.robotPosition.distanceR += deltaDistanceR;
-      robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR, (float)REFRESH1_POSITION / 1000);
+      robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR, (double)REFRESH1_POSITION / 1000);
 
-      robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0, robotSensors.MPU6050.accAngle.roll, robotSensors.MPU6050.gyAngle.roll, (float)REFRESH1_POSITION / 1000);
-      robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(1, robotSensors.MPU6050.accAngle.pitch, robotSensors.MPU6050.gyAngle.pitch, (float)REFRESH1_POSITION / 1000);
+      robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0, robotSensors.MPU6050.accAngle.roll, robotSensors.MPU6050.gyAngle.roll, (double)REFRESH1_POSITION / 1000);
+      robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(1, robotSensors.MPU6050.accAngle.pitch, robotSensors.MPU6050.gyAngle.pitch, (double)REFRESH1_POSITION / 1000);
       robotSensors.robotPosition.imuAngle.yaw = tiltCompensate(
             robotSensors.HMC5883L.compassAxis,
             robotSensors.robotPosition.imuAngle.pitch,
             robotSensors.robotPosition.imuAngle.roll);
 
-      calcRobotPosition(robotSensors.robotPosition.speedL, robotSensors.robotPosition.speedR, (float)REFRESH1_POSITION / 1000);
+      calcRobotPosition(robotSensors.robotPosition.speedL, robotSensors.robotPosition.speedR, (double)REFRESH1_POSITION / 1000);
     }
 
     if (refreshAmpCheck)    robotSensors.amper = getAmp();

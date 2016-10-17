@@ -24,6 +24,7 @@
 #include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include "libfreenect.h"
 
 using namespace std;
 using namespace cv;
@@ -70,6 +71,8 @@ extern "C" {
 #define REFRESH2_MODULE     33.0f
 
 #define REFRESH_GPS_STATUS 0 
+
+#define REFRESH1_ACC_KINECT REFRESH1_MODULE*10.0f
 
 #define R2 5.3f
 #define R1 31.4f
@@ -192,16 +195,16 @@ typedef enum{
 } semafor_name_t;
 
 struct Kalman_struct{
-  float x_angle;
-  float x_bias;
-  float P_00;
-  float P_01;
-  float P_10;
-  float P_11;
-  float y;
-  float S;
-  float K_0;
-  float K_1;
+  double x_angle;
+  double x_bias;
+  double P_00;
+  double P_01;
+  double P_10;
+  double P_11;
+  double y;
+  double S;
+  double K_0;
+  double K_1;
 };
 
 //MPU6050
@@ -346,15 +349,15 @@ typedef enum{
 //--------------------------------------------
 
 struct Axis_struct{
-  float x;
-  float y;
-  float z;
+  double x;
+  double y;
+  double z;
 };
 
 struct Angle3d_struct{
-  float roll;
-  float pitch;
-  float yaw;
+  double roll;
+  double pitch;
+  double yaw;
 };
 
 
@@ -364,31 +367,31 @@ struct MPU6050_struct {
   Axis_struct gyAxis;
   Angle3d_struct accAngle;
   Angle3d_struct gyAngle;
-  float temperature;
+  double temperature;
 };
 
 struct HMC5883L_struct {
   Axis_struct compassAxis;
-  float yaw;
+  double yaw;
 };
 //-----------------------
 
 struct BMP180_struct {
-  float temperature;
-  float preasure;
+  double temperature;
+  double preasure;
 };
 
 //------------------------
 struct GPGGA_struct {
   char UTCTime[9];
-  float Latitude;
+  double Latitude;
   char NSIndicator;
-  float Longitude;
+  double Longitude;
   char EWindicator;
   int PositionFixIndictor;
   int SatellitesUsed;
-  float HDOP;
-  float MSLAltitude;
+  double HDOP;
+  double MSLAltitude;
   char Units1;
   int GeoidSeparation;
   char Units2;
@@ -398,9 +401,9 @@ struct GPGGA_struct {
 };
 
 struct GPGLL_struct {
-  float Latitude;
+  double Latitude;
   char NSIndicator;
-  float Longitude;
+  double Longitude;
   char EWIndicator;
   char UTCTime[9];
   char Status;
@@ -423,9 +426,9 @@ struct GPGSA_struct {
   int SatellitesUsedCH10;
   int SatellitesUsedCH11;
   int SatellitesUsedCH12;
-  float PDOP;
-  float HDOP;
-  float VDOP;
+  double PDOP;
+  double HDOP;
+  double VDOP;
   char Checksum[3];
 };
 
@@ -455,24 +458,24 @@ struct GPGSV_struct {
 struct GPRMC_struct {
   char UTCTime[9];
   char Status;
-  float Latitude;
+  double Latitude;
   char NSIndicator;
-  float Longitude;
+  double Longitude;
   char EWIndicator;
-  float SpeedOverGround;
-  float CourseOverGround;
+  double SpeedOverGround;
+  double CourseOverGround;
   char Date[6];
   char Mode;
   char Checksum[3];
 };
 
 struct GPVTG_struct {
-  float CourseTrue;
+  double CourseTrue;
   char ReferenceTrue;
-  float CourseMagnetic;
+  double CourseMagnetic;
   char ReferenceMagnetic;
-  float SpeedKnots;
-  float SpeedKmh;
+  double SpeedKnots;
+  double SpeedKmh;
   char UnitsKnots;
   char UnitsKmh;
   char Mode;
@@ -507,9 +510,9 @@ struct MotorsAcculator_struct {
 
 struct MotorSensor_struct {
   int distanceRaw;
-  float distance;
+  double distance;
   int speedRaw;
-  float speed;
+  double speed;
 };
 
 struct MotorsSensor_struct {
@@ -542,29 +545,29 @@ struct Leds_struct {
 };
 
 struct RobotPosition_struct {
-  float x;
-  float y;
+  double x;
+  double y;
   
-  float distanceL;
-  float distanceR;
-  float distance;
+  double distanceL;
+  double distanceR;
+  double distance;
   
-  float speedL;
-  float speedR;
-  float speed;
-  float angleEncoder;
+  double speedL;
+  double speedR;
+  double speed;
+  double angleEncoder;
   Angle3d_struct imuAngle;
 };
 
 struct Voltage_struct{
-  float volts;
-  float capacityPercent;
+  double volts;
+  double capacityPercent;
 }; 
 
 struct KinectSensor_struct{
   Angle3d_struct accAngle;
   Axis_struct accAxis; 
-}
+};
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
   GPS_struct gps;                     //gps
@@ -576,8 +579,8 @@ struct RobotSensors {                 //struktura pre snimace aktualizovane s ca
   Buttons_struct buttons;             //tlacidla
   RobotPosition_struct robotPosition; //prepocitana pozicia
   Voltage_struct voltage;
-  float ultrasonic;                   //udaje z ultrazvuku
-  float amper;                        //prud odoberany z baterii
+  double ultrasonic;                   //udaje z ultrazvuku
+  double amper;                        //prud odoberany z baterii
 };
 
 struct RobotAcculators {              //struktura pre riadiace veliciny s casom refresh podla jednotlivych hodnot pre riadenie
@@ -629,18 +632,18 @@ int getDistanceRaw(position6_t pos);
 int getDeltaDistanceRaw(position6_t pos);
 void resetDistance(position6_t pos);
 void resetDistanceAll(void);
-float prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov);
-float getDistance(position6_t pos);
-float getDeltaDistance(position6_t pos);
+double prepocetTikovOtackomeraDoVzdialenosti(int pocetTikov);
+double getDistance(position6_t pos);
+double getDeltaDistance(position6_t pos);
 void setServo(int angle);
 unsigned int getUltrasonicRaw(void);
-float getUltrasonic(void);
+double getUltrasonic(void);
 int getVoltageRaw(void);
-float getVoltage(void);
-float calcVoltagePercent(float volt);
+double getVoltage(void);
+double calcVoltagePercent(double volt);
 int getAmpRaw(void);
-float getAmpVolt(void);
-float getAmp(void);
+double getAmpVolt(void);
+double getAmp(void);
 void setLed(position3_t pos, color_t color);
 void initMotorPowerSupply(void);
 void setMotorPowerSupply(bool state);
@@ -651,6 +654,8 @@ void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
 void setMove(direction_t direction,unsigned char speed,bool onReg);
 int getKbhit(void);
 GPS_struct getGPS(void);
+
+bool initKinect();
 
 bool HMC5883LTestConnection(void);
 hmc5883l_measurement_t getHMC5883LMeasurementSetting(void);
@@ -691,13 +696,13 @@ Axis_struct getMPU6050GyRaw(void);
 Axis_struct getMPU6050AccRaw(void);
 Axis_struct getMPU6050GyNorm(void);
 Axis_struct getMPU6050AccNorm(void);
-float getMPU6050TempRaw(void);
-float getMPU6050TempNorm(void);
+double getMPU6050TempRaw(void);
+double getMPU6050TempNorm(void);
 
-float dist(float a, float b);
-float getSpeedFromDistance(float distance,float dt);
-float rad2Deg(float angle);
-float deg2Rad(float angle);
+double dist(double a, double b);
+double getSpeedFromDistance(double distance,double dt);
+double rad2Deg(double angle);
+double deg2Rad(double angle);
 
 Mat getImageLeft(void);
 Mat getImageRight(void);
@@ -705,7 +710,7 @@ Mat getImage(void);
 
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
-void calcRobotPosition(float deltaSpeedL,float deltaSpeedR,float dt);
+void calcRobotPosition(double deltaSpeedL,double deltaSpeedR,double dt);
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
 void initRefresh1(void);
 void stopRefresh1(void);
