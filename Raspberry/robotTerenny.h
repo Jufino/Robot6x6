@@ -34,7 +34,7 @@ using namespace cv;
 #include <arpa/inet.h>
 #include <serial.h>
 extern "C" {
-  #include <gpio.h>
+#include <gpio.h>
 }
 
 #define PORT_I2C          "/dev/i2c-1"
@@ -51,28 +51,46 @@ extern "C" {
 #define SENSORS_WIFI 0
 #define SENSORS_PORT 1213
 
-#define REFRESH1_STATUS     1 //zap alebo vyp autorefresh
-#define REFRESH1_MODULE     20.0f //v ms
-#define REFRESH1_MOTORS     REFRESH1_MODULE*5.0f
-#define REFRESH1_HMC5883L   REFRESH1_MODULE*2.0f
-#define REFRESH1_BMP180     REFRESH1_MODULE*5.0f
-#define REFRESH1_ACC        REFRESH1_MODULE*5.0f
-#define REFRESH1_GY         REFRESH1_MODULE*1.0f
-#define REFRESH1_TEMP       REFRESH1_MODULE*5.0f
-#define REFRESH1_LEDS       REFRESH1_MODULE*5.0f
-#define REFRESH1_POSITION   REFRESH1_MODULE*5.0f
-#define REFRESH1_ULTRASONIC REFRESH1_MODULE*5.0f
-#define REFRESH1_VOLTAGE    REFRESH1_MODULE*100.0f
-#define REFRESH1_AMP        REFRESH1_MODULE*100.0f
-#define REFRESH1_BATTERY    REFRESH1_MODULE*100.0f
-#define REFRESH1_BUTTON     REFRESH1_MODULE*10.0f
+#define SYNC_MIN_TIME 1 // 1 ms
+#define SYNC_BMP180_TIME            SYNC_MIN_TIME*100
+#define SYNC_HMC5883L_TIME          SYNC_MIN_TIME*40
+#define SYNC_MPU6050ACC_TIME        SYNC_MIN_TIME*100
+#define SYNC_MPU6050GY_TIME         SYNC_MIN_TIME*20
+#define SYNC_MPU6050TEMP_TIME       SYNC_MIN_TIME*1000
+#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
+#define SYNC_IMUPOSSITION_TIME      SYNC_MIN_TIME*20
+#define SYNC_ENCODERS_TIME          SYNC_MIN_TIME*100
+#define SYNC_VOLTAGEANDAMP_TIME     SYNC_MIN_TIME*1000
+#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*20
+#define SYNC_LEDS_TIME              SYNC_MIN_TIME*1000
 
-#define REFRESH2_STATUS     0 //zap alebo vyp autorefresh
-#define REFRESH2_MODULE     33.0f
+#define ENABLE_I2C 0
+#define ENABLE_BLUE 0
+#define ENABLE_YELLOW 0
+#define ENABLE_ORANGE 0
+#define ENABLE_BMP180             ENABLE_I2C&0
+#define ENABLE_HMC5883L           ENABLE_I2C&0
+#define ENABLE_MPU6050ACC         ENABLE_I2C&0
+#define ENABLE_MPU6050GY          ENABLE_I2C&0
+#define ENABLE_MPU6050TEMP        ENABLE_I2C&0
+#define ENABLE_IMUPOSSITION       ENABLE_I2C&0
+#define ENABLE_MOTORS             ENABLE_BLUE&ENABLE_YELLOW&ENABLE_ORANGE&0
+#define ENABLE_ENCODERS           ENABLE_BLUE&ENABLE_YELLOW&ENABLE_ORANGE&0
+#define ENABLE_VOLTAGEANDAMP      ENABLE_BLUE&ENABLE_YELLOW&ENABLE_ORANGE&0
+#define ENABLE_ULTRASONIC         ENABLE_BLUE&ENABLE_YELLOW&ENABLE_ORANGE&0
+#define ENABLE_LEDS               ENABLE_BLUE&ENABLE_YELLOW&ENABLE_ORANGE&0
 
-#define REFRESH_GPS_STATUS 0 
+#define SYNC_GPS_TIME               SYNC_MIN_TIME*100
+#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*1000
+#define SYNC_KINECTACCULATORS_TIME SYNC_MIN_TIME*10
+#define SYNC_KINECTSENSORS_TIME     SYNC_MIN_TIME*20
+#define SYNC_BATTERYINDICATOR_TIME  SYNC_MIN_TIME*1000
 
-#define REFRESH1_ACC_KINECT REFRESH1_MODULE*10.0f
+#define ENABLE_GPS 0
+#define ENABLE_BUTTONS 0
+#define ENABLE_KINECTACCULATORS 1
+#define ENABLE_KINECTSENSORS 0
+#define ENABLE_BATTERYINDICATOR   0
 
 #define R2 5.3f
 #define R1 31.4f
@@ -94,7 +112,7 @@ extern "C" {
 #define HMC5883L_OFFSET_Y -540.0f
 #define HMC5883L_OFFSET_Z    0.0f
 
-// zavisle na zemepisnej sirke: http://magnetic-declination.com/  
+// zavisle na zemepisnej sirke: http://magnetic-declination.com/
 #define HMC5883L_DEGREE 4.0f
 #define HMC5883L_MINUTES 30.0f
 #define CAMERA_WIFI  0
@@ -168,19 +186,19 @@ extern "C" {
 #define MPU6050_REG_WHO_AM_I          (0x75) // Who Am I
 
 //BMP 180
-#define	BMP180_REG_CONTROL 0xF4
-#define	BMP180_REG_RESULT 0xF6
-#define	BMP180_COMMAND_TEMPERATURE 0x2E
-#define	BMP180_COMMAND_PRESSURE0 0x34
-#define	BMP180_COMMAND_PRESSURE1 0x74
-#define	BMP180_COMMAND_PRESSURE2 0xB4
-#define	BMP180_COMMAND_PRESSURE3 0xF4
+#define BMP180_REG_CONTROL 0xF4
+#define BMP180_REG_RESULT 0xF6
+#define BMP180_COMMAND_TEMPERATURE 0x2E
+#define BMP180_COMMAND_PRESSURE0 0x34
+#define BMP180_COMMAND_PRESSURE1 0x74
+#define BMP180_COMMAND_PRESSURE2 0xB4
+#define BMP180_COMMAND_PRESSURE3 0xF4
 
 #define Q_angle  0.01
 #define Q_gyro   0.0003
 #define R_angle  0.01
 
-typedef enum{
+typedef enum {
   CAMERA_VARIABLE_L,
   CAMERA_IMAGE_L1,
   CAMERA_IMAGE_L2,
@@ -190,11 +208,10 @@ typedef enum{
   ROBOTSENSORS,
   ROBOTACCULATORS,
   CALLIBRATE,
-  REFRESH1_LOCK,
-  REFRESH2_LOCK
+  I2C
 } semafor_name_t;
 
-struct Kalman_struct{
+struct Kalman_struct {
   double x_angle;
   double x_bias;
   double P_00;
@@ -210,151 +227,151 @@ struct Kalman_struct{
 //MPU6050
 typedef enum
 {
-    MPU6050_CLOCK_KEEP_RESET      = 0b111,
-    MPU6050_CLOCK_EXTERNAL_19MHZ  = 0b101,
-    MPU6050_CLOCK_EXTERNAL_32KHZ  = 0b100,
-    MPU6050_CLOCK_PLL_ZGYRO       = 0b011,
-    MPU6050_CLOCK_PLL_YGYRO       = 0b010,
-    MPU6050_CLOCK_PLL_XGYRO       = 0b001,
-    MPU6050_CLOCK_INTERNAL_8MHZ   = 0b000
+  MPU6050_CLOCK_KEEP_RESET      = 0b111,
+  MPU6050_CLOCK_EXTERNAL_19MHZ  = 0b101,
+  MPU6050_CLOCK_EXTERNAL_32KHZ  = 0b100,
+  MPU6050_CLOCK_PLL_ZGYRO       = 0b011,
+  MPU6050_CLOCK_PLL_YGYRO       = 0b010,
+  MPU6050_CLOCK_PLL_XGYRO       = 0b001,
+  MPU6050_CLOCK_INTERNAL_8MHZ   = 0b000
 } mpu6050_clockSource_t;
 
 typedef enum
 {
-    MPU6050_SCALE_2000DPS         = 0b11,
-    MPU6050_SCALE_1000DPS         = 0b10,
-    MPU6050_SCALE_500DPS          = 0b01,
-    MPU6050_SCALE_250DPS          = 0b00
+  MPU6050_SCALE_2000DPS         = 0b11,
+  MPU6050_SCALE_1000DPS         = 0b10,
+  MPU6050_SCALE_500DPS          = 0b01,
+  MPU6050_SCALE_250DPS          = 0b00
 } mpu6050_dps_t;
 
 typedef enum
 {
-    MPU6050_RANGE_16G             = 0b11,
-    MPU6050_RANGE_8G              = 0b10,
-    MPU6050_RANGE_4G              = 0b01,
-    MPU6050_RANGE_2G              = 0b00,
+  MPU6050_RANGE_16G             = 0b11,
+  MPU6050_RANGE_8G              = 0b10,
+  MPU6050_RANGE_4G              = 0b01,
+  MPU6050_RANGE_2G              = 0b00,
 } mpu6050_range_t;
 
 typedef enum
 {
-    MPU6050_DELAY_3MS             = 0b11,
-    MPU6050_DELAY_2MS             = 0b10,
-    MPU6050_DELAY_1MS             = 0b01,
-    MPU6050_NO_DELAY              = 0b00,
+  MPU6050_DELAY_3MS             = 0b11,
+  MPU6050_DELAY_2MS             = 0b10,
+  MPU6050_DELAY_1MS             = 0b01,
+  MPU6050_NO_DELAY              = 0b00,
 } mpu6050_onDelay_t;
 
 typedef enum
 {
-    MPU6050_DHPF_HOLD             = 0b111,
-    MPU6050_DHPF_0_63HZ           = 0b100,
-    MPU6050_DHPF_1_25HZ           = 0b011,
-    MPU6050_DHPF_2_5HZ            = 0b010,
-    MPU6050_DHPF_5HZ              = 0b001,
-    MPU6050_DHPF_RESET            = 0b000,
+  MPU6050_DHPF_HOLD             = 0b111,
+  MPU6050_DHPF_0_63HZ           = 0b100,
+  MPU6050_DHPF_1_25HZ           = 0b011,
+  MPU6050_DHPF_2_5HZ            = 0b010,
+  MPU6050_DHPF_5HZ              = 0b001,
+  MPU6050_DHPF_RESET            = 0b000,
 } mpu6050_dhpf_t;
 
 typedef enum
 {
-    MPU6050_DLPF_6                = 0b110,
-    MPU6050_DLPF_5                = 0b101,
-    MPU6050_DLPF_4                = 0b100,
-    MPU6050_DLPF_3                = 0b011,
-    MPU6050_DLPF_2                = 0b010,
-    MPU6050_DLPF_1                = 0b001,
-    MPU6050_DLPF_0                = 0b000,
+  MPU6050_DLPF_6                = 0b110,
+  MPU6050_DLPF_5                = 0b101,
+  MPU6050_DLPF_4                = 0b100,
+  MPU6050_DLPF_3                = 0b011,
+  MPU6050_DLPF_2                = 0b010,
+  MPU6050_DLPF_1                = 0b001,
+  MPU6050_DLPF_0                = 0b000,
 } mpu6050_dlpf_t;
 //--------------------------------------------
 //HMC5883L
-typedef enum{
-    HMC5883L_SAMPLES_8     = 0b11,
-    HMC5883L_SAMPLES_4     = 0b10,
-    HMC5883L_SAMPLES_2     = 0b01,
-    HMC5883L_SAMPLES_1     = 0b00
+typedef enum {
+  HMC5883L_SAMPLES_8     = 0b11,
+  HMC5883L_SAMPLES_4     = 0b10,
+  HMC5883L_SAMPLES_2     = 0b01,
+  HMC5883L_SAMPLES_1     = 0b00
 } hmc5883l_samples_t;
 
-typedef enum{
-    HMC5883L_DATARATE_75HZ       = 0b110,
-    HMC5883L_DATARATE_30HZ       = 0b101,
-    HMC5883L_DATARATE_15HZ       = 0b100,
-    HMC5883L_DATARATE_7_5HZ      = 0b011,
-    HMC5883L_DATARATE_3HZ        = 0b010,
-    HMC5883L_DATARATE_1_5HZ      = 0b001,
-    HMC5883L_DATARATE_0_75_HZ    = 0b000
+typedef enum {
+  HMC5883L_DATARATE_75HZ       = 0b110,
+  HMC5883L_DATARATE_30HZ       = 0b101,
+  HMC5883L_DATARATE_15HZ       = 0b100,
+  HMC5883L_DATARATE_7_5HZ      = 0b011,
+  HMC5883L_DATARATE_3HZ        = 0b010,
+  HMC5883L_DATARATE_1_5HZ      = 0b001,
+  HMC5883L_DATARATE_0_75_HZ    = 0b000
 } hmc5883l_dataRate_t;
 
-typedef enum{
-    HMC5883L_RANGE_8_1GA     = 0b111,
-    HMC5883L_RANGE_5_6GA     = 0b110,
-    HMC5883L_RANGE_4_7GA     = 0b101,
-    HMC5883L_RANGE_4GA       = 0b100,
-    HMC5883L_RANGE_2_5GA     = 0b011,
-    HMC5883L_RANGE_1_9GA     = 0b010,
-    HMC5883L_RANGE_1_3GA     = 0b001,
-    HMC5883L_RANGE_0_88GA    = 0b000
+typedef enum {
+  HMC5883L_RANGE_8_1GA     = 0b111,
+  HMC5883L_RANGE_5_6GA     = 0b110,
+  HMC5883L_RANGE_4_7GA     = 0b101,
+  HMC5883L_RANGE_4GA       = 0b100,
+  HMC5883L_RANGE_2_5GA     = 0b011,
+  HMC5883L_RANGE_1_9GA     = 0b010,
+  HMC5883L_RANGE_1_3GA     = 0b001,
+  HMC5883L_RANGE_0_88GA    = 0b000
 } hmc5883l_range_t;
 
-typedef enum{
-    HMC5883L_IDLE          = 0b10,
-    HMC5883L_SINGLE        = 0b01,
-    HMC5883L_CONTINOUS     = 0b00
+typedef enum {
+  HMC5883L_IDLE          = 0b10,
+  HMC5883L_SINGLE        = 0b01,
+  HMC5883L_CONTINOUS     = 0b00
 } hmc5883l_mode_t;
 
-typedef enum{
-    HMC5883L_NORMAL          = 0b00,
-    HMC5883L_POSITIVE_BIAS   = 0b01,
-    HMC5883L_NEGATIVE_BIAS   = 0b10
+typedef enum {
+  HMC5883L_NORMAL          = 0b00,
+  HMC5883L_POSITIVE_BIAS   = 0b01,
+  HMC5883L_NEGATIVE_BIAS   = 0b10
 } hmc5883l_measurement_t;
 //--------------------------------------------
 //ostatne
-typedef enum{
-    COLOR_OFF,
-    COLOR_GREEN,
-    COLOR_RED,
-    COLOR_ORANGE
+typedef enum {
+  COLOR_OFF,
+  COLOR_GREEN,
+  COLOR_RED,
+  COLOR_ORANGE
 } color_t;
 
-typedef enum{
-    SIDE_LEFT,
-    SIDE_RIGHT
+typedef enum {
+  SIDE_LEFT,
+  SIDE_RIGHT
 } side_t;
 
-typedef enum{
-    ROTATE_CLOCKWISE,
-    ROTATE_ANTICLOCKWISE,
-    ROTATE_STOP
+typedef enum {
+  ROTATE_CLOCKWISE,
+  ROTATE_ANTICLOCKWISE,
+  ROTATE_STOP
 } rotate_t;
 
-typedef enum{
-    DIRECTION_FRONT,
-    DIRECTION_BACK,
-    DIRECTION_LEFT,
-    DIRECTION_RIGHT,
-    DIRECTION_STOP
+typedef enum {
+  DIRECTION_FRONT,
+  DIRECTION_BACK,
+  DIRECTION_LEFT,
+  DIRECTION_RIGHT,
+  DIRECTION_STOP
 } direction_t;
 
-typedef enum{
-    POSITION_DOWN,
-    POSITION_MIDDLE,
-    POSITION_UP
+typedef enum {
+  POSITION_DOWN,
+  POSITION_MIDDLE,
+  POSITION_UP
 } position3_t;
 
-typedef enum{
-    POSITION_DOWN_LEFT,
-    POSITION_DOWN_RIGHT,
-    POSITION_MIDDLE_LEFT,
-    POSITION_MIDDLE_RIGHT,
-    POSITION_UP_LEFT,
-    POSITION_UP_RIGHT,
+typedef enum {
+  POSITION_DOWN_LEFT,
+  POSITION_DOWN_RIGHT,
+  POSITION_MIDDLE_LEFT,
+  POSITION_MIDDLE_RIGHT,
+  POSITION_UP_LEFT,
+  POSITION_UP_RIGHT,
 } position6_t;
 //--------------------------------------------
 
-struct Axis_struct{
+struct Axis_struct {
   double x;
   double y;
   double z;
 };
 
-struct Angle3d_struct{
+struct Angle3d_struct {
   double roll;
   double pitch;
   double yaw;
@@ -547,11 +564,11 @@ struct Leds_struct {
 struct RobotPosition_struct {
   double x;
   double y;
-  
+
   double distanceL;
   double distanceR;
   double distance;
-  
+
   double speedL;
   double speedR;
   double speed;
@@ -559,14 +576,14 @@ struct RobotPosition_struct {
   Angle3d_struct imuAngle;
 };
 
-struct Voltage_struct{
+struct Voltage_struct {
   double volts;
   double capacityPercent;
-}; 
+};
 
-struct KinectSensor_struct{
+struct KinectSensor_struct {
   Angle3d_struct accAngle;
-  Axis_struct accAxis; 
+  Axis_struct accAxis;
 };
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
@@ -650,8 +667,8 @@ void setMotorPowerSupply(bool state);
 void closeMotorPowerSupply(void);
 void setMotor(position6_t pos, rotate_t rotate, unsigned char speed, bool onReg);
 void stopAllMotors(void);
-void setMotors(side_t side,rotate_t rotate,unsigned char speed,bool onReg);
-void setMove(direction_t direction,unsigned char speed,bool onReg);
+void setMotors(side_t side, rotate_t rotate, unsigned char speed, bool onReg);
+void setMove(direction_t direction, unsigned char speed, bool onReg);
 int getKbhit(void);
 GPS_struct getGPS(void);
 
@@ -700,7 +717,7 @@ double getMPU6050TempRaw(void);
 double getMPU6050TempNorm(void);
 
 double dist(double a, double b);
-double getSpeedFromDistance(double distance,double dt);
+double getSpeedFromDistance(double distance, double dt);
 double rad2Deg(double angle);
 double deg2Rad(double angle);
 
@@ -710,13 +727,8 @@ Mat getImage(void);
 
 //http://rossum.sourceforge.net/papers/DiffSteer/DiffSteer.html
 //http://users.isr.ist.utl.pt/~mir/cadeiras/robmovel/Kinematics.pdf
-void calcRobotPosition(double deltaSpeedL,double deltaSpeedR,double dt);
+void calcRobotPosition(double deltaSpeedL, double deltaSpeedR, double dt);
 bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor);
-void initRefresh1(void);
-void stopRefresh1(void);
-void initRefresh2(void);
-void stopRefresh2(void);
-void initRefreshSignalAction(void);
-void *syncGPS(void *arg);
-void syncModules(int signal , siginfo_t * siginfo, void * ptr);
+void *syncI2cModules(void *arg);
+void *syncOtherModules(void *arg);
 #endif

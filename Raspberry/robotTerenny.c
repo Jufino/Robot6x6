@@ -34,21 +34,6 @@ double mgPerDigit = 0.92f;
 double rangePerDigit = 0.0f;
 double dpsPerDigit = 0.0f;
 
-unsigned char pocetPosition = 100;
-unsigned char pocetMotors = 100;
-unsigned char pocetBattery = 100;
-unsigned char pocetBMP180 = 100;
-unsigned char pocetHMC5883L = 100;
-unsigned char pocetLeds = 100;
-unsigned char pocetAmp = 100;
-unsigned char pocetUltrasonic = 100;
-unsigned char pocetVoltage = 100;
-unsigned char pocetButtons = 100;
-unsigned char pocetAcc = 100;
-unsigned char pocetGy = 100;
-unsigned char pocetTemp = 100;
-unsigned char pocetAccKinect = 100;
-
 Axis_struct minAxis;
 Axis_struct maxAxis;
 Axis_struct lastGy;
@@ -98,85 +83,7 @@ void semRem(int sem_id) {
 
 
 void initRobot(void) {
-  initI2C();
-
-  setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
-  setMPU6050RangeSetting(MPU6050_RANGE_2G);
-  setMPU6050DLPFModeSetting(MPU6050_DLPF_3);
-  setMPU6050I2CMasterModeEnabledSetting(false);
-  setMPU6050I2CBypassEnabledSetting(true) ;
-  setMPU6050SleepEnabledSetting(false);
-  callibrateMPU6050Gyroscope(50);
-
-  setLed(POSITION_DOWN, COLOR_GREEN);
-  setLed(POSITION_MIDDLE, COLOR_GREEN);
-  setLed(POSITION_UP, COLOR_GREEN);
-
-  if (!initKinect()) {
-    printf("Kinect problem s konektivitou");
-    exit(0);
-  }
-
-  if (!MPU6050TestConnection()) {
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    closeI2C();
-    printf("MPU6050 problem s konektivitou");
-    exit(0);
-  }
-
-  if (!HMC5883LTestConnection()) {
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    closeI2C();
-    printf("HMC5883L problem s konektivitou");
-    exit(0);
-  }
-
-  setHMC5883LMeasurementSetting(HMC5883L_NORMAL);
-  setHMC5883LSampleSetting(HMC5883L_SAMPLES_8);
-  setHMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
-  setHMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
-  setHMC5883LReadModeSetting(HMC5883L_CONTINOUS);
-  setHMC5883LHighI2CSpeedSetting(false);
-
-  if (!blueTestConnection()) {
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    closeI2C();
-    printf("Modry problem s konektivitou");
-    exit(0);
-  }
-  if (!yellowTestConnection()) {
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    closeI2C();
-    printf("Zlty problem s konektivitou");
-    exit(0);
-  }
-  if (!orangeTestConnection()) {
-    setLed(POSITION_DOWN, COLOR_RED);
-    setLed(POSITION_MIDDLE, COLOR_RED);
-    setLed(POSITION_UP, COLOR_RED);
-    closeI2C();
-    printf("Oranzovy problem s konektivitou");
-    exit(0);
-  }
-
-  portHandle = SerialOpen(PORT_GPS, B9600);
-
-  initButton(POSITION_DOWN);
-  initButton(POSITION_MIDDLE);
-  initButton(POSITION_UP);
-  initMotorPowerSupply();
-
-  stopAllMotors();
-
-  sem_id = semCreate(getpid(), 12);
+  sem_id = semCreate(getpid(), 9);
   semInit(sem_id, CAMERA_VARIABLE_L, 1);
   semInit(sem_id, CAMERA_IMAGE_L1, 1);
   semInit(sem_id, CAMERA_IMAGE_L2, 1);
@@ -185,9 +92,112 @@ void initRobot(void) {
   semInit(sem_id, CAMERA_IMAGE_R2, 1);
   semInit(sem_id, ROBOTSENSORS, 1);
   semInit(sem_id, ROBOTACCULATORS, 1);
-  semInit(sem_id, REFRESH1_LOCK, 1);
-  semInit(sem_id, REFRESH2_LOCK, 1);
-  semInit(sem_id, CALLIBRATE, 1);
+  semInit(sem_id, I2C, 1);
+
+  if (ENABLE_I2C)
+    initI2C();
+
+  if (ENABLE_LEDS) {
+    setLed(POSITION_DOWN, COLOR_GREEN);
+    setLed(POSITION_MIDDLE, COLOR_GREEN);
+    setLed(POSITION_UP, COLOR_GREEN);
+  }
+
+  if (ENABLE_MPU6050ACC || ENABLE_MPU6050GY || ENABLE_MPU6050TEMP) {
+    if (!MPU6050TestConnection()) {
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      closeI2C();
+      printf("MPU6050 problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("MPU6050 ok\n");
+      setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
+      setMPU6050RangeSetting(MPU6050_RANGE_2G);
+      setMPU6050DLPFModeSetting(MPU6050_DLPF_3);
+      setMPU6050I2CMasterModeEnabledSetting(false);
+      setMPU6050I2CBypassEnabledSetting(true) ;
+      setMPU6050SleepEnabledSetting(false);
+      callibrateMPU6050Gyroscope(50);
+    }
+  }
+
+  if (ENABLE_HMC5883L) {
+    if (!HMC5883LTestConnection()) {
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      closeI2C();
+      printf("HMC5883L problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("HMC5883L ok\n");
+      setHMC5883LMeasurementSetting(HMC5883L_NORMAL);
+      setHMC5883LSampleSetting(HMC5883L_SAMPLES_8);
+      setHMC5883LRateSetting(HMC5883L_DATARATE_30HZ);
+      setHMC5883LRangeSetting(HMC5883L_RANGE_1_3GA);
+      setHMC5883LReadModeSetting(HMC5883L_CONTINOUS);
+      setHMC5883LHighI2CSpeedSetting(false);
+    }
+  }
+
+  if (ENABLE_BLUE) {
+    if (!blueTestConnection()) {
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      closeI2C();
+      printf("Modry problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("modry ok\n");
+    }
+  }
+
+  if (ENABLE_YELLOW) {
+    if (!yellowTestConnection()) {
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      closeI2C();
+      printf("Zlty problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("zlty ok\n");
+    }
+  }
+
+  if (ENABLE_ORANGE) {
+    if (!orangeTestConnection()) {
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      closeI2C();
+      printf("Oranzovy problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("oranzovy ok\n");
+    }
+  }
+
+  if (ENABLE_GPS) {
+    portHandle = SerialOpen(PORT_GPS, B9600);
+  }
+
+  initButton(POSITION_DOWN);
+  initButton(POSITION_MIDDLE);
+  initButton(POSITION_UP);
+  initMotorPowerSupply();
+
+  if (ENABLE_MOTORS) {
+    stopAllMotors();
+  }
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
@@ -200,19 +210,6 @@ void initRobot(void) {
     cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
     cvSetCaptureProperty( cameraR, CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
   }
-
-  usleep(100000);
-  setLed(POSITION_DOWN, COLOR_RED);
-  setLed(POSITION_MIDDLE, COLOR_RED);
-  setLed(POSITION_UP, COLOR_RED);
-  usleep(100000);
-  setLed(POSITION_DOWN, COLOR_ORANGE);
-  setLed(POSITION_MIDDLE, COLOR_ORANGE);
-  setLed(POSITION_UP, COLOR_ORANGE);
-  usleep(100000);
-  setLed(POSITION_DOWN, COLOR_OFF);
-  setLed(POSITION_MIDDLE, COLOR_OFF);
-  setLed(POSITION_UP, COLOR_OFF);
 
   if (SENSORS_WIFI == 1) {
     struct sockaddr_in server;
@@ -270,10 +267,52 @@ void initRobot(void) {
     pthread_create(&vlaknoCamera, NULL, &cameraNetworkConnection, NULL);
   }
   if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
-
-  resetDistanceAll();
+  if (ENABLE_MOTORS) {
+    resetDistanceAll();
+  }
 
   setMotorPowerSupply(true);
+  if (ENABLE_LEDS) {
+    for (int i = 0; i < 10; i++) {
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_ORANGE);
+      setLed(POSITION_MIDDLE, COLOR_ORANGE);
+      setLed(POSITION_UP, COLOR_ORANGE);
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_OFF);
+      setLed(POSITION_MIDDLE, COLOR_OFF);
+      setLed(POSITION_UP, COLOR_OFF);
+    }
+  }
+  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
+    if (!initKinect()) {
+      printf("Kinect problem s konektivitou");
+      exit(0);
+    }
+    else {
+      printf("Kinect ok\n");
+    }
+  }
+  if (ENABLE_LEDS) {
+    for (int i = 0; i < 10; i++) {
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_RED);
+      setLed(POSITION_MIDDLE, COLOR_RED);
+      setLed(POSITION_UP, COLOR_RED);
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_ORANGE);
+      setLed(POSITION_MIDDLE, COLOR_ORANGE);
+      setLed(POSITION_UP, COLOR_ORANGE);
+      usleep(100000);
+      setLed(POSITION_DOWN, COLOR_OFF);
+      setLed(POSITION_MIDDLE, COLOR_OFF);
+      setLed(POSITION_UP, COLOR_OFF);
+    }
+  }
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     pthread_t threadImgL;
@@ -285,18 +324,26 @@ void initRobot(void) {
     pthread_create(&threadImgR, NULL, &getImgR, NULL);
   }
 
-  if (REFRESH_GPS_STATUS == 1) {
-    pthread_t threadGPS;
-    pthread_create(&threadGPS, NULL, &syncGPS, NULL);
-  }
-
-  if (REFRESH1_STATUS == 1) initRefresh1();
-  if (REFRESH2_STATUS == 1) initRefresh2();
+  pthread_t threadI2CModules;
+  pthread_create(&threadI2CModules, NULL, &syncI2cModules, NULL);
+  pthread_t threadOtherModules;
+  pthread_create(&threadOtherModules, NULL, &syncOtherModules, NULL);
 
   signal(SIGINT, sigctrl);
 }
 
 bool initKinect() {
+  if (freenect_init(&ctx, NULL) < 0)
+  {
+    std::cout << "freenect_init() failed\n";
+    exit(EXIT_FAILURE);
+  }
+// set the highest log level so we can see what is going on
+  freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
+
+  int nr_devices = freenect_num_devices (ctx);
+  std::cout << "Number of devices found: " << nr_devices << "\n";
+
   if (freenect_init(&ctx, NULL) < 0) {
     return false;
   }
@@ -334,9 +381,6 @@ void closeSensorConnection(void) {
 
 void closeRobot(void) {
   onAllThreads = false;
-
-  if (REFRESH1_STATUS) stopRefresh1();
-  if (REFRESH2_STATUS) stopRefresh2();
 
   freenect_shutdown(ctx);
 
@@ -1682,414 +1726,379 @@ bool compareMotors(MotorAcculator_struct motor, MotorAcculator_struct lastMotor)
   return motor.direction != lastMotor.direction || motor.speed != lastMotor.speed || motor.onRegulator != lastMotor.onRegulator;
 }
 
-void initRefresh1(void) {
-  struct sigevent CasovacSignalEvent;
-  CasovacSignalEvent.sigev_notify = SIGEV_SIGNAL;
-  CasovacSignalEvent.sigev_signo = SIGUSR1;
-
-  timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac1);
-  struct itimerspec cas;
-  cas.it_value.tv_sec = 0;
-  cas.it_value.tv_nsec = (long)REFRESH1_MODULE * 1000L * 1000L;
-  cas.it_interval.tv_sec = 0;
-  cas.it_interval.tv_nsec = (long)REFRESH1_MODULE * 1000L * 1000L;
-  timer_settime(casovac1, CLOCK_REALTIME, &cas, NULL);
-  sigset_t signalSet;
-  struct sigaction CasovacSignalAction;
-  sigemptyset(&signalSet);
-  CasovacSignalAction.sa_sigaction = syncModules;
-  CasovacSignalAction.sa_flags = SA_SIGINFO;
-  CasovacSignalAction.sa_mask = signalSet;
-  sigaction(CasovacSignalEvent.sigev_signo, &CasovacSignalAction, NULL);
-}
-
-void initRefresh2(void) {
-  struct sigevent CasovacSignalEvent;
-  CasovacSignalEvent.sigev_notify = SIGEV_SIGNAL;
-  CasovacSignalEvent.sigev_signo = SIGUSR2;
-
-  timer_create(CLOCK_REALTIME, &CasovacSignalEvent, &casovac2);
-  struct itimerspec cas;
-  cas.it_value.tv_sec = 0;
-  cas.it_value.tv_nsec = (long)REFRESH2_MODULE * 1000L * 1000L;
-  cas.it_interval.tv_sec = 0;
-  cas.it_interval.tv_nsec = (long)REFRESH2_MODULE * 1000L * 1000L;
-  timer_settime(casovac2, CLOCK_REALTIME, &cas, NULL);
-  sigset_t signalSet;
-  struct sigaction CasovacSignalAction;
-  sigemptyset(&signalSet);
-  CasovacSignalAction.sa_sigaction = syncModules;
-  CasovacSignalAction.sa_flags = SA_SIGINFO;
-  CasovacSignalAction.sa_mask = signalSet;
-  sigaction(CasovacSignalEvent.sigev_signo, &CasovacSignalAction, NULL);
-}
-
-void stopRefresh1(void) {
-  struct itimerspec cas;
-  cas.it_value.tv_sec = 0;
-  cas.it_value.tv_nsec = 0;
-  cas.it_interval.tv_sec = 0;
-  cas.it_interval.tv_nsec = 0;
-  timer_settime(casovac1, CLOCK_REALTIME, &cas, NULL);
-}
-
-void stopRefresh2(void) {
-  struct itimerspec cas;
-  cas.it_value.tv_sec = 0;
-  cas.it_value.tv_nsec = 0;
-  cas.it_interval.tv_sec = 0;
-  cas.it_interval.tv_nsec = 0;
-  timer_settime(casovac2, CLOCK_REALTIME, &cas, NULL);
-}
-
 void *syncGPS(void *arg) {
+  GPS_struct gps = getGPS();
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.gps = gps;
+  semPost(sem_id, ROBOTSENSORS);
+  return 0;
+}
+
+void *syncBMP180(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  //sem pojde BMP180
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncHMC5883L(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.HMC5883L = getHMC5883LNorm();
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncMPU6050Acc(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
+  robotSensors.MPU6050.accAngle = calcAccAngle3d(robotSensors.MPU6050.accAxis);
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncMPU6050Gy(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  double deltaTime = 0;//TODO:spravit prepocitanie casu
+  robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
+  Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis, deltaTime);
+  robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
+  robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
+  robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncMPU6050Temp(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.MPU6050.temperature = getMPU6050TempNorm();
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncMotors(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTACCULATORS);
+  setMotor(POSITION_DOWN_RIGHT, robotAcculators.motors.motorDownRight.direction, robotAcculators.motors.motorDownRight.speed, robotAcculators.motors.motorDownRight.onRegulator);
+  setMotor(POSITION_UP_LEFT, robotAcculators.motors.motorUpLeft.direction, robotAcculators.motors.motorUpLeft.speed, robotAcculators.motors.motorUpLeft.onRegulator);
+  setMotor(POSITION_MIDDLE_RIGHT, robotAcculators.motors.motorMiddleRight.direction, robotAcculators.motors.motorMiddleRight.speed, robotAcculators.motors.motorMiddleRight.onRegulator);
+  setServo(robotAcculators.kinect.yaw);
+  setMotor(POSITION_UP_RIGHT, robotAcculators.motors.motorUpRight.direction, robotAcculators.motors.motorUpRight.speed, robotAcculators.motors.motorUpRight.onRegulator);
+  setMotor(POSITION_MIDDLE_LEFT, robotAcculators.motors.motorMiddleLeft.direction, robotAcculators.motors.motorMiddleLeft.speed, robotAcculators.motors.motorMiddleLeft.onRegulator);
+  setMotor(POSITION_DOWN_LEFT, robotAcculators.motors.motorDownLeft.direction, robotAcculators.motors.motorDownLeft.speed, robotAcculators.motors.motorDownLeft.onRegulator);
+  semPost(sem_id, ROBOTACCULATORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *imuPossion(void *arg) {
+  double deltaTime = 0;//TODO:spravit prepocet casu
+  robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0, robotSensors.MPU6050.accAngle.roll, robotSensors.MPU6050.gyAngle.roll, deltaTime);
+  robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(1, robotSensors.MPU6050.accAngle.pitch, robotSensors.MPU6050.gyAngle.pitch, deltaTime);
+  robotSensors.robotPosition.imuAngle.yaw = tiltCompensate(
+        robotSensors.HMC5883L.compassAxis,
+        robotSensors.robotPosition.imuAngle.pitch,
+        robotSensors.robotPosition.imuAngle.roll);
+  return 0;
+}
+
+void *syncButtons(void *arg) {
+  bool buttonState;
+
+  buttonState = getButtonWithoutBounce(POSITION_UP);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.buttons.buttonUp = buttonState;
+  semPost(sem_id, ROBOTSENSORS);
+
+  buttonState = getButtonWithoutBounce(POSITION_MIDDLE);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.buttons.buttonMiddle = buttonState;
+  semPost(sem_id, ROBOTSENSORS);
+
+  buttonState = getButtonWithoutBounce(POSITION_DOWN);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.buttons.buttonDown = buttonState;
+  semPost(sem_id, ROBOTSENSORS);
+  return 0;
+}
+
+void *syncEncoders(void *arg) {
+  double deltaTime = 0; //TODO: spravit prepocet casu
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  double deltaDistanceDownRight = getDeltaDistanceRaw(POSITION_DOWN_RIGHT);
+  if (deltaDistanceDownRight > MAX_DELTA_TICKS_ENCODER) deltaDistanceDownRight = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceDownRight < -MAX_DELTA_TICKS_ENCODER) deltaDistanceDownRight = -MAX_DELTA_TICKS_ENCODER;
+  robotSensors.motors.motorDownRight.distanceRaw += deltaDistanceDownRight;
+  deltaDistanceDownRight = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceDownRight);
+  robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
+  robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, deltaTime);
+
+  double deltaDistanceUpLeft = getDeltaDistanceRaw(POSITION_UP_LEFT);
+  if (deltaDistanceUpLeft > MAX_DELTA_TICKS_ENCODER) deltaDistanceUpLeft = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceUpLeft < -MAX_DELTA_TICKS_ENCODER) deltaDistanceUpLeft = -MAX_DELTA_TICKS_ENCODER;
+
+  robotSensors.motors.motorUpLeft.distanceRaw += deltaDistanceUpLeft;
+  deltaDistanceUpLeft = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceUpLeft);
+  robotSensors.motors.motorUpLeft.distance +=  deltaDistanceUpLeft;
+  robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, deltaTime);
+
+  double deltaDistanceMiddleRight = getDeltaDistanceRaw(POSITION_MIDDLE_RIGHT);
+  if (deltaDistanceMiddleRight > MAX_DELTA_TICKS_ENCODER) deltaDistanceMiddleRight = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceMiddleRight < -MAX_DELTA_TICKS_ENCODER) deltaDistanceMiddleRight = -MAX_DELTA_TICKS_ENCODER;
+  robotSensors.motors.motorMiddleRight.distanceRaw += deltaDistanceMiddleRight;
+  deltaDistanceMiddleRight = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceMiddleRight);
+  robotSensors.motors.motorMiddleRight.distance +=  deltaDistanceMiddleRight;
+  robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, deltaTime);
+
+
+  double deltaDistanceUpRight = getDeltaDistanceRaw(POSITION_UP_RIGHT);
+  if (deltaDistanceUpRight > MAX_DELTA_TICKS_ENCODER) deltaDistanceUpRight = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceUpRight < -MAX_DELTA_TICKS_ENCODER) deltaDistanceUpRight = -MAX_DELTA_TICKS_ENCODER;
+
+  robotSensors.motors.motorUpRight.distanceRaw += deltaDistanceUpRight;
+  deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceUpRight);
+  robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
+  robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, deltaTime);
+
+  double deltaDistanceMiddleLeft = getDeltaDistanceRaw(POSITION_MIDDLE_LEFT);
+  if (deltaDistanceMiddleLeft > MAX_DELTA_TICKS_ENCODER) deltaDistanceMiddleLeft = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceMiddleLeft < -MAX_DELTA_TICKS_ENCODER) deltaDistanceMiddleLeft = -MAX_DELTA_TICKS_ENCODER;
+  robotSensors.motors.motorMiddleLeft.distanceRaw += deltaDistanceMiddleLeft;
+  deltaDistanceMiddleLeft = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceMiddleLeft);
+  robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
+  robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, deltaTime);
+
+  double deltaDistanceDownLeft = getDeltaDistanceRaw(POSITION_DOWN_LEFT);
+  if (deltaDistanceDownLeft > MAX_DELTA_TICKS_ENCODER) deltaDistanceDownLeft = MAX_DELTA_TICKS_ENCODER;
+  else if (deltaDistanceDownLeft < -MAX_DELTA_TICKS_ENCODER) deltaDistanceDownLeft = -MAX_DELTA_TICKS_ENCODER;
+  robotSensors.motors.motorDownLeft.distanceRaw += deltaDistanceDownLeft;
+  deltaDistanceDownLeft = prepocetTikovOtackomeraDoVzdialenosti(deltaDistanceDownLeft);
+  robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
+  robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, deltaTime);
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+
+  double deltaDistanceL;
+  double deltaDistanceR;
+  double diff1 = abs(deltaDistanceUpLeft - deltaDistanceMiddleLeft);
+  double diff2 = abs(deltaDistanceUpLeft - deltaDistanceDownLeft);
+  double diff3 = abs(deltaDistanceMiddleLeft - deltaDistanceDownLeft);
+  if (diff1 < diff2 && diff1 < diff3)
+    deltaDistanceL = (deltaDistanceUpLeft + deltaDistanceMiddleLeft) / 2;
+  else if (diff2 < diff1 && diff2 < diff3)
+    deltaDistanceL = (deltaDistanceUpLeft + deltaDistanceDownLeft) / 2;
+  else
+    deltaDistanceL = (deltaDistanceMiddleLeft + deltaDistanceDownLeft) / 2;
+  robotSensors.robotPosition.distanceL += deltaDistanceL;
+  robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL, deltaTime);
+
+  double diff4 = abs(deltaDistanceDownRight - deltaDistanceMiddleRight);
+  double diff5 = abs(deltaDistanceMiddleRight - deltaDistanceUpRight);
+  double diff6 = abs(deltaDistanceUpRight - deltaDistanceDownRight);
+  if (diff4 < diff5 && diff4 < diff6)
+    deltaDistanceR = (deltaDistanceDownRight + deltaDistanceMiddleRight) / 2;
+  else if (diff5 < diff4 && diff5 < diff6)
+    deltaDistanceR = (deltaDistanceMiddleRight + deltaDistanceUpRight) / 2;
+  else
+    deltaDistanceR = (deltaDistanceUpRight + deltaDistanceDownRight) / 2;
+  robotSensors.robotPosition.distanceR += deltaDistanceR;
+  robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR, deltaTime);
+
+  calcRobotPosition(robotSensors.robotPosition.speedL, robotSensors.robotPosition.speedR, deltaTime);
+  return 0;
+}
+
+void *syncKinectAcculators(void *arg) {
+  semWait(sem_id, ROBOTACCULATORS);
+  //freenect_set_tilt_degs(dev, robotAcculators.kinect.roll);
+  freenect_set_led(dev, robotAcculators.leds.LedKinect);
+  semPost(sem_id, ROBOTACCULATORS);
+  return 0;
+}
+
+void *syncKinectSensors(void *arg) {
+  freenect_raw_tilt_state *state = 0;
+  // Get the raw accelerometer values and tilt data
+  state = freenect_get_tilt_state(dev);
+  semWait(sem_id, ROBOTSENSORS);
+  // Get the processed accelerometer values (calibrated to gravity)
+  freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
+  robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
+  semPost(sem_id, ROBOTSENSORS);
+  return 0;
+}
+
+void *syncVoltageAndAmp(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.voltage.volts = getVoltage();
+  robotSensors.voltage.capacityPercent = calcVoltagePercent(robotSensors.voltage.volts);
+  robotSensors.amper = getAmp();
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncUltrasonic(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTSENSORS);
+  robotSensors.ultrasonic = getUltrasonic();
+  semPost(sem_id, ROBOTSENSORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncLeds(void *arg) {
+  semWait(sem_id, I2C);
+  semWait(sem_id, ROBOTACCULATORS);
+  setLed(POSITION_UP, robotAcculators.leds.LedUp);
+  setLed(POSITION_MIDDLE, robotAcculators.leds.LedMiddle);
+  if (!BATTERY_LED_INDICATING) {
+    setLed(POSITION_DOWN, robotAcculators.leds.LedDown);
+  }
+  semPost(sem_id, ROBOTACCULATORS);
+  semPost(sem_id, I2C);
+  return 0;
+}
+
+void *syncBatteryIndicator(void *arg) {
+  semWait(sem_id, ROBOTSENSORS);
+  semWait(sem_id, ROBOTACCULATORS);
+  if (robotSensors.voltage.capacityPercent > 60)           robotAcculators.leds.LedDown = COLOR_GREEN;
+  else if (robotSensors.voltage.capacityPercent > 20)      robotAcculators.leds.LedDown = COLOR_ORANGE;
+  else                                                     robotAcculators.leds.LedDown = COLOR_RED;
+  semPost(sem_id, ROBOTACCULATORS);
+  semPost(sem_id, ROBOTSENSORS);
+  return 0;
+}
+
+void *syncI2cModules(void *arg) {
+  pthread_t threads[11];
+  unsigned long timeRunThread[11];
+  for (int i = 0; i < 11; i++) {
+    timeRunThread[i] = 0;
+  }
+  int threadIndex = 0;
+  struct timespec tstart = {0, 0}, tend = {0, 0};
   while (onAllThreads) {
-    GPS_struct gps = getGPS();
-    semWait(sem_id, ROBOTSENSORS);
-    robotSensors.gps = gps;
-    semPost(sem_id, ROBOTSENSORS);
+    threadIndex = 0;
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
+    if (ENABLE_BMP180 && timeRunThread[threadIndex] > SYNC_BMP180_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncBMP180, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_HMC5883L && timeRunThread[threadIndex] > SYNC_HMC5883L_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncHMC5883L, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_MPU6050ACC && timeRunThread[threadIndex] > SYNC_MPU6050ACC_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncMPU6050Acc, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_MPU6050GY && timeRunThread[threadIndex] > SYNC_MPU6050GY_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncMPU6050Gy, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_MPU6050TEMP && timeRunThread[threadIndex] > SYNC_MPU6050TEMP_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncMPU6050Temp, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_MOTORS && timeRunThread[threadIndex] > SYNC_MOTORS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncMotors, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_IMUPOSSITION && timeRunThread[threadIndex] > SYNC_IMUPOSSITION_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &imuPossion, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_ENCODERS && timeRunThread[threadIndex] > SYNC_ENCODERS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncEncoders, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_VOLTAGEANDAMP && timeRunThread[threadIndex] > SYNC_VOLTAGEANDAMP_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncVoltageAndAmp, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_ULTRASONIC && timeRunThread[threadIndex] > SYNC_ULTRASONIC_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncUltrasonic, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    if (ENABLE_LEDS && timeRunThread[threadIndex] > SYNC_LEDS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncLeds, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+
+    usleep(SYNC_MIN_TIME);
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+
+    unsigned long deltaTimeRun = (tend.tv_nsec - tstart.tv_nsec) / 1000000;
+    for (int i = 0; i < 11; i++) {
+      timeRunThread[i] += deltaTimeRun;
+    }
   }
   return 0;
 }
 
-void syncModules(int signal , siginfo_t * siginfo, void * ptr) {
-  if (signal == SIGUSR1) {
-    semWait(sem_id, REFRESH1_LOCK);
-    bool refreshPositionCheck = (REFRESH1_POSITION / REFRESH1_MODULE) <= pocetPosition;
-    if (refreshPositionCheck) pocetPosition = 0;
-    bool refreshMotorsCheck = (REFRESH1_MOTORS / REFRESH1_MODULE) <= pocetMotors;
-    if (refreshMotorsCheck) pocetMotors = 0;
-    bool refreshBatteryCheck = (REFRESH1_BATTERY / REFRESH1_MODULE) <= pocetBattery;
-    if (refreshBatteryCheck) pocetBattery = 0;
-    bool refreshBMP180Check = (REFRESH1_BMP180 / REFRESH1_MODULE) <= pocetBMP180;
-    if (refreshBMP180Check) pocetBMP180 = 0;
-    bool refreshHMC5883LCheck = (REFRESH1_HMC5883L / REFRESH1_MODULE) <= pocetHMC5883L;
-    if (refreshHMC5883LCheck) pocetHMC5883L = 0;
-    bool refreshLedsCheck = (REFRESH1_LEDS / REFRESH1_MODULE) <= pocetLeds;
-    if (refreshLedsCheck) pocetLeds = 0;
-    bool refreshAmpCheck = (REFRESH1_AMP / REFRESH1_MODULE) <= pocetAmp;
-    if (refreshAmpCheck) pocetAmp = 0;
-    bool refreshUltrasonicCheck = (REFRESH1_ULTRASONIC / REFRESH1_MODULE) <= pocetUltrasonic;
-    if (refreshUltrasonicCheck) pocetUltrasonic = 0;
-    bool refreshAccCheck = (REFRESH1_ACC / REFRESH1_MODULE) <= pocetAcc;
-    if (refreshAccCheck) pocetAcc = 0;
-    bool refreshGyCheck = (REFRESH1_GY / REFRESH1_MODULE) <= pocetGy;
-    if (refreshGyCheck) pocetGy = 0;
-    bool refreshTempCheck = (REFRESH1_TEMP / REFRESH1_MODULE) <= pocetTemp;
-    if (refreshTempCheck) pocetTemp = 0;
-    bool refreshVoltageCheck = (REFRESH1_VOLTAGE / REFRESH1_MODULE) <= pocetVoltage;
-    if (refreshVoltageCheck) pocetVoltage = 0;
-    bool refreshButtonsCheck = (REFRESH1_BUTTON / REFRESH1_MODULE) <= pocetButtons;
-    if (refreshButtonsCheck) pocetButtons = 0;
-    bool refreshAccKinectCheck = (REFRESH1_ACC_KINECT / REFRESH1_MODULE) <= pocetAccKinect;
-    if (refreshAccKinectCheck) pocetAccKinect = 0;
-
-    double pomocnaZmenaOtackomera;
-    double deltaDistanceL;
-    double deltaDistanceR;
-    double deltaDistanceDownRight;
-    double deltaDistanceMiddleRight;
-    double deltaDistanceUpRight;
-    double deltaDistanceUpLeft;
-    double deltaDistanceMiddleLeft;
-    double deltaDistanceDownLeft;
-
-    if (refreshBMP180Check) {
-      semWait(sem_id, ROBOTSENSORS);
-      //sem pojde BMP180
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshHMC5883LCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.HMC5883L = getHMC5883LNorm();
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshAccCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.MPU6050.accAxis = getMPU6050AccNorm();
-      robotSensors.MPU6050.accAngle = calcAccAngle3d(robotSensors.MPU6050.accAxis);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshGyCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.MPU6050.gyAxis = getMPU6050GyNorm();
-      Angle3d_struct deltaAngle3d = calcDeltaGyAngle3d(robotSensors.MPU6050.gyAxis, (double)REFRESH1_GY / 1000);
-      robotSensors.MPU6050.gyAngle.pitch = robotSensors.MPU6050.gyAngle.pitch + deltaAngle3d.pitch;
-      robotSensors.MPU6050.gyAngle.roll = robotSensors.MPU6050.gyAngle.roll + deltaAngle3d.roll;
-      robotSensors.MPU6050.gyAngle.yaw = robotSensors.MPU6050.gyAngle.yaw + deltaAngle3d.yaw;
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshTempCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.MPU6050.temperature = getMPU6050TempNorm();
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_DOWN_RIGHT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-      robotSensors.motors.motorDownRight.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceDownRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorDownRight.distance +=  deltaDistanceDownRight;
-      robotSensors.motors.motorDownRight.speed = getSpeedFromDistance(deltaDistanceDownRight, (double)REFRESH1_POSITION / 1000);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownRight, lastRobotAcculators.motors.motorDownRight)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_DOWN_RIGHT, robotAcculators.motors.motorDownRight.direction, robotAcculators.motors.motorDownRight.speed, robotAcculators.motors.motorDownRight.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_LEFT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-
-      robotSensors.motors.motorUpLeft.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceUpLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorUpLeft.distance +=  deltaDistanceUpLeft;
-      robotSensors.motors.motorUpLeft.speed = getSpeedFromDistance(deltaDistanceUpLeft, (double)REFRESH1_POSITION / 1000);
-
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpLeft, lastRobotAcculators.motors.motorUpLeft)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_UP_LEFT, robotAcculators.motors.motorUpLeft.direction, robotAcculators.motors.motorUpLeft.speed, robotAcculators.motors.motorUpLeft.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_MIDDLE_RIGHT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-      robotSensors.motors.motorMiddleRight.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceMiddleRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorMiddleRight.distance +=  deltaDistanceMiddleRight;
-      robotSensors.motors.motorMiddleRight.speed = getSpeedFromDistance(deltaDistanceMiddleRight, (double)REFRESH1_POSITION / 1000);
-
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleRight, lastRobotAcculators.motors.motorMiddleRight)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_MIDDLE_RIGHT, robotAcculators.motors.motorMiddleRight.direction, robotAcculators.motors.motorMiddleRight.speed, robotAcculators.motors.motorMiddleRight.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshMotorsCheck || robotAcculators.kinect.yaw != lastRobotAcculators.kinect.yaw) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setServo(robotAcculators.kinect.yaw);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshMotorsCheck || robotAcculators.kinect.roll != lastRobotAcculators.kinect.roll) {
-      semWait(sem_id, ROBOTACCULATORS);
-      freenect_set_tilt_degs(dev, robotAcculators.kinect.roll);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshMotorsCheck )
-      if (refreshPositionCheck) {
-        semWait(sem_id, ROBOTSENSORS);
-        pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_UP_RIGHT);
-        if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-        else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-
-        robotSensors.motors.motorUpRight.distanceRaw += pomocnaZmenaOtackomera;
-        deltaDistanceUpRight = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-        robotSensors.motors.motorUpRight.distance +=  deltaDistanceUpRight;
-        robotSensors.motors.motorUpRight.speed = getSpeedFromDistance(deltaDistanceUpRight, (double)REFRESH1_POSITION / 1000);
-
-        semPost(sem_id, ROBOTSENSORS);
-      }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorUpRight, lastRobotAcculators.motors.motorUpRight)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_UP_RIGHT, robotAcculators.motors.motorUpRight.direction, robotAcculators.motors.motorUpRight.speed, robotAcculators.motors.motorUpRight.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_MIDDLE_LEFT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-      robotSensors.motors.motorMiddleLeft.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceMiddleLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorMiddleLeft.distance +=  deltaDistanceMiddleLeft;
-      robotSensors.motors.motorMiddleLeft.speed = getSpeedFromDistance(deltaDistanceMiddleLeft, (double)REFRESH1_POSITION / 1000);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorMiddleLeft, lastRobotAcculators.motors.motorMiddleLeft)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_MIDDLE_LEFT, robotAcculators.motors.motorMiddleLeft.direction, robotAcculators.motors.motorMiddleLeft.speed, robotAcculators.motors.motorMiddleLeft.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshPositionCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      pomocnaZmenaOtackomera = getDeltaDistanceRaw(POSITION_DOWN_LEFT);
-      if (pomocnaZmenaOtackomera > MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = MAX_DELTA_TICKS_ENCODER;
-      else if (pomocnaZmenaOtackomera < -MAX_DELTA_TICKS_ENCODER) pomocnaZmenaOtackomera = -MAX_DELTA_TICKS_ENCODER;
-      robotSensors.motors.motorDownLeft.distanceRaw += pomocnaZmenaOtackomera;
-      deltaDistanceDownLeft = prepocetTikovOtackomeraDoVzdialenosti(pomocnaZmenaOtackomera);
-      robotSensors.motors.motorDownLeft.distance +=  deltaDistanceDownLeft;
-      robotSensors.motors.motorDownLeft.speed = getSpeedFromDistance(deltaDistanceDownLeft, (double)REFRESH1_POSITION / 1000);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshMotorsCheck || compareMotors(robotAcculators.motors.motorDownLeft, lastRobotAcculators.motors.motorDownLeft)) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setMotor(POSITION_DOWN_LEFT, robotAcculators.motors.motorDownLeft.direction, robotAcculators.motors.motorDownLeft.speed, robotAcculators.motors.motorDownLeft.onRegulator);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshLedsCheck || robotAcculators.leds.LedUp != lastRobotAcculators.leds.LedUp) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setLed(POSITION_UP, robotAcculators.leds.LedUp);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshLedsCheck || robotAcculators.leds.LedMiddle != lastRobotAcculators.leds.LedMiddle) {
-      semWait(sem_id, ROBOTACCULATORS);
-      setLed(POSITION_UP, robotAcculators.leds.LedMiddle);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshLedsCheck || robotAcculators.leds.LedDown != lastRobotAcculators.leds.LedDown) {
-      if (!BATTERY_LED_INDICATING) {
-        semWait(sem_id, ROBOTACCULATORS);
-        setLed(POSITION_DOWN, robotAcculators.leds.LedDown);
-        semPost(sem_id, ROBOTACCULATORS);
-      }
-    }
-
-    if (robotAcculators.leds.LedKinect != lastRobotAcculators.leds.LedKinect) {
-      semWait(sem_id, ROBOTACCULATORS);
-      freenect_set_led(dev, robotAcculators.leds.LedKinect);
-      semPost(sem_id, ROBOTACCULATORS);
-    }
-
-    if (refreshAccKinectCheck) {
-      freenect_raw_tilt_state *state = 0;
-      // Get the raw accelerometer values and tilt data
-      state = freenect_get_tilt_state(dev);
-      semWait(sem_id, ROBOTSENSORS);
-      // Get the processed accelerometer values (calibrated to gravity)
-      freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
-      robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshPositionCheck) {
-      double diff1 = abs(deltaDistanceUpLeft - deltaDistanceMiddleLeft);
-      double diff2 = abs(deltaDistanceUpLeft - deltaDistanceDownLeft);
-      double diff3 = abs(deltaDistanceMiddleLeft - deltaDistanceDownLeft);
-      if (diff1 < diff2 && diff1 < diff3)
-        deltaDistanceL = (deltaDistanceUpLeft + deltaDistanceMiddleLeft) / 2;
-      else if (diff2 < diff1 && diff2 < diff3)
-        deltaDistanceL = (deltaDistanceUpLeft + deltaDistanceDownLeft) / 2;
-      else
-        deltaDistanceL = (deltaDistanceMiddleLeft + deltaDistanceDownLeft) / 2;
-      robotSensors.robotPosition.distanceL += deltaDistanceL;
-      robotSensors.robotPosition.speedL = getSpeedFromDistance(deltaDistanceL, (double)REFRESH1_POSITION / 1000);
-
-      double diff4 = abs(deltaDistanceDownRight - deltaDistanceMiddleRight);
-      double diff5 = abs(deltaDistanceMiddleRight - deltaDistanceUpRight);
-      double diff6 = abs(deltaDistanceUpRight - deltaDistanceDownRight);
-      if (diff4 < diff5 && diff4 < diff6)
-        deltaDistanceR = (deltaDistanceDownRight + deltaDistanceMiddleRight) / 2;
-      else if (diff5 < diff4 && diff5 < diff6)
-        deltaDistanceR = (deltaDistanceMiddleRight + deltaDistanceUpRight) / 2;
-      else
-        deltaDistanceR = (deltaDistanceUpRight + deltaDistanceDownRight) / 2;
-      robotSensors.robotPosition.distanceR += deltaDistanceR;
-      robotSensors.robotPosition.speedR = getSpeedFromDistance(deltaDistanceR, (double)REFRESH1_POSITION / 1000);
-
-      robotSensors.robotPosition.imuAngle.roll =  kalmanCalculate(0, robotSensors.MPU6050.accAngle.roll, robotSensors.MPU6050.gyAngle.roll, (double)REFRESH1_POSITION / 1000);
-      robotSensors.robotPosition.imuAngle.pitch = kalmanCalculate(1, robotSensors.MPU6050.accAngle.pitch, robotSensors.MPU6050.gyAngle.pitch, (double)REFRESH1_POSITION / 1000);
-      robotSensors.robotPosition.imuAngle.yaw = tiltCompensate(
-            robotSensors.HMC5883L.compassAxis,
-            robotSensors.robotPosition.imuAngle.pitch,
-            robotSensors.robotPosition.imuAngle.roll);
-
-      calcRobotPosition(robotSensors.robotPosition.speedL, robotSensors.robotPosition.speedR, (double)REFRESH1_POSITION / 1000);
-    }
-
-    if (refreshAmpCheck)    robotSensors.amper = getAmp();
-
-    if (refreshUltrasonicCheck) robotSensors.ultrasonic = getUltrasonic();
-
-    if (refreshButtonsCheck) {
-      bool buttonState;
-
-      buttonState = getButtonWithoutBounce(POSITION_UP);
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.buttons.buttonUp = buttonState;
-      semPost(sem_id, ROBOTSENSORS);
-
-      buttonState = getButtonWithoutBounce(POSITION_MIDDLE);
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.buttons.buttonMiddle = buttonState;
-      semPost(sem_id, ROBOTSENSORS);
-
-      buttonState = getButtonWithoutBounce(POSITION_DOWN);
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.buttons.buttonDown = buttonState;
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (refreshVoltageCheck) {
-      semWait(sem_id, ROBOTSENSORS);
-      robotSensors.voltage.volts = getVoltage();
-      robotSensors.voltage.capacityPercent = calcVoltagePercent(robotSensors.voltage.volts);
-      semPost(sem_id, ROBOTSENSORS);
-    }
-
-    if (BATTERY_LED_INDICATING) {
-      if (refreshBatteryCheck) {
-        semWait(sem_id, ROBOTSENSORS);
-        semWait(sem_id, ROBOTACCULATORS);
-        if (robotSensors.voltage.capacityPercent > 60)           robotAcculators.leds.LedDown = COLOR_GREEN;
-        else if (robotSensors.voltage.capacityPercent > 20)      robotAcculators.leds.LedDown = COLOR_ORANGE;
-        else                                                     robotAcculators.leds.LedDown = COLOR_RED;
-        semPost(sem_id, ROBOTACCULATORS);
-        semPost(sem_id, ROBOTSENSORS);
-      }
-    }
-
-    semWait(sem_id, ROBOTACCULATORS);
-    memcpy(&lastRobotAcculators, &robotAcculators, sizeof(RobotAcculators));
-    semPost(sem_id, ROBOTACCULATORS);
-
-    pocetBMP180++;
-    pocetHMC5883L++;
-    pocetPosition++;
-    pocetMotors++;
-    pocetLeds++;
-    pocetAmp++;
-    pocetVoltage++;
-    pocetUltrasonic++;
-    pocetAcc++;
-    pocetGy++;
-    pocetTemp++;
-    pocetBattery++;
-
-    semPost(sem_id, REFRESH1_LOCK);
+void *syncOtherModules(void *arg) {
+  printf("sync other modules\n");
+  pthread_t threads[5];
+  unsigned long timeRunThread[5];
+  for (int i = 0; i < 5; i++) {
+    timeRunThread[i] = 0;
   }
-  else if (signal == SIGUSR2) {
-    semWait(sem_id, REFRESH2_LOCK);
-    semPost(sem_id, REFRESH2_LOCK);
+  int threadIndex = 0;
+  struct timespec tstart = {0, 0}, tend = {0, 0};
+  while (onAllThreads) {
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
+    threadIndex = 0;
+    if (ENABLE_GPS && timeRunThread[threadIndex] > SYNC_GPS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncGPS, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+    if (ENABLE_BUTTONS && timeRunThread[threadIndex] > SYNC_BUTTONS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncButtons, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+    if (ENABLE_KINECTACCULATORS && timeRunThread[threadIndex] > SYNC_KINECTACCULATORS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncKinectAcculators, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+    if (ENABLE_KINECTSENSORS && timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncKinectSensors, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+    if (ENABLE_BATTERYINDICATOR && timeRunThread[threadIndex] > SYNC_BATTERYINDICATOR_TIME) {
+      pthread_create(&threads[threadIndex], NULL, &syncBatteryIndicator, NULL);
+      timeRunThread[threadIndex++] = 0;
+    }
+    usleep(SYNC_MIN_TIME);
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+
+    unsigned long deltaTimeRun = (tend.tv_nsec - tstart.tv_nsec) / 1000000;
+    for (int i = 0; i < 5; i++) {
+      timeRunThread[i] += deltaTimeRun;
+    }
   }
+  return 0;
 }
+
