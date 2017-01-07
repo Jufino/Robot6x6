@@ -1,6 +1,10 @@
+#include <Wire.h>
+/*I2C adresa*/
+#define I2CDebug true
+#define addressI2C 0x01 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureDebugCurrent false    //pri merani nastaviť na true, meranie rýchlosti nastaviť na false
-#define measureDebugSpeed true       //pri merani nastaviť na true, meranie prúdu nastaviť na false
+#define measureDebugSpeed false       //pri merani nastaviť na true, meranie prúdu nastaviť na false
 #define numberOfMeasureData 600
 #define numberOfMeasureDataCurrent 600 //600*0.0015=0.9s
 #define numberOfMeasureDataSpeed 20 //20*0.25=5s
@@ -9,9 +13,11 @@ unsigned int measureIndex = 0;
 bool measureStart = false;
 /*--------------------------------------------------*/
 /* ostatné nastavenia*/
-#define numberOfTimer 2              //pocet casovacov
+#define numberOfTimer 3              //pocet casovacov
+#define periodVoltageMeasure 1000000L //perioda pre prudovy regulator
 #define periodCurrentRegulator 1500L //perioda pre prudovy regulator
 #define periodSpeedRegulator 250000L //perioda pre rychlostny regulator
+/* filter */
 #define LPF_Beta 0.025 //konštanta dolnopriepustného filtra - https://kiritchatterjee.wordpress.com/2014/11/10/a-simple-digital-low-pass-filter-in-c/
 #define useLPF true   //spustenie alebo vypnutie filtrácie prúdu
 /* konštanty prúdového regulátora */
@@ -25,7 +31,7 @@ bool measureStart = false;
 unsigned long last_time = 0;
 unsigned long sumCurrent = 0;
 unsigned long timesCurrentMeasure = 0;
-double averageMeasureCurrent = 0;
+
 double regCurrentIsum = 0;
 double regSpeedIsum = 0;
 double pozadCurrent = 0;
@@ -34,7 +40,14 @@ unsigned long time_integral[numberOfTimer];
 long numberTickLast = 0;
 volatile bool periodDone = false;
 volatile long numberTick = 0;
+volatile int numberTickForI2C = 0;
 volatile unsigned char combLast = 0;
+volatile char c = -1;
+volatile int measureSpeed = 0;
+volatile double averageMeasureCurrent = 0;
+volatile unsigned int measureVoltage = 0;
+volatile bool onCurrentReg = true;
+volatile bool onSpeedReg = true;
 /*--------------------------------------------------*/
 void encoderMotor() {
   char pinA = digitalRead(2);
@@ -43,40 +56,48 @@ void encoderMotor() {
   if (combLast == 3) {
     if (comb == 2) {
       numberTick++;
+      numberTickForI2C++;
       combLast = comb;
     }
     else if (comb == 1) {
       numberTick--;
+      numberTickForI2C--;
       combLast = comb;
     }
   }
   else if (combLast == 1) {
     if (comb == 3) {
       numberTick++;
+      numberTickForI2C++;
       combLast = comb;
     }
     else if (comb == 0) {
       numberTick--;
+      numberTickForI2C--;
       combLast = comb;
     }
   }
   else if (combLast == 0) {
     if (comb == 1) {
       numberTick++;
+      numberTickForI2C++;
       combLast = comb;
     }
     else if (comb == 2) {
       numberTick--;
+      numberTickForI2C--;
       combLast = comb;
     }
   }
   else if (combLast == 2) {
     if (comb == 0) {
       numberTick++;
+      numberTickForI2C++;
       combLast = comb;
     }
     else if (comb == 3) {
       numberTick--;
+      numberTickForI2C--;
       combLast = comb;
     }
   }
@@ -109,7 +130,7 @@ void motor(int pwm) {
 }
 /*--------------------------------------------------*/
 void setup() {
-  if (measureDebugCurrent || measureDebugSpeed)
+  if (measureDebugCurrent || measureDebugSpeed || I2CDebug)
     Serial.begin(9600);
 
   pinMode(10, OUTPUT);
@@ -139,8 +160,84 @@ void setup() {
 
   digitalWrite(13, HIGH);
   digitalWrite(A0, HIGH);
+
+  Wire.begin(addressI2C);
+  Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent);
 }
 /*--------------------------------------------------*/
+void receiveEvent(int howMany) {
+  byte d = 0;
+  byte e = 0;
+  while (3 < Wire.available()) {
+    Wire.read();
+  }
+  c = Wire.read();
+  switch (c) {
+    case 99:
+      d = Wire.read();
+      e = Wire.read();
+      onSpeedReg = false;
+      onCurrentReg = true;
+      pozadCurrent = (d << 8) | e;
+      break;
+    case 100:
+      d = Wire.read();
+      e = Wire.read();
+      onSpeedReg = true;
+      onCurrentReg = true;
+      pozadSpeed = (d << 8) | e;
+      break;
+    case 101:
+      d = Wire.read();
+      e = Wire.read();
+      onSpeedReg = false;
+      onCurrentReg = false;
+      motor((d << 8) | e);
+      break;
+  }
+  if (I2CDebug) {
+    Serial.print(d, DEC);
+    Serial.print("/");
+    Serial.print(e, DEC);
+    Serial.print("/");
+    Serial.println((d << 8) | e);
+  }
+}
+/*--------------------------------------------------*/
+void requestEvent() {
+  byte data[2];
+  unsigned int current;
+  switch (c) {
+    case 1:
+      data[0] = (measureSpeed & 0xFF);
+      data[1] = (measureSpeed >> 8) & 0xFF;
+      Wire.write(data, 2);
+      break;
+    case 2:
+      current = averageMeasureCurrent;
+      data[0] = (current & 0xFF);
+      data[1] = (current >> 8) & 0xFF;
+      Wire.write(data, 2);
+      break;
+    case 3:
+      data[0] = (numberTickForI2C & 0xFF);
+      data[1] = (numberTickForI2C >> 8) & 0xFF;
+      numberTickForI2C = 0;
+      Wire.write(data, 2);
+      break;
+    case 4:
+      data[0] = (measureVoltage & 0xFF);
+      data[1] = (measureVoltage >> 8) & 0xFF;
+      Wire.write(data, 2);
+      break;
+  }
+  if (I2CDebug) {
+    Serial.println(c, DEC);
+  }
+  c = -1;
+}
+
 void loop() {
   /*--------------------------------------------------*/
   /*prikazy pouzitelne cez seriovy port pre meranie*/
@@ -199,37 +296,40 @@ void loop() {
   /*--------------------------------------------------*/
   /*regulator rychlosti*/
   if (time_integral[0] >= periodSpeedRegulator) {
-    /*--------------------------------------------------*/
-    /*ziskana rychlost derivovanim polohy*/
-    double speedWheel = numberTick - numberTickLast;
-    numberTickLast = numberTick;
-    /*--------------------------------------------------*/
-    /*PI regulator rychlosti*/
-    double e = pozadSpeed - speedWheel;
-    regSpeedIsum += Ispeed * e;
-    if (regSpeedIsum > 500) regSpeedIsum = 500;
-    else if (regSpeedIsum < -500) regSpeedIsum = -500;
-    else if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
-    double u = e * Pspeed + regSpeedIsum;
-    if (pozadSpeed >= 0) {
-      if (u > 500) u = 500;
-      else if (u < 0) u = 0;
-    }
-    else {
-      if (u < -500) u = -500;
-      else if (u > 0) u = 0;
-    }
-    pozadCurrent = u;
-    /*--------------------------------------------------*/
-    /*sluzi iba pri merani*/
-    if (measureStart && measureDebugSpeed) {
-      if (numberOfMeasureDataSpeed <= measureIndex) {
-        measureStart = false;
-        measureIndex = 0;
-        pozadSpeed = 0;
+    if (onSpeedReg) {
+      /*--------------------------------------------------*/
+      /*ziskana rychlost derivovanim polohy*/
+      double speedWheel = numberTick - numberTickLast;
+      numberTickLast = numberTick;
+      measureSpeed = (int)speedWheel;
+      /*--------------------------------------------------*/
+      /*PI regulator rychlosti*/
+      double e = pozadSpeed - speedWheel;
+      regSpeedIsum += Ispeed * e;
+      if (regSpeedIsum > 500) regSpeedIsum = 500;
+      else if (regSpeedIsum < -500) regSpeedIsum = -500;
+      else if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
+      double u = e * Pspeed + regSpeedIsum;
+      if (pozadSpeed >= 0) {
+        if (u > 500) u = 500;
+        else if (u < 0) u = 0;
       }
       else {
-        measureData[measureIndex++] = (unsigned char)speedWheel;
+        if (u < -500) u = -500;
+        else if (u > 0) u = 0;
+      }
+      pozadCurrent = u;
+      /*--------------------------------------------------*/
+      /*sluzi iba pri merani*/
+      if (measureStart && measureDebugSpeed) {
+        if (numberOfMeasureDataSpeed <= measureIndex) {
+          measureStart = false;
+          measureIndex = 0;
+          pozadSpeed = 0;
+        }
+        else {
+          measureData[measureIndex++] = (unsigned char)speedWheel;
+        }
       }
     }
     /*--------------------------------------------------*/
@@ -238,36 +338,45 @@ void loop() {
   /*--------------------------------------------------*/
   /*regulator prudu*/
   if (time_integral[1] >= periodCurrentRegulator) {
-    /*--------------------------------------------------*/
-    /*PI regulator prúdu*/
-    double e = pozadCurrent - averageMeasureCurrent;
-    regCurrentIsum += Icurrent * e;
-    if (regCurrentIsum > 255) regCurrentIsum = 255;
-    else if (regCurrentIsum < -255) regCurrentIsum = -255;
-    int u = (int)(e * Pcurrent + regCurrentIsum);
-    if (pozadCurrent >= 0) {
+    if (onCurrentReg) {
+      /*--------------------------------------------------*/
+      /*PI regulator prúdu*/
+      double e;
+      if (pozadCurrent > 0)
+        e = pozadCurrent - averageMeasureCurrent;
+      else
+        e = -pozadCurrent - averageMeasureCurrent;
+      regCurrentIsum += Icurrent * e;
+      if (regCurrentIsum > 255) regCurrentIsum = 255;
+      else if (regCurrentIsum < 0) regCurrentIsum = 0;
+      int u = (int)(e * Pcurrent + regCurrentIsum);
       if (u > 255) u = 255;
       else if (u < 0) u = 0;
-    }
-    else {
-      if (u < -255) u = -255;
-      else if (u > 0) u = 0;
-    }
-    motor(u);
-    /*--------------------------------------------------*/
-    /*sluzi iba pri merani*/
-    if (measureStart && measureDebugCurrent) {
-      if (numberOfMeasureDataCurrent <= measureIndex) {
-        measureStart = false;
-        measureIndex = 0;
-        pozadCurrent = 0;
-      }
-      else {
-        measureData[measureIndex++] = (char)averageMeasureCurrent;
+      if (pozadCurrent > 0)
+        motor(u);
+      else
+        motor(-u);
+      /*--------------------------------------------------*/
+      /*sluzi iba pri merani*/
+      if (measureStart && measureDebugCurrent) {
+        if (numberOfMeasureDataCurrent <= measureIndex) {
+          measureStart = false;
+          measureIndex = 0;
+          pozadCurrent = 0;
+        }
+        else {
+          measureData[measureIndex++] = (char)averageMeasureCurrent;
+        }
       }
     }
     /*--------------------------------------------------*/
     time_integral[1] = 0;
+  }
+  /*--------------------------------------------------*/
+  /*meranie napatia*/
+  if (time_integral[2] >= periodVoltageMeasure) {
+    measureVoltage = analogRead(A2);
+    time_integral[2] = 0;
   }
   /*--------------------------------------------------*/
 }
