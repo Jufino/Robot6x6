@@ -1,0 +1,17 @@
+/*
+ * Position.h
+ *
+ *  Created on: 9. 1. 2017
+ *      Author: Juraj
+ */
+
+#ifndef POSITION_POSITION_H_
+#define POSITION_POSITION_H_
+
+class Position {
+public:
+	Position();
+	virtual ~Position();
+};
+
+#endif /* POSITION_POSITION_H_ */

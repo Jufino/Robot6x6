@@ -1,0 +1,18 @@
+/*
+ * Position.cpp
+ *
+ *  Created on: 9. 1. 2017
+ *      Author: Juraj
+ */
+
+#include <Position/Position.h>
+
+Position::Position() {
+	// TODO Auto-generated constructor stub
+
+}
+
+Position::~Position() {
+	// TODO Auto-generated destructor stub
+}
+

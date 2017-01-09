@@ -1,8 +1,10 @@
 #include <Wire.h>
 /*I2C adresa*/
-#define I2CDebug true
-#define addressI2C 0x01 //motory cislovane  z lava vzadu 
+#define I2CDebug false
+#define addressI2C 0x06 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
+#define measureCurrentAction 50
+#define measureSpeedAction 25
 #define measureDebugCurrent false    //pri merani nastaviť na true, meranie rýchlosti nastaviť na false
 #define measureDebugSpeed false       //pri merani nastaviť na true, meranie prúdu nastaviť na false
 #define numberOfMeasureData 600
@@ -16,16 +18,20 @@ bool measureStart = false;
 #define numberOfTimer 3              //pocet casovacov
 #define periodVoltageMeasure 1000000L //perioda pre prudovy regulator
 #define periodCurrentRegulator 1500L //perioda pre prudovy regulator
-#define periodSpeedRegulator 250000L //perioda pre rychlostny regulator
+#define periodSpeedRegulator 200000L //perioda pre rychlostny regulator
 /* filter */
 #define LPF_Beta 0.025 //konštanta dolnopriepustného filtra - https://kiritchatterjee.wordpress.com/2014/11/10/a-simple-digital-low-pass-filter-in-c/
 #define useLPF true   //spustenie alebo vypnutie filtrácie prúdu
 /* konštanty prúdového regulátora */
-#define Pcurrent 3.02
-#define Icurrent 0.6
+#define Pcurrent 2
+#define Icurrent 0.8
+#define Kbcurrent 0.2
+volatile bool onCurrentReg = true;
 /*konštanty rýchlostného regulátora */
-#define Pspeed 0.3
-#define Ispeed 0.35
+#define Pspeed 0.30
+#define Ispeed 0.27
+#define Kbspeed 0.5
+volatile bool onSpeedReg = true;
 /*--------------------------------------------------*/
 /*pomocné premenné*/
 unsigned long last_time = 0;
@@ -46,8 +52,6 @@ volatile char c = -1;
 volatile int measureSpeed = 0;
 volatile double averageMeasureCurrent = 0;
 volatile unsigned int measureVoltage = 0;
-volatile bool onCurrentReg = true;
-volatile bool onSpeedReg = true;
 /*--------------------------------------------------*/
 void encoderMotor() {
   char pinA = digitalRead(2);
@@ -164,6 +168,7 @@ void setup() {
   Wire.begin(addressI2C);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
+  //motor(0);
 }
 /*--------------------------------------------------*/
 void receiveEvent(int howMany) {
@@ -237,7 +242,8 @@ void requestEvent() {
   }
   c = -1;
 }
-
+double uLastSpeed =0;
+double uLastCurrent = 0;
 void loop() {
   /*--------------------------------------------------*/
   /*prikazy pouzitelne cez seriovy port pre meranie*/
@@ -259,9 +265,11 @@ void loop() {
       measureIndex = 0;
       measureStart = true;
       if (measureDebugSpeed)
-        pozadSpeed = 150; //rychlost pri merani
-      else if (measureDebugCurrent)
-        pozadCurrent = 200; //prud pri merani
+        pozadSpeed = measureSpeedAction;
+      else if (measureDebugCurrent) {
+        pozadCurrent = measureCurrentAction;
+        //motor(255); //prud pri merani
+      }
     }
   }
   /*--------------------------------------------------*/
@@ -296,20 +304,21 @@ void loop() {
   /*--------------------------------------------------*/
   /*regulator rychlosti*/
   if (time_integral[0] >= periodSpeedRegulator) {
+    /*--------------------------------------------------*/
+    /*ziskana rychlost derivovanim polohy*/
+    double speedWheel = numberTick - numberTickLast;
+    numberTickLast = numberTick;
+    measureSpeed = (int)speedWheel;
+    /*--------------------------------------------------*/
     if (onSpeedReg) {
-      /*--------------------------------------------------*/
-      /*ziskana rychlost derivovanim polohy*/
-      double speedWheel = numberTick - numberTickLast;
-      numberTickLast = numberTick;
-      measureSpeed = (int)speedWheel;
-      /*--------------------------------------------------*/
       /*PI regulator rychlosti*/
       double e = pozadSpeed - speedWheel;
       regSpeedIsum += Ispeed * e;
-      if (regSpeedIsum > 500) regSpeedIsum = 500;
-      else if (regSpeedIsum < -500) regSpeedIsum = -500;
+      if(uLastSpeed > 500) regSpeedIsum+=-uLastSpeed+500;
+      if(uLastSpeed < 0) regSpeedIsum+=-uLastSpeed+0;
       else if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
       double u = e * Pspeed + regSpeedIsum;
+      uLastSpeed = u;
       if (pozadSpeed >= 0) {
         if (u > 500) u = 500;
         else if (u < 0) u = 0;
@@ -319,19 +328,20 @@ void loop() {
         else if (u > 0) u = 0;
       }
       pozadCurrent = u;
-      /*--------------------------------------------------*/
-      /*sluzi iba pri merani*/
-      if (measureStart && measureDebugSpeed) {
-        if (numberOfMeasureDataSpeed <= measureIndex) {
-          measureStart = false;
-          measureIndex = 0;
-          pozadSpeed = 0;
-        }
-        else {
-          measureData[measureIndex++] = (unsigned char)speedWheel;
-        }
+    }
+    /*--------------------------------------------------*/
+    /*sluzi iba pri merani*/
+    if (measureStart && measureDebugSpeed) {
+      if (numberOfMeasureDataSpeed <= measureIndex) {
+        measureStart = false;
+        measureIndex = 0;
+        pozadSpeed = 0;
+      }
+      else {
+        measureData[measureIndex++] = (unsigned char)speedWheel;
       }
     }
+
     /*--------------------------------------------------*/
     time_integral[0] = 0;
   }
@@ -347,28 +357,32 @@ void loop() {
       else
         e = -pozadCurrent - averageMeasureCurrent;
       regCurrentIsum += Icurrent * e;
-      if (regCurrentIsum > 255) regCurrentIsum = 255;
-      else if (regCurrentIsum < 0) regCurrentIsum = 0;
+      if(uLastCurrent > 255) regCurrentIsum+=-uLastCurrent+255;
+      if(uLastCurrent < 0) regCurrentIsum+=-uLastCurrent+0;
       int u = (int)(e * Pcurrent + regCurrentIsum);
+      uLastCurrent = u;
       if (u > 255) u = 255;
       else if (u < 0) u = 0;
       if (pozadCurrent > 0)
         motor(u);
       else
         motor(-u);
-      /*--------------------------------------------------*/
-      /*sluzi iba pri merani*/
-      if (measureStart && measureDebugCurrent) {
-        if (numberOfMeasureDataCurrent <= measureIndex) {
-          measureStart = false;
-          measureIndex = 0;
-          pozadCurrent = 0;
-        }
-        else {
-          measureData[measureIndex++] = (char)averageMeasureCurrent;
-        }
+        
+    }
+    /*--------------------------------------------------*/
+    /*sluzi iba pri merani*/
+    if (measureStart && measureDebugCurrent) {
+      if (numberOfMeasureDataCurrent <= measureIndex) {
+        measureStart = false;
+        measureIndex = 0;
+        pozadCurrent = 0;
+        //motor(0);
+      }
+      else {
+        measureData[measureIndex++] = (unsigned int)averageMeasureCurrent;
       }
     }
+
     /*--------------------------------------------------*/
     time_integral[1] = 0;
   }
