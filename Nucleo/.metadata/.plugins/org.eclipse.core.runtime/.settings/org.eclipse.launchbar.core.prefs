@@ -1,6 +1,6 @@
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/arch=x86
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/os=win32
-configDescList=org.eclipse.launchbar.core.descriptorType.default\:STM32L152-EVAL_I2C_I2C_TwoBoards_DataExchangeInterrupt.elf,org.eclipse.launchbar.core.descriptorType.default\:STM32L152-EVAL_I2C_I2C_TwoBoards_MasterReceiverInterrupt.elf,org.eclipse.launchbar.core.descriptorType.default\:motor_master.elf
+configDescList=org.eclipse.launchbar.core.descriptorType.default\:motor_master.elf
 eclipse.preferences.version=1
 org.eclipse.launchbar.core.descriptorType.default\:motor_master.elf/activeLaunchMode=debug
 org.eclipse.launchbar.core.descriptorType.default\:motor_master.elf/activeLaunchTarget=org.eclipse.launchbar.core.launchTargetType.local\:Local

@@ -1,9 +1,9 @@
 #ifndef MOTOR_H_
 #define MOTOR_H_
 
-extern "C"{
-	#include "stm32l1xx.h"
-	#include <I2CMasterLib/I2CMasterLib.h>
+extern "C" {
+#include "stm32l1xx.h"
+#include <I2CMasterLib/I2CMasterLib.h>
 #include <Math.h>
 }
 
@@ -15,7 +15,7 @@ extern "C"{
 #define MOTOR4 8
 #define MOTOR5 10
 #define MOTOR6 12
-const uint8_t MOTORSADDR[] = {MOTOR1,MOTOR2,MOTOR3,MOTOR4,MOTOR5,MOTOR6};
+const uint8_t MOTORSADDR[] = { MOTOR1, MOTOR2, MOTOR3, MOTOR4, MOTOR5, MOTOR6 };
 //------------------------------------------------------------------
 //set register
 #define SETSPEEDREG 100
@@ -27,6 +27,7 @@ const uint8_t MOTORSADDR[] = {MOTOR1,MOTOR2,MOTOR3,MOTOR4,MOTOR5,MOTOR6};
 #define GETCURRENTREG 2
 #define GETDELTATICKSREG 3
 #define GETVOLTAGEREG 4
+#define GETWHO_I_AM 255
 //------------------------------------------------------------------
 #define wheelDiameter 86
 #define lengthBetweenLeftAndRightWheel 250
@@ -40,6 +41,7 @@ private:
 	int16_t speedRaw;
 	uint16_t voltageRaw;
 	uint16_t current;
+	bool test = false;
 public:
 	Motor(uint8_t motorAddr);
 	//------------------------------------------------------------------
@@ -83,6 +85,12 @@ public:
 	double getAngleSpeed(void);
 	//------------------------------------------------------------------
 	double getSpeed(void);
+	//------------------------------------------------------------------
+	bool isTestOk(void);
+	//------------------------------------------------------------------
+	void setTestValue(uint8_t value);
+	//------------------------------------------------------------------
+	void DMATestInvoke(void);
 
 };
 

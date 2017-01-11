@@ -37,6 +37,46 @@ volatile double y = 0;
 volatile double angle = 0;
 #define dt 0.025
 
+enum Direction {
+	FORWARD, BACKWARD, ROTATE_CLOCKWISE, ROTATE_ANTICLOCKWISE, STOP
+};
+
+void speedL(double speed) {
+	getMotor(1)->setSpeedMotor(speed);
+	getMotor(2)->setSpeedMotor(speed);
+	getMotor(3)->setSpeedMotor(speed);
+}
+void speedR(double speed) {
+	getMotor(4)->setSpeedMotor(speed);
+	getMotor(5)->setSpeedMotor(speed);
+	getMotor(6)->setSpeedMotor(speed);
+}
+void goDirection(Direction dir, double speed) {
+	switch (dir) {
+	case FORWARD:
+		speedL(speed);
+		speedR(speed);
+		break;
+	case BACKWARD:
+		speedL(-speed);
+		speedR(-speed);
+		break;
+	case ROTATE_CLOCKWISE:
+		speedL(speed);
+		speedR(-speed);
+		break;
+	case ROTATE_ANTICLOCKWISE:
+		speedL(-speed);
+		speedR(speed);
+		break;
+	case STOP:
+		speedL(0);
+		speedR(0);
+		break;
+	}
+
+}
+
 extern "C" void I2C1_ER_IRQHandler(void) {
 	if (I2C_GetITStatus(I2C1, I2C_IT_AF)) {
 		I2C_ClearITPendingBit(I2C1, I2C_IT_AF);
@@ -44,8 +84,26 @@ extern "C" void I2C1_ER_IRQHandler(void) {
 }
 
 uint16_t i2c1_reg;
+uint16_t numberOfRecvValues = 0;
 int16_t i2c1_val;
+#define I2C_MAX_SEND_BUFFER 4
+uint8_t i2c_indexSendBuffer = 0;
+uint8_t i2c_sendBuffer[I2C_MAX_SEND_BUFFER];
 bool i2c1_recv_reg_done = false;
+bool buttons[3];
+
+void longToI2CBuffer(long number) {
+	for (int i = 0; i < 4; i++) {
+		i2c_sendBuffer[i] = (number >> ((3 - i) * 8)) & 0xFF;
+	}
+}
+
+void intToI2CBuffer(int16_t number) {
+	for (int i = 0; i < 2; i++) {
+		i2c_sendBuffer[i] = (number >> ((1 - i) * 8)) & 0xFF;
+	}
+}
+
 extern "C" void I2C1_EV_IRQHandler() {
 	//ev1
 	while ((I2C_SR1_ADDR & I2C1->SR1) == I2C_SR1_ADDR) {
@@ -59,32 +117,88 @@ extern "C" void I2C1_EV_IRQHandler() {
 			i2c1_reg = I2C1->DR;
 			i2c1_recv_reg_done = true;
 			i2c1_val = 0;
+			numberOfRecvValues = 0;
+			i2c_indexSendBuffer = 0;
+			switch (i2c1_reg) {
+			case 100:
+				longToI2CBuffer(x);
+				break;
+			case 101:
+				longToI2CBuffer(y);
+				break;
+			case 102:
+				longToI2CBuffer(angle * 1000);
+				break;
+			case 103:
+				i2c_sendBuffer[0] = 0;
+				i2c_sendBuffer[1] = 0;
+				i2c_sendBuffer[2] = 0;
+				i2c_sendBuffer[3] = 0;
+				if(buttons[0]) i2c_sendBuffer[0] |= 1;
+				if(buttons[1]) i2c_sendBuffer[0] |= 2;
+				if(buttons[2]) i2c_sendBuffer[0] |= 4;
+				break;
+			}
+
 		} else {
-			i2c1_val = (i2c1_val<<8) | I2C1->DR;
-			if(i2c1_reg == 100){
-				getMotor(1)->setSpeedMotor((double)i2c1_val);
+			i2c1_val = (i2c1_val << 8) | I2C1->DR;
+			numberOfRecvValues++;
+			if (numberOfRecvValues == 2) {
+				switch (i2c1_reg) {
+				case 1:
+					getMotor(1)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 2:
+					getMotor(2)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 3:
+					getMotor(3)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 4:
+					getMotor(4)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 5:
+					getMotor(5)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 6:
+					getMotor(6)->setSpeedMotor((double) i2c1_val);
+					break;
+				case 7:
+					goDirection(FORWARD, (double) i2c1_val);
+					break;
+				case 8:
+					goDirection(BACKWARD, (double) i2c1_val);
+					break;
+				case 9:
+					goDirection(ROTATE_CLOCKWISE, (double) i2c1_val);
+					break;
+				case 10:
+					goDirection(ROTATE_ANTICLOCKWISE, (double) i2c1_val);
+					break;
+				case 11:
+					goDirection(STOP, (double) i2c1_val);
+					break;
+				}
 			}
 		}
 
 	}
 
-	//ev3
+//ev3
 	while ((I2C_SR1_TXE & I2C1->SR1) == I2C_SR1_TXE) {
-		if (i2c1_reg == 1) {
-			I2C1->DR = 0xF0;
+		if (i2c_indexSendBuffer < I2C_MAX_SEND_BUFFER) {
+			I2C1->DR = i2c_sendBuffer[i2c_indexSendBuffer++];
 		} else {
-			I2C1->DR = 0xFF;
+			I2C1->SR1 |= I2C_SR1_AF;
 		}
-		//I2C1->SR1 |= I2C_SR1_AF;
 	}
 
-	//ev4
+//ev4
 	while ((I2C1->SR1 & I2C_SR1_STOPF) == I2C_SR1_STOPF) {
 		i2c1_recv_reg_done = false;
 		I2C1->SR1;
 		I2C1->CR1 |= 0x1;
 	}
-
 }
 
 double getAverageOfSimilaryValues(double val1, double val2, double val3) {
@@ -142,6 +256,15 @@ extern "C" void DMA1_Channel5_IRQHandler(void) {
 					break;
 				}
 			}
+		} else if (I2C2_getReadRegister() == GETWHO_I_AM) {
+			for (int i = 1; i <= numberOfMotors; i++) {
+				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
+					getMotor(i)->setTestValue((int8_t) I2C2_getRxBuffer(0));
+					I2C2_clearReadRegister();
+					I2C2_clearDeviceAddress();
+					break;
+				}
+			}
 		} else {
 			I2C2_clearReadRegister();
 			I2C2_clearDeviceAddress();
@@ -155,6 +278,109 @@ extern "C" void TIM2_IRQHandler() {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 		timePosition = true;
 	}
+}
+
+void Leds_Init() {
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15
+			| GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_12;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+}
+
+void setLed(char index,bool green,bool red){
+	switch(index){
+	case 0:
+		if(green)
+			GPIOB->BSRRL = GPIO_Pin_14;
+		else
+			GPIOB->BSRRH = GPIO_Pin_14;
+		if(red)
+			GPIOB->BSRRL = GPIO_Pin_13;
+		else
+			GPIOB->BSRRH = GPIO_Pin_13;
+		break;
+	case 1:
+		if(green)
+			GPIOB->BSRRL = GPIO_Pin_15;
+		else
+			GPIOB->BSRRH = GPIO_Pin_15;
+		if(red)
+			GPIOB->BSRRL = GPIO_Pin_1;
+		else
+			GPIOB->BSRRH = GPIO_Pin_1;
+		break;
+	case 2:
+		if(green)
+			GPIOB->BSRRL = GPIO_Pin_2;
+		else
+			GPIOB->BSRRH = GPIO_Pin_2;
+		if(red)
+			GPIOB->BSRRL = GPIO_Pin_12;
+		else
+			GPIOB->BSRRH = GPIO_Pin_12;
+		break;
+	}
+}
+
+extern "C" void EXTI9_5_IRQHandler(void) {
+	if (EXTI_GetITStatus(EXTI_Line6) != RESET) {
+		buttons[0] = !(GPIOC->IDR & GPIO_Pin_6) && GPIO_Pin_6;
+		EXTI_ClearITPendingBit(EXTI_Line6);
+	}
+	if (EXTI_GetITStatus(EXTI_Line8) != RESET) {
+		buttons[1] = !(GPIOC->IDR & GPIO_Pin_8) && GPIO_Pin_8;
+		EXTI_ClearITPendingBit(EXTI_Line8);
+	}
+	if (EXTI_GetITStatus(EXTI_Line9) != RESET) {
+		buttons[2] = !(GPIOC->IDR & GPIO_Pin_9) && GPIO_Pin_9;
+		EXTI_ClearITPendingBit(EXTI_Line9);
+	}
+
+}
+
+void Buttons_Init() {
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_8 | GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource6);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource8);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource9);
+
+	EXTI_InitTypeDef EXTI_InitStructure;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line6;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	EXTI_InitStructure.EXTI_Line = EXTI_Line8;
+	EXTI_Init(&EXTI_InitStructure);
+	EXTI_InitStructure.EXTI_Line = EXTI_Line9;
+	EXTI_Init(&EXTI_InitStructure);
+
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
 }
 
 void InitializeTimer() {
@@ -179,9 +405,12 @@ void InitializeTimer() {
 
 double lastDistance[6];
 int main(void) {
+	Leds_Init();
+	Buttons_Init();
 	I2C2_Init();
 	I2C1_Init();
 	InitializeTimer();
+	setLed(1,true,true);
 	while (1) {
 		if (timePosition) {
 			double speeds[6];
@@ -197,6 +426,10 @@ int main(void) {
 			double vT = (vL + vR) / 2;
 			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
 			angle += omegaT;
+			if (angle > 2 * M_PI)
+				angle -= 2 * M_PI;
+			else if (angle < 0)
+				angle += 2 * M_PI;
 			x += vT * cos(angle);
 			y += vT * sin(angle);
 			timePosition = false;

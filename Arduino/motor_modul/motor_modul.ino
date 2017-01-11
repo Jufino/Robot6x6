@@ -1,7 +1,7 @@
 #include <Wire.h>
 /*I2C adresa*/
 #define I2CDebug false
-#define addressI2C 0x06 //motory cislovane  z lava vzadu 
+#define addressI2C 0x01 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureCurrentAction 50
 #define measureSpeedAction 25
@@ -184,7 +184,7 @@ void receiveEvent(int howMany) {
       e = Wire.read();
       onSpeedReg = false;
       onCurrentReg = true;
-      pozadCurrent = (d << 8) | e;
+      pozadCurrent = ((d << 8) | e);
       break;
     case 100:
       d = Wire.read();
@@ -236,13 +236,17 @@ void requestEvent() {
       data[1] = (measureVoltage >> 8) & 0xFF;
       Wire.write(data, 2);
       break;
+    case 255:
+      data[0] = addressI2C;
+      Wire.write(data, 1);
+      break;
   }
   if (I2CDebug) {
     Serial.println(c, DEC);
   }
   c = -1;
 }
-double uLastSpeed =0;
+double uLastSpeed = 0;
 double uLastCurrent = 0;
 void loop() {
   /*--------------------------------------------------*/
@@ -314,9 +318,15 @@ void loop() {
       /*PI regulator rychlosti*/
       double e = pozadSpeed - speedWheel;
       regSpeedIsum += Ispeed * e;
-      if(uLastSpeed > 500) regSpeedIsum+=-uLastSpeed+500;
-      if(uLastSpeed < 0) regSpeedIsum+=-uLastSpeed+0;
-      else if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
+      if (pozadSpeed >= 0) {
+        if (uLastSpeed > 500) regSpeedIsum += -uLastSpeed + 500;
+        else if (uLastSpeed < 0) regSpeedIsum += -uLastSpeed + 0;
+      }
+      else {
+        if (uLastSpeed < -500) regSpeedIsum += -uLastSpeed - 500;
+        else if (uLastSpeed > 0) regSpeedIsum += -uLastSpeed + 0;
+      }
+      if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
       double u = e * Pspeed + regSpeedIsum;
       uLastSpeed = u;
       if (pozadSpeed >= 0) {
@@ -357,8 +367,8 @@ void loop() {
       else
         e = -pozadCurrent - averageMeasureCurrent;
       regCurrentIsum += Icurrent * e;
-      if(uLastCurrent > 255) regCurrentIsum+=-uLastCurrent+255;
-      if(uLastCurrent < 0) regCurrentIsum+=-uLastCurrent+0;
+      if (uLastCurrent > 255) regCurrentIsum += -uLastCurrent + 255;
+      if (uLastCurrent < 0) regCurrentIsum += -uLastCurrent + 0;
       int u = (int)(e * Pcurrent + regCurrentIsum);
       uLastCurrent = u;
       if (u > 255) u = 255;
@@ -367,7 +377,7 @@ void loop() {
         motor(u);
       else
         motor(-u);
-        
+
     }
     /*--------------------------------------------------*/
     /*sluzi iba pri merani*/

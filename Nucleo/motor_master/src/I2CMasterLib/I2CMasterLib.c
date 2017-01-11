@@ -1,5 +1,6 @@
 #include <I2CMasterLib/I2CMasterLib.h>
 
+#define I2C_READ_TIMEOUT 10000
 uint32_t I2C_Rx_Buffer[10];
 uint8_t deviceAddrUseI2c = 0;
 uint8_t readReg = 0;
@@ -104,6 +105,7 @@ void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_
 }
 
 void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceive) {
+	//int timeout_var = 0;
 	while (deviceAddrUseI2c != 0);
 	deviceAddrUseI2c = slaveAddr;
 	readReg = readAddr;
