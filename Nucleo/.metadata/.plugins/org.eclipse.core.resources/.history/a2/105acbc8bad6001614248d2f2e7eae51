@@ -1,0 +1,8 @@
+#ifndef I2CLIB_H_
+#define I2CLIB_H_
+
+#include "stm32l1xx.h"
+
+void I2C1_Init(void);
+
+#endif /* I2CLIB_H_ */

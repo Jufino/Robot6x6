@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete 5 resources" deleteContents="true" description="Delete 5 resources" element1="/STM32L152-EVAL_I2C_I2C_TwoBoards_DataExchangeDMA" element2="/STM32L152-EVAL_I2C_I2C_TwoBoards_DataExchangeInterrupt" element3="/STM32L152-EVAL_I2C_I2C_TwoBoards_MasterReceiverInterrupt" element4="/STM32L152-EVAL_I2C_I2C_TwoBoards_MasterTransmitterInterrupt" element5="/STM32L152-EVAL_TIM_TimeBase" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="5" stamp="1484139768347"/>
+</session>

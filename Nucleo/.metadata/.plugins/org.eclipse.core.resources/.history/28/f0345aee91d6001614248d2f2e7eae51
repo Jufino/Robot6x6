@@ -1,0 +1,168 @@
+#include <math.h>
+#include <Motor/Motor.h>
+
+#define numberOfMotors 6
+Motor *motor1 = new Motor(MOTOR1);
+Motor *motor2 = new Motor(MOTOR2);
+Motor *motor3 = new Motor(MOTOR3);
+Motor *motor4 = new Motor(MOTOR4);
+Motor *motor5 = new Motor(MOTOR5);
+Motor *motor6 = new Motor(MOTOR6);
+Motor *getMotor(int i) {
+	switch (i) {
+	case 1:
+		return motor1;
+	case 2:
+		return motor2;
+	case 3:
+		return motor3;
+	case 4:
+		return motor4;
+	case 5:
+		return motor5;
+	case 6:
+		return motor6;
+	}
+}
+
+extern "C" {
+#include <I2Clib/i2clib.h>
+#include "stm32l1xx.h"
+}
+
+volatile double x = 0;
+volatile double y = 0;
+volatile double angle = 0;
+#define dt 0.025
+
+double getAverageOfSimilaryValues(double val1, double val2, double val3) {
+	double diff1 = fabs(val1 - val2);
+	double diff2 = fabs(val2 - val3);
+	double diff3 = fabs(val1 - val3);
+	if (diff1 < diff2 && diff1 < diff3) {
+		return (val1 + val2) / 2;
+	} else if (diff2 < diff1 && diff2 < diff3) {
+		return (val2 + val3) / 2;
+	} else
+		return (val1 + val3) / 2;
+}
+
+extern "C" void DMA1_Channel5_IRQHandler(void) {
+	if (DMA_GetFlagStatus(DMA1_FLAG_TC5)) {
+		DMA_ClearFlag(DMA1_FLAG_TC5);
+		I2C_DMACmd(I2C2, DISABLE);
+		I2C_GenerateSTOP(I2C2, ENABLE);
+		DMA_Cmd(DMA1_Channel5, DISABLE);
+
+		if (I2C2_getReadRegister() == GETDELTATICKSREG) {
+			for (int i = 1; i <= numberOfMotors; i++) {
+				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
+					getMotor(i)->addDeltaTicks((int16_t) I2C2_getRxBuffer(0));
+					I2C2_clearReadRegister();
+					I2C2_clearDeviceAddress();
+					break;
+				}
+			}
+		} else if (I2C2_getReadRegister() == GETVOLTAGEREG) {
+			for (int i = 1; i <= numberOfMotors; i++) {
+				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
+					getMotor(i)->setVoltageRaw((uint16_t) I2C2_getRxBuffer(0));
+					I2C2_clearReadRegister();
+					I2C2_clearDeviceAddress();
+					break;
+				}
+			}
+		} else if (I2C2_getReadRegister() == GETCURRENTREG) {
+			for (int i = 1; i <= numberOfMotors; i++) {
+				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
+					getMotor(i)->setCurrent((uint16_t) I2C2_getRxBuffer(0));
+					I2C2_clearReadRegister();
+					I2C2_clearDeviceAddress();
+					break;
+				}
+			}
+		} else if (I2C2_getReadRegister() == GETSPEEDREG) {
+			for (int i = 1; i <= numberOfMotors; i++) {
+				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
+					getMotor(i)->setSpeedRaw((int16_t) I2C2_getRxBuffer(0));
+					I2C2_clearReadRegister();
+					I2C2_clearDeviceAddress();
+					break;
+				}
+			}
+		} else {
+			I2C2_clearReadRegister();
+			I2C2_clearDeviceAddress();
+		}
+
+	}
+}
+
+extern "C" void TIM2_IRQHandler() {
+	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+		getMotor(1)->DMASpeedInvoke();
+		getMotor(2)->DMASpeedInvoke();
+		getMotor(3)->DMASpeedInvoke();
+		getMotor(4)->DMASpeedInvoke();
+		getMotor(5)->DMASpeedInvoke();
+		getMotor(6)->DMASpeedInvoke();
+		double vL = getAverageOfSimilaryValues(getMotor(1)->getSpeed(), getMotor(2)->getSpeed(), getMotor(3)->getSpeed());
+		double vR = getAverageOfSimilaryValues(getMotor(4)->getSpeed(), getMotor(5)->getSpeed(), getMotor(6)->getSpeed());
+		double vT = (vL+vR)/2;
+		double omegaT = (vR-vL)/lengthBetweenLeftAndRightWheel;
+		angle += omegaT*dt;
+		x += vT*cos(angle)*dt;
+		y += vT*sin(angle)*dt;
+	}
+}
+
+void InitializeTimer() {
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+	TIM_TimeBaseInitTypeDef timerInitStructure; //nastavit 40 hz
+	timerInitStructure.TIM_Prescaler = 999;
+	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	timerInitStructure.TIM_Period = 49;
+	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInit(TIM2, &timerInitStructure);
+	TIM_Cmd(TIM2, ENABLE);
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+
+	NVIC_InitTypeDef nvicStructure;
+	nvicStructure.NVIC_IRQChannel = TIM2_IRQn;
+	nvicStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	nvicStructure.NVIC_IRQChannelSubPriority = 1;
+	nvicStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&nvicStructure);
+}
+
+
+int main(void) {
+	I2C2_Init();
+	InitializeTimer();
+//getMotor(5)->setSpeedRawMotor(100);
+//getMotor(5)->setSpeedRawMotor(100);
+//getMotor(6)->setSpeedRawMotor(100);
+//getMotor(4)->setSpeedRawMotor(0);
+//getMotor(5)->setSpeedRawMotor(0);
+//getMotor(6)->setSpeedRawMotor(0);
+	while (1) {
+		getMotor(1)->DMADeltaTicksInvoke();
+		getMotor(2)->DMADeltaTicksInvoke();
+		getMotor(3)->DMADeltaTicksInvoke();
+		getMotor(4)->DMADeltaTicksInvoke();
+		getMotor(5)->DMADeltaTicksInvoke();
+		getMotor(6)->DMADeltaTicksInvoke();
+		for (long i = 0; i < 100000; i++);
+	}
+}
+
+#ifdef  USE_FULL_ASSERT
+void assert_failed(uint8_t* file, uint32_t line)
+{
+	while (1)
+	{
+	}
+}
+#endif

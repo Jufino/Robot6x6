@@ -5,9 +5,31 @@
     <link>http://blog.atollic.com</link>
     <description>The TruePERSPECTIVES blog discusses topics relevant to embedded developers and their managers: best practices for embedded development, industry observations, and tips and techniques for using Atollic TrueSTUDIO development tools, ARM Cortex-M development, and more.</description>
     <language>en-us</language>
-    <pubDate>Wed, 04 Jan 2017 09:15:27 GMT</pubDate>
-    <dc:date>2017-01-04T09:15:27Z</dc:date>
+    <pubDate>Wed, 11 Jan 2017 08:15:35 GMT</pubDate>
+    <dc:date>2017-01-11T08:15:35Z</dc:date>
     <dc:language>en-us</dc:language>
+    <item>
+      <title>How To Debug the GNU LD Linker Configuration File [ARM Cortex-M Development]</title>
+      <link>http://blog.atollic.com/how-to-debug-the-gnu-ld-linker-configuration-file-arm-cortex-m-development</link>
+      <description>&lt;div class="hs-featured-image-wrapper"&gt; 
+ &lt;a href="http://blog.atollic.com/how-to-debug-the-gnu-ld-linker-configuration-file-arm-cortex-m-development" title="" class="hs-featured-image-link"&gt; &lt;img src="http://blog.atollic.com/hubfs/Blog/linker_configuration_scripts.png?t=1483610720927" alt="linker_configuration_scripts.png" class="hs-featured-image" style="width:auto !important; max-width:50%; float:left; margin:0 15px 15px 0;"&gt; &lt;/a&gt; 
+&lt;/div&gt;    
+&lt;p&gt;One of the most confusing things in embedded development can be the linker configuration files. Their grammar looks like something from the dark ages, and tends to genuinely confuse even seasoned software developers.&lt;/p&gt; 
+&lt;p&gt;This is a bad thing since the linker configuration file is a common source of problems. To understand what the linker did to your code, you can study the MAP file, which is also hard to understand and cumbersome to use, so few developers do it. A build analyzer tool can come to your rescue and make you a more efficient developer!&lt;/p&gt;</description>
+      <content:encoded>&lt;div class="hs-featured-image-wrapper"&gt; 
+ &lt;a href="http://blog.atollic.com/how-to-debug-the-gnu-ld-linker-configuration-file-arm-cortex-m-development" title="" class="hs-featured-image-link"&gt; &lt;img src="http://blog.atollic.com/hubfs/Blog/linker_configuration_scripts.png?t=1483610720927" alt="linker_configuration_scripts.png" class="hs-featured-image" style="width:auto !important; max-width:50%; float:left; margin:0 15px 15px 0;"&gt; &lt;/a&gt; 
+&lt;/div&gt;    
+&lt;p&gt;One of the most confusing things in embedded development can be the linker configuration files. Their grammar looks like something from the dark ages, and tends to genuinely confuse even seasoned software developers.&lt;/p&gt; 
+&lt;p&gt;This is a bad thing since the linker configuration file is a common source of problems. To understand what the linker did to your code, you can study the MAP file, which is also hard to understand and cumbersome to use, so few developers do it. A build analyzer tool can come to your rescue and make you a more efficient developer!&lt;/p&gt;    
+&lt;img src="http://track.hubspot.com/__ptq.gif?a=460400&amp;amp;k=14&amp;amp;r=http%3A%2F%2Fblog.atollic.com%2Fhow-to-debug-the-gnu-ld-linker-configuration-file-arm-cortex-m-development&amp;amp;bu=http%253A%252F%252Fblog.atollic.com&amp;amp;bvt=rss" alt="" width="1" height="1" style="min-height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important; "&gt;</content:encoded>
+      <category>GNU tools (GCC/GDB)</category>
+      <category>Atollic TrueSTUDIO</category>
+      <category>Embedded Software Development</category>
+      <pubDate>Wed, 11 Jan 2017 08:00:00 GMT</pubDate>
+      <author>magnus.unemyr@atollic.com (Magnus Unemyr)</author>
+      <guid>http://blog.atollic.com/how-to-debug-the-gnu-ld-linker-configuration-file-arm-cortex-m-development</guid>
+      <dc:date>2017-01-11T08:00:00Z</dc:date>
+    </item>
     <item>
       <title>How the Right Tools can Help Embedded Consultants and Contractors Improve Their Business [Make Money Developing for ARM Cortex-M]</title>
       <link>http://blog.atollic.com/how-the-right-tools-can-help-embedded-consultants-and-contractors-improve-their-business-make-money-developing-for-arm-cortex-m</link>
@@ -186,26 +208,6 @@
       <author>magnus.unemyr@atollic.com (Magnus Unemyr)</author>
       <guid>http://blog.atollic.com/how-to-manage-tasks-in-the-c/c-editor-tips-tricks-for-embedded-developers</guid>
       <dc:date>2016-11-28T09:38:02Z</dc:date>
-    </item>
-    <item>
-      <title>Why you should run your embedded ARM Cortex code as a host PC application [using x86 tools in your ARM IDE]</title>
-      <link>http://blog.atollic.com/why-running-your-embedded-arm-cortex-code-on-a-host-pc-is-a-good-thing</link>
-      <description>&lt;div class="hs-featured-image-wrapper"&gt; 
- &lt;a href="http://blog.atollic.com/why-running-your-embedded-arm-cortex-code-on-a-host-pc-is-a-good-thing" title="" class="hs-featured-image-link"&gt; &lt;img src="http://blog.atollic.com/hs-fs/hub/460400/file-2417251728-png/Blog/ARMx86.png?t=1483610720927" alt="ARMx86.png" class="hs-featured-image" style="width:auto !important; max-width:50%; float:left; margin:0 15px 15px 0;"&gt; &lt;/a&gt; 
-&lt;/div&gt;    
-&lt;p&gt;Most ARM developers spend their days in front of an embedded IDE, which comes with a cross-compiler and a cross-debugger. The thought that you build your code for the target device, and run the code on it, is deeply rooted. And there are very good reasons for this - hardware dependencies, timing issues, and other things that prevent portability. In short, it is often very difficult to compile your embedded application into a host-PC application - or, at least to run it on the PC. And why would you?&lt;/p&gt; 
-&lt;p&gt;As it turns out, there are several situations when this is a very good idea. This is why &lt;a href="http://www.atollic.com/truestudio/"&gt;Atollic TrueSTUDIO&lt;/a&gt; bundle not only an ARM Cortex toolchain, but an x86 host-PC toolchain as well. Effectively, Atollic TrueSTUDIO can be used both for embedded development and PC application development at the same time. Read this blog post to learn more on this unusual but very powerful capability!&lt;/p&gt;</description>
-      <content:encoded>&lt;div class="hs-featured-image-wrapper"&gt; 
- &lt;a href="http://blog.atollic.com/why-running-your-embedded-arm-cortex-code-on-a-host-pc-is-a-good-thing" title="" class="hs-featured-image-link"&gt; &lt;img src="http://blog.atollic.com/hs-fs/hub/460400/file-2417251728-png/Blog/ARMx86.png?t=1483610720927" alt="ARMx86.png" class="hs-featured-image" style="width:auto !important; max-width:50%; float:left; margin:0 15px 15px 0;"&gt; &lt;/a&gt; 
-&lt;/div&gt;    
-&lt;p&gt;Most ARM developers spend their days in front of an embedded IDE, which comes with a cross-compiler and a cross-debugger. The thought that you build your code for the target device, and run the code on it, is deeply rooted. And there are very good reasons for this - hardware dependencies, timing issues, and other things that prevent portability. In short, it is often very difficult to compile your embedded application into a host-PC application - or, at least to run it on the PC. And why would you?&lt;/p&gt; 
-&lt;p&gt;As it turns out, there are several situations when this is a very good idea. This is why &lt;a href="http://www.atollic.com/truestudio/"&gt;Atollic TrueSTUDIO&lt;/a&gt; bundle not only an ARM Cortex toolchain, but an x86 host-PC toolchain as well. Effectively, Atollic TrueSTUDIO can be used both for embedded development and PC application development at the same time. Read this blog post to learn more on this unusual but very powerful capability!&lt;/p&gt;    
-&lt;img src="http://track.hubspot.com/__ptq.gif?a=460400&amp;amp;k=14&amp;amp;r=http%3A%2F%2Fblog.atollic.com%2Fwhy-running-your-embedded-arm-cortex-code-on-a-host-pc-is-a-good-thing&amp;amp;bu=http%253A%252F%252Fblog.atollic.com&amp;amp;bvt=rss" alt="" width="1" height="1" style="min-height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important; "&gt;</content:encoded>
-      <category>Atollic TrueSTUDIO</category>
-      <pubDate>Fri, 25 Nov 2016 09:23:25 GMT</pubDate>
-      <author>magnus.unemyr@atollic.com (Magnus Unemyr)</author>
-      <guid>http://blog.atollic.com/why-running-your-embedded-arm-cortex-code-on-a-host-pc-is-a-good-thing</guid>
-      <dc:date>2016-11-25T09:23:25Z</dc:date>
     </item>
   </channel>
 </rss>

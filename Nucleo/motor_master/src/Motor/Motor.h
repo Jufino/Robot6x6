@@ -1,8 +1,9 @@
 #ifndef MOTOR_H_
 #define MOTOR_H_
+
 extern "C"{
 	#include "stm32l1xx.h"
-	#include <I2Clib/i2clib.h>
+	#include <I2CMasterLib/I2CMasterLib.h>
 #include <Math.h>
 }
 
@@ -28,6 +29,7 @@ const uint8_t MOTORSADDR[] = {MOTOR1,MOTOR2,MOTOR3,MOTOR4,MOTOR5,MOTOR6};
 #define GETVOLTAGEREG 4
 //------------------------------------------------------------------
 #define wheelDiameter 86
+#define lengthBetweenLeftAndRightWheel 250
 #define numberTicksOfWheel 120 //overit
 #define periodSpeedRegulator 0.25
 //------------------------------------------------------------------
