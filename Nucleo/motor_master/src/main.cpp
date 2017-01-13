@@ -22,6 +22,8 @@ Motor *getMotor(int i) {
 		return motor5;
 	case 6:
 		return motor6;
+	default:
+		return NULL;
 	}
 }
 
@@ -30,27 +32,328 @@ extern "C" {
 #include <I2CSlaveLib/I2CSlaveLib.h>
 #include "stm32l1xx.h"
 }
-volatile bool timePosition = false;
-int timePoc = 0;
-volatile double x = 0;
-volatile double y = 0;
-volatile double angle = 0;
-#define dt 0.025
 
+#define dt 0.025
+#define I2C_MAX_SEND_BUFFER 4
+#define SERVO_MIN 1500//1400
+#define SERVO_MAX 5000//5300
 enum Direction {
 	FORWARD, BACKWARD, ROTATE_CLOCKWISE, ROTATE_ANTICLOCKWISE, STOP
 };
+
+uint16_t i2c1_reg;
+bool i2c1_recv_reg_done = false;
+uint16_t numberOfRecvValues = 0;
+int16_t i2c1_val;
+uint16_t timePoc = 0;
+uint8_t i2c_indexSendBuffer = 0;
+uint8_t i2c_sendBuffer[I2C_MAX_SEND_BUFFER];
+volatile bool buttons[3];
+volatile bool timePosition = false;
+volatile double x = 0;
+volatile double y = 0;
+volatile double z = 0;
+volatile double yaw = 0;
+volatile double roll = 0;
+volatile double pitch = 0;
+
+#define NUMBER_OF_ULTS 1
+volatile int chooseUlt = -1;
+volatile uint32_t ultRawValue[NUMBER_OF_ULTS];
+extern "C" void EXTI1_IRQHandler(void) {
+	if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
+		if((GPIOA->IDR & GPIO_Pin_1) && GPIO_Pin_1){
+			TIM_SetCounter(TIM4, 0);
+		}
+		else{
+			ultRawValue[chooseUlt] = TIM_GetCounter(TIM4);
+			chooseUlt = -1;
+		}
+		EXTI_ClearITPendingBit(EXTI_Line1);
+	}
+}
+
+void Ultrasonic_init(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource1);
+
+	EXTI_InitTypeDef EXTI_InitStructure;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+
+	TIM_TimeBaseInitTypeDef timerInitStructure;//timer clock 2000khz
+	timerInitStructure.TIM_Prescaler = 46513; // 2000khz/43hz = 46512 pretoze pri 400 cm je 43 hz a chceme vyresetovat
+	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	timerInitStructure.TIM_Period = 65534;
+	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInit(TIM4, &timerInitStructure);
+	TIM_Cmd(TIM4, ENABLE);
+	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+
+	NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+}
+
+void ultTriger(int index) {
+	while(chooseUlt!= -1);
+	switch (index) {
+	case 0:
+		TIM_SetCounter(TIM4, 0);
+		chooseUlt = index;
+		GPIOA->BSRRH = GPIO_Pin_0;
+		for (int i = 0; i < 100; i++)
+			;
+		GPIOA->BSRRL = GPIO_Pin_0;
+		break;
+	}
+}
+
+double getUltCm(int index){
+	return ((double)ultRawValue[index])*(46512/(2000000*65*58));
+}
+
+extern "C" void TIM4_IRQHandler(void) {
+	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+		if(chooseUlt!=-1){
+			ultRawValue[chooseUlt] = 65535;
+			chooseUlt = -1;
+		}
+	}
+}
+
+void setLed(char index, bool green, bool red) {
+	switch (index) {
+	case 0:
+		if (green)
+			GPIOB->BSRRL = GPIO_Pin_14;
+		else
+			GPIOB->BSRRH = GPIO_Pin_14;
+		if (red)
+			GPIOB->BSRRL = GPIO_Pin_13;
+		else
+			GPIOB->BSRRH = GPIO_Pin_13;
+		break;
+	case 1:
+		if (green)
+			GPIOB->BSRRL = GPIO_Pin_15;
+		else
+			GPIOB->BSRRH = GPIO_Pin_15;
+		if (red)
+			GPIOB->BSRRL = GPIO_Pin_1;
+		else
+			GPIOB->BSRRH = GPIO_Pin_1;
+		break;
+	case 2:
+		if (green)
+			GPIOB->BSRRL = GPIO_Pin_2;
+		else
+			GPIOB->BSRRH = GPIO_Pin_2;
+		if (red)
+			GPIOB->BSRRL = GPIO_Pin_12;
+		else
+			GPIOB->BSRRH = GPIO_Pin_12;
+		break;
+	}
+}
+
+void Leds_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15
+			| GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_12;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	setLed(1, false, false);
+	setLed(2, false, false);
+	setLed(3, false, false);
+}
+
+void Buttons_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_8 | GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource6);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource8);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource9);
+
+	EXTI_InitTypeDef EXTI_InitStructure;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line6;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	EXTI_InitStructure.EXTI_Line = EXTI_Line8;
+	EXTI_Init(&EXTI_InitStructure);
+	EXTI_InitStructure.EXTI_Line = EXTI_Line9;
+	EXTI_Init(&EXTI_InitStructure);
+
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	buttons[0] = !(GPIOC->IDR & GPIO_Pin_6) && GPIO_Pin_6;
+	buttons[1] = !(GPIOC->IDR & GPIO_Pin_8) && GPIO_Pin_8;
+	buttons[2] = !(GPIOC->IDR & GPIO_Pin_9) && GPIO_Pin_9;
+}
+
+void InitializeTimer(void) {
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+	TIM_TimeBaseInitTypeDef timerInitStructure; //nastavit 40 hz
+	timerInitStructure.TIM_Prescaler = 999;
+	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	timerInitStructure.TIM_Period = 49;
+	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInit(TIM2, &timerInitStructure);
+	TIM_Cmd(TIM2, ENABLE);
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+
+	NVIC_InitTypeDef nvicStructure;
+	nvicStructure.NVIC_IRQChannel = TIM2_IRQn;
+	nvicStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	nvicStructure.NVIC_IRQChannelSubPriority = 1;
+	nvicStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&nvicStructure);
+}
+
+void setServoRaw(uint32_t value) {
+	if (value < SERVO_MIN)
+		value = SERVO_MIN;
+	else if (value > SERVO_MAX)
+		value = SERVO_MAX;
+
+	/* PWM1 Mode configuration: Channel1 */
+	TIM_OCInitTypeDef TIM_OCInitStructure;
+	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+	TIM_OCInitStructure.TIM_Pulse = value;
+	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+
+	TIM_OC1Init(TIM3, &TIM_OCInitStructure);
+	TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
+}
+void setServo(double angle) {
+	if (angle < 0)
+		angle = 0;
+	else if (angle > 180)
+		angle = 180;
+	uint32_t value = ((SERVO_MAX - SERVO_MIN) / 180) * angle + SERVO_MIN;
+
+	/* PWM1 Mode configuration: Channel1 */
+	TIM_OCInitTypeDef TIM_OCInitStructure;
+	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+	TIM_OCInitStructure.TIM_Pulse = value;
+	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+
+	TIM_OC1Init(TIM3, &TIM_OCInitStructure);
+	TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
+}
+void InitializePWMServo(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource6, GPIO_AF_TIM3);
+
+	TIM_TimeBaseInitTypeDef timerInitStructure; //nastavit 50 hz
+	timerInitStructure.TIM_Prescaler = 0;
+	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	timerInitStructure.TIM_Period = 41999;
+	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInit(TIM3, &timerInitStructure);
+
+	TIM_ARRPreloadConfig(TIM3, ENABLE);
+	TIM_Cmd(TIM3, ENABLE);
+
+	setServo(90);
+}
+
+void longToI2CBuffer(long number) {
+	for (int i = 0; i < 4; i++) {
+		i2c_sendBuffer[i] = (number >> ((3 - i) * 8)) & 0xFF;
+	}
+}
+
+void intToI2CBuffer(int16_t number) {
+	for (int i = 0; i < 2; i++) {
+		i2c_sendBuffer[i] = (number >> ((1 - i) * 8)) & 0xFF;
+	}
+}
 
 void speedL(double speed) {
 	getMotor(1)->setSpeedMotor(speed);
 	getMotor(2)->setSpeedMotor(speed);
 	getMotor(3)->setSpeedMotor(speed);
 }
+
 void speedR(double speed) {
 	getMotor(4)->setSpeedMotor(speed);
 	getMotor(5)->setSpeedMotor(speed);
 	getMotor(6)->setSpeedMotor(speed);
 }
+
 void goDirection(Direction dir, double speed) {
 	switch (dir) {
 	case FORWARD:
@@ -77,40 +380,30 @@ void goDirection(Direction dir, double speed) {
 
 }
 
+double getAverageOfSimilaryValues(double val1, double val2, double val3) {
+	double diff1 = fabs(val1 - val2);
+	double diff2 = fabs(val2 - val3);
+	double diff3 = fabs(val1 - val3);
+	if (diff1 < diff2 && diff1 < diff3) {
+		return (val1 + val2) / 2;
+	} else if (diff2 < diff1 && diff2 < diff3) {
+		return (val2 + val3) / 2;
+	} else
+		return (val1 + val3) / 2;
+}
+
 extern "C" void I2C1_ER_IRQHandler(void) {
 	if (I2C_GetITStatus(I2C1, I2C_IT_AF)) {
 		I2C_ClearITPendingBit(I2C1, I2C_IT_AF);
 	}
 }
 
-uint16_t i2c1_reg;
-uint16_t numberOfRecvValues = 0;
-int16_t i2c1_val;
-#define I2C_MAX_SEND_BUFFER 4
-uint8_t i2c_indexSendBuffer = 0;
-uint8_t i2c_sendBuffer[I2C_MAX_SEND_BUFFER];
-bool i2c1_recv_reg_done = false;
-bool buttons[3];
-
-void longToI2CBuffer(long number) {
-	for (int i = 0; i < 4; i++) {
-		i2c_sendBuffer[i] = (number >> ((3 - i) * 8)) & 0xFF;
-	}
-}
-
-void intToI2CBuffer(int16_t number) {
-	for (int i = 0; i < 2; i++) {
-		i2c_sendBuffer[i] = (number >> ((1 - i) * 8)) & 0xFF;
-	}
-}
-
-extern "C" void I2C1_EV_IRQHandler() {
+extern "C" void I2C1_EV_IRQHandler(void) {
 	//ev1
 	while ((I2C_SR1_ADDR & I2C1->SR1) == I2C_SR1_ADDR) {
 		I2C1->SR1;
 		I2C1->SR2;
 	}
-
 	//ev2
 	while ((I2C_SR1_RXNE & I2C1->SR1) == I2C_SR1_RXNE) {
 		if (!i2c1_recv_reg_done) {
@@ -127,19 +420,30 @@ extern "C" void I2C1_EV_IRQHandler() {
 				longToI2CBuffer(y);
 				break;
 			case 102:
-				longToI2CBuffer(angle * 1000);
+				longToI2CBuffer(z);
 				break;
 			case 103:
+				longToI2CBuffer(roll * 10000);
+				break;
+			case 104:
+				longToI2CBuffer(pitch * 10000);
+				break;
+			case 105:
+				longToI2CBuffer(yaw * 10000);
+				break;
+			case 106:
 				i2c_sendBuffer[0] = 0;
 				i2c_sendBuffer[1] = 0;
 				i2c_sendBuffer[2] = 0;
 				i2c_sendBuffer[3] = 0;
-				if(buttons[0]) i2c_sendBuffer[0] |= 1;
-				if(buttons[1]) i2c_sendBuffer[0] |= 2;
-				if(buttons[2]) i2c_sendBuffer[0] |= 4;
+				if (buttons[0])
+					i2c_sendBuffer[0] |= 1;
+				if (buttons[1])
+					i2c_sendBuffer[0] |= 2;
+				if (buttons[2])
+					i2c_sendBuffer[0] |= 4;
 				break;
 			}
-
 		} else {
 			i2c1_val = (i2c1_val << 8) | I2C1->DR;
 			numberOfRecvValues++;
@@ -178,12 +482,20 @@ extern "C" void I2C1_EV_IRQHandler() {
 				case 11:
 					goDirection(STOP, (double) i2c1_val);
 					break;
+				case 12:
+					setLed(0, (i2c1_val & 0x01) && 0x01,
+							(i2c1_val & 0x02) && 0x02);
+					setLed(1, (i2c1_val & 0x04) && 0x04,
+							(i2c1_val & 0x08) && 0x08);
+					setLed(2, (i2c1_val & 0x10) && 0x10,
+							(i2c1_val & 0x20) && 0x20);
+					break;
+				case 13:
+					setServo((double) i2c1_val);
 				}
 			}
 		}
-
 	}
-
 //ev3
 	while ((I2C_SR1_TXE & I2C1->SR1) == I2C_SR1_TXE) {
 		if (i2c_indexSendBuffer < I2C_MAX_SEND_BUFFER) {
@@ -192,25 +504,12 @@ extern "C" void I2C1_EV_IRQHandler() {
 			I2C1->SR1 |= I2C_SR1_AF;
 		}
 	}
-
 //ev4
 	while ((I2C1->SR1 & I2C_SR1_STOPF) == I2C_SR1_STOPF) {
 		i2c1_recv_reg_done = false;
 		I2C1->SR1;
 		I2C1->CR1 |= 0x1;
 	}
-}
-
-double getAverageOfSimilaryValues(double val1, double val2, double val3) {
-	double diff1 = fabs(val1 - val2);
-	double diff2 = fabs(val2 - val3);
-	double diff3 = fabs(val1 - val3);
-	if (diff1 < diff2 && diff1 < diff3) {
-		return (val1 + val2) / 2;
-	} else if (diff2 < diff1 && diff2 < diff3) {
-		return (val2 + val3) / 2;
-	} else
-		return (val1 + val3) / 2;
 }
 
 extern "C" void DMA1_Channel5_IRQHandler(void) {
@@ -273,59 +572,10 @@ extern "C" void DMA1_Channel5_IRQHandler(void) {
 	}
 }
 
-extern "C" void TIM2_IRQHandler() {
+extern "C" void TIM2_IRQHandler(void) {
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 		timePosition = true;
-	}
-}
-
-void Leds_Init() {
-	GPIO_InitTypeDef GPIO_InitStructure;
-
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15
-			| GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_12;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-}
-
-void setLed(char index,bool green,bool red){
-	switch(index){
-	case 0:
-		if(green)
-			GPIOB->BSRRL = GPIO_Pin_14;
-		else
-			GPIOB->BSRRH = GPIO_Pin_14;
-		if(red)
-			GPIOB->BSRRL = GPIO_Pin_13;
-		else
-			GPIOB->BSRRH = GPIO_Pin_13;
-		break;
-	case 1:
-		if(green)
-			GPIOB->BSRRL = GPIO_Pin_15;
-		else
-			GPIOB->BSRRH = GPIO_Pin_15;
-		if(red)
-			GPIOB->BSRRL = GPIO_Pin_1;
-		else
-			GPIOB->BSRRH = GPIO_Pin_1;
-		break;
-	case 2:
-		if(green)
-			GPIOB->BSRRL = GPIO_Pin_2;
-		else
-			GPIOB->BSRRH = GPIO_Pin_2;
-		if(red)
-			GPIOB->BSRRL = GPIO_Pin_12;
-		else
-			GPIOB->BSRRH = GPIO_Pin_12;
-		break;
 	}
 }
 
@@ -345,104 +595,47 @@ extern "C" void EXTI9_5_IRQHandler(void) {
 
 }
 
-void Buttons_Init() {
-	GPIO_InitTypeDef GPIO_InitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
-
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_8 | GPIO_Pin_9;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource6);
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource8);
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource9);
-
-	EXTI_InitTypeDef EXTI_InitStructure;
-	EXTI_InitStructure.EXTI_Line = EXTI_Line6;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-
-	EXTI_InitStructure.EXTI_Line = EXTI_Line8;
-	EXTI_Init(&EXTI_InitStructure);
-	EXTI_InitStructure.EXTI_Line = EXTI_Line9;
-	EXTI_Init(&EXTI_InitStructure);
-
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-
-}
-
-void InitializeTimer() {
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-
-	TIM_TimeBaseInitTypeDef timerInitStructure; //nastavit 40 hz
-	timerInitStructure.TIM_Prescaler = 999;
-	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 49;
-	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseInit(TIM2, &timerInitStructure);
-	TIM_Cmd(TIM2, ENABLE);
-	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-
-	NVIC_InitTypeDef nvicStructure;
-	nvicStructure.NVIC_IRQChannel = TIM2_IRQn;
-	nvicStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	nvicStructure.NVIC_IRQChannelSubPriority = 1;
-	nvicStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&nvicStructure);
-}
-
 double lastDistance[6];
 int main(void) {
+	InitializePWMServo();
 	Leds_Init();
 	Buttons_Init();
 	I2C2_Init();
 	I2C1_Init();
 	InitializeTimer();
-	setLed(1,true,true);
+	Ultrasonic_init();
+	ultTriger(1);
 	while (1) {
-		if (timePosition) {
-			double speeds[6];
-			for (int i = 0; i < 6; i++) {
-				speeds[i] = (getMotor(i)->getDistance() - lastDistance[i]);
-				lastDistance[i] = getMotor(i)->getDistance();
-			}
+		/*if (timePosition) {
+		 double speeds[6];
+		 for (int i = 0; i < 6; i++) {
+		 speeds[i] = (getMotor(i)->getDistance() - lastDistance[i]);
+		 lastDistance[i] = getMotor(i)->getDistance();
+		 }
 
-			double vL = getAverageOfSimilaryValues(speeds[1], speeds[2],
-					speeds[3]);
-			double vR = getAverageOfSimilaryValues(speeds[4], speeds[5],
-					speeds[6]);
-			double vT = (vL + vR) / 2;
-			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
-			angle += omegaT;
-			if (angle > 2 * M_PI)
-				angle -= 2 * M_PI;
-			else if (angle < 0)
-				angle += 2 * M_PI;
-			x += vT * cos(angle);
-			y += vT * sin(angle);
-			timePosition = false;
-		} else {
-			getMotor(1)->DMADeltaTicksInvoke();
-			getMotor(2)->DMADeltaTicksInvoke();
-			getMotor(3)->DMADeltaTicksInvoke();
-			getMotor(4)->DMADeltaTicksInvoke();
-			getMotor(5)->DMADeltaTicksInvoke();
-			getMotor(6)->DMADeltaTicksInvoke();
-			for (int i = 0; i < 1000; i++)
-				;
-		}
+		 double vL = getAverageOfSimilaryValues(speeds[1], speeds[2],
+		 speeds[3]);
+		 double vR = getAverageOfSimilaryValues(speeds[4], speeds[5],
+		 speeds[6]);
+		 double vT = (vL + vR) / 2;
+		 double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
+		 yaw += omegaT;
+		 if (yaw > 2 * M_PI)
+		 yaw -= 2 * M_PI;
+		 else if (yaw < 0)
+		 yaw += 2 * M_PI;
+		 x += vT * cos(yaw);
+		 y += vT * sin(yaw);
+		 timePosition = false;
+		 } else {
+		 getMotor(1)->DMADeltaTicksInvoke();
+		 getMotor(2)->DMADeltaTicksInvoke();
+		 getMotor(3)->DMADeltaTicksInvoke();
+		 getMotor(4)->DMADeltaTicksInvoke();
+		 getMotor(5)->DMADeltaTicksInvoke();
+		 getMotor(6)->DMADeltaTicksInvoke();
+		 for (int i = 0; i < 1000; i++);
+		 }*/
 	}
 }
 
