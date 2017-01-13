@@ -142,7 +142,7 @@ void ultTriger(int index) {
 }
 
 double getUltCm(int index){
-	return ((double)ultRawValue[index])/58;
+	return (double)ultRawValue[index])/58;
 }
 
 extern "C" void TIM4_IRQHandler(void) {

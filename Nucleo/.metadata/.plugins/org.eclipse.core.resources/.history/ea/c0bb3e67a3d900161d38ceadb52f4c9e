@@ -135,7 +135,10 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-
+	/*  TimingDelay_Decrement(); */
+#ifdef USE_STM32L_DISCOVERY
+  TimingDelay_Decrement();
+#endif
 }
 
 /******************************************************************************/

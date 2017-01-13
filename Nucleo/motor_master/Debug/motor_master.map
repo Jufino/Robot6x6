@@ -1397,7 +1397,7 @@ Discarded input sections
  .bss           0x00000000        0x0 src\main.o
  .bss.timePoc   0x00000000        0x2 src\main.o
  .text._Z8getUltCmi
-                0x00000000       0x34 src\main.o
+                0x00000000       0x38 src\main.o
  .text._Z11setServoRawm
                 0x00000000       0x5c src\main.o
  .text._Z14intToI2CBuffers

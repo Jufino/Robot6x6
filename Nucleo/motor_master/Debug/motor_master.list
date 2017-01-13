@@ -5369,7 +5369,7 @@ extern "C" void EXTI1_IRQHandler(void) {
  80021a0:	b2db      	uxtb	r3, r3
  80021a2:	2b00      	cmp	r3, #0
  80021a4:	d020      	beq.n	80021e8 <EXTI1_IRQHandler+0x5c>
-		if((GPIOA->IDR & GPIO_Pin_1) && GPIO_Pin_1){
+		if((GPIOC->IDR & GPIO_Pin_1) && GPIO_Pin_1){
  80021a6:	4b11      	ldr	r3, [pc, #68]	; (80021ec <EXTI1_IRQHandler+0x60>)
  80021a8:	8a1b      	ldrh	r3, [r3, #16]
  80021aa:	b29b      	uxth	r3, r3
@@ -5408,7 +5408,7 @@ extern "C" void EXTI1_IRQHandler(void) {
 }
  80021e8:	bf00      	nop
  80021ea:	bd98      	pop	{r3, r4, r7, pc}
- 80021ec:	40020000 	.word	0x40020000
+ 80021ec:	40020800 	.word	0x40020800
  80021f0:	40000800 	.word	0x40000800
  80021f4:	2000001c 	.word	0x2000001c
  80021f8:	20000108 	.word	0x20000108
@@ -5422,9 +5422,9 @@ void Ultrasonic_init(void) {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
  8002202:	2101      	movs	r1, #1
- 8002204:	2001      	movs	r0, #1
+ 8002204:	2004      	movs	r0, #4
  8002206:	f7ff fad1 	bl	80017ac <RCC_AHBPeriphClockCmd>
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
  800220a:	2101      	movs	r1, #1
@@ -5446,7 +5446,7 @@ void Ultrasonic_init(void) {
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
  8002222:	2303      	movs	r3, #3
  8002224:	777b      	strb	r3, [r7, #29]
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
  8002226:	f107 0318 	add.w	r3, r7, #24
  800222a:	4619      	mov	r1, r3
  800222c:	482e      	ldr	r0, [pc, #184]	; (80022e8 <_Z15Ultrasonic_initv+0xec>)
@@ -5467,15 +5467,15 @@ void Ultrasonic_init(void) {
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
  8002242:	2303      	movs	r3, #3
  8002244:	777b      	strb	r3, [r7, #29]
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
  8002246:	f107 0318 	add.w	r3, r7, #24
  800224a:	4619      	mov	r1, r3
  800224c:	4826      	ldr	r0, [pc, #152]	; (80022e8 <_Z15Ultrasonic_initv+0xec>)
  800224e:	f7fe feab 	bl	8000fa8 <GPIO_Init>
 
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource1);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource1);
  8002252:	2101      	movs	r1, #1
- 8002254:	2000      	movs	r0, #0
+ 8002254:	2002      	movs	r0, #2
  8002256:	f7ff fb21 	bl	800189c <SYSCFG_EXTILineConfig>
 
 	EXTI_InitTypeDef EXTI_InitStructure;
@@ -5519,56 +5519,57 @@ void Ultrasonic_init(void) {
  8002292:	f7ff fac7 	bl	8001824 <RCC_APB1PeriphClockCmd>
 
 	TIM_TimeBaseInitTypeDef timerInitStructure;//timer clock 2000khz
-	timerInitStructure.TIM_Prescaler = 46513; // 2000khz/43hz = 46512 pretoze pri 400 cm je 43 hz a chceme vyresetovat
- 8002296:	f24b 53b1 	movw	r3, #46513	; 0xb5b1
- 800229a:	803b      	strh	r3, [r7, #0]
+	timerInitStructure.TIM_Prescaler = 1; // 2000khz/2 = 1000khz = kazdu 1 us
+ 8002296:	2301      	movs	r3, #1
+ 8002298:	803b      	strh	r3, [r7, #0]
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
- 800229c:	2300      	movs	r3, #0
- 800229e:	807b      	strh	r3, [r7, #2]
-	timerInitStructure.TIM_Period = 65534;
- 80022a0:	f64f 73fe 	movw	r3, #65534	; 0xfffe
- 80022a4:	607b      	str	r3, [r7, #4]
+ 800229a:	2300      	movs	r3, #0
+ 800229c:	807b      	strh	r3, [r7, #2]
+	timerInitStructure.TIM_Period = 30000; // po 30 ms si povie ze to uz je maximum
+ 800229e:	f247 5330 	movw	r3, #30000	; 0x7530
+ 80022a2:	607b      	str	r3, [r7, #4]
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
- 80022a6:	2300      	movs	r3, #0
- 80022a8:	813b      	strh	r3, [r7, #8]
+ 80022a4:	2300      	movs	r3, #0
+ 80022a6:	813b      	strh	r3, [r7, #8]
 	TIM_TimeBaseInit(TIM4, &timerInitStructure);
- 80022aa:	463b      	mov	r3, r7
- 80022ac:	4619      	mov	r1, r3
- 80022ae:	480f      	ldr	r0, [pc, #60]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
- 80022b0:	f7ff fb36 	bl	8001920 <TIM_TimeBaseInit>
+ 80022a8:	463b      	mov	r3, r7
+ 80022aa:	4619      	mov	r1, r3
+ 80022ac:	480f      	ldr	r0, [pc, #60]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
+ 80022ae:	f7ff fb37 	bl	8001920 <TIM_TimeBaseInit>
 	TIM_Cmd(TIM4, ENABLE);
- 80022b4:	2101      	movs	r1, #1
- 80022b6:	480d      	ldr	r0, [pc, #52]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
- 80022b8:	f7ff fbbe 	bl	8001a38 <TIM_Cmd>
+ 80022b2:	2101      	movs	r1, #1
+ 80022b4:	480d      	ldr	r0, [pc, #52]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
+ 80022b6:	f7ff fbbf 	bl	8001a38 <TIM_Cmd>
 	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
- 80022bc:	2201      	movs	r2, #1
- 80022be:	2101      	movs	r1, #1
- 80022c0:	480a      	ldr	r0, [pc, #40]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
- 80022c2:	f7ff fc37 	bl	8001b34 <TIM_ITConfig>
+ 80022ba:	2201      	movs	r2, #1
+ 80022bc:	2101      	movs	r1, #1
+ 80022be:	480b      	ldr	r0, [pc, #44]	; (80022ec <_Z15Ultrasonic_initv+0xf0>)
+ 80022c0:	f7ff fc38 	bl	8001b34 <TIM_ITConfig>
 
 	NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
- 80022c6:	231e      	movs	r3, #30
- 80022c8:	753b      	strb	r3, [r7, #20]
+ 80022c4:	231e      	movs	r3, #30
+ 80022c6:	753b      	strb	r3, [r7, #20]
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
- 80022ca:	2300      	movs	r3, #0
- 80022cc:	757b      	strb	r3, [r7, #21]
+ 80022c8:	2300      	movs	r3, #0
+ 80022ca:	757b      	strb	r3, [r7, #21]
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
- 80022ce:	2300      	movs	r3, #0
- 80022d0:	75bb      	strb	r3, [r7, #22]
+ 80022cc:	2300      	movs	r3, #0
+ 80022ce:	75bb      	strb	r3, [r7, #22]
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
- 80022d2:	2301      	movs	r3, #1
- 80022d4:	75fb      	strb	r3, [r7, #23]
+ 80022d0:	2301      	movs	r3, #1
+ 80022d2:	75fb      	strb	r3, [r7, #23]
 	NVIC_Init(&NVIC_InitStructure);
- 80022d6:	f107 0314 	add.w	r3, r7, #20
- 80022da:	4618      	mov	r0, r3
- 80022dc:	f7fe fbea 	bl	8000ab4 <NVIC_Init>
+ 80022d4:	f107 0314 	add.w	r3, r7, #20
+ 80022d8:	4618      	mov	r0, r3
+ 80022da:	f7fe fbeb 	bl	8000ab4 <NVIC_Init>
 
 }
- 80022e0:	bf00      	nop
- 80022e2:	3720      	adds	r7, #32
- 80022e4:	46bd      	mov	sp, r7
- 80022e6:	bd80      	pop	{r7, pc}
- 80022e8:	40020000 	.word	0x40020000
+ 80022de:	bf00      	nop
+ 80022e0:	3720      	adds	r7, #32
+ 80022e2:	46bd      	mov	sp, r7
+ 80022e4:	bd80      	pop	{r7, pc}
+ 80022e6:	bf00      	nop
+ 80022e8:	40020800 	.word	0x40020800
  80022ec:	40000800 	.word	0x40000800
 
 080022f0 <_Z9ultTrigeri>:
@@ -5593,9 +5594,9 @@ void ultTriger(int index) {
  800230e:	687b      	ldr	r3, [r7, #4]
  8002310:	2b00      	cmp	r3, #0
  8002312:	d000      	beq.n	8002316 <_Z9ultTrigeri+0x26>
-		for (int i = 0; i < 100; i++)
-			;
-		GPIOA->BSRRL = GPIO_Pin_0;
+		GPIOC->BSRRL = GPIO_Pin_0;
+		for (int i = 0; i < 2; i++); //cca 15 us
+		GPIOC->BSRRH = GPIO_Pin_0;
 		break;
 	}
 }
@@ -5613,25 +5614,24 @@ void ultTriger(int index) {
  800231e:	4a0b      	ldr	r2, [pc, #44]	; (800234c <_Z9ultTrigeri+0x5c>)
  8002320:	687b      	ldr	r3, [r7, #4]
  8002322:	6013      	str	r3, [r2, #0]
-		GPIOA->BSRRH = GPIO_Pin_0;
+		GPIOC->BSRRL = GPIO_Pin_0;
  8002324:	4b0b      	ldr	r3, [pc, #44]	; (8002354 <_Z9ultTrigeri+0x64>)
  8002326:	2201      	movs	r2, #1
- 8002328:	835a      	strh	r2, [r3, #26]
-		for (int i = 0; i < 100; i++)
+ 8002328:	831a      	strh	r2, [r3, #24]
+		for (int i = 0; i < 2; i++); //cca 15 us
  800232a:	2300      	movs	r3, #0
  800232c:	60fb      	str	r3, [r7, #12]
  800232e:	68fb      	ldr	r3, [r7, #12]
- 8002330:	2b63      	cmp	r3, #99	; 0x63
+ 8002330:	2b01      	cmp	r3, #1
  8002332:	dc03      	bgt.n	800233c <_Z9ultTrigeri+0x4c>
  8002334:	68fb      	ldr	r3, [r7, #12]
  8002336:	3301      	adds	r3, #1
  8002338:	60fb      	str	r3, [r7, #12]
  800233a:	e7f8      	b.n	800232e <_Z9ultTrigeri+0x3e>
-			;
-		GPIOA->BSRRL = GPIO_Pin_0;
+		GPIOC->BSRRH = GPIO_Pin_0;
  800233c:	4b05      	ldr	r3, [pc, #20]	; (8002354 <_Z9ultTrigeri+0x64>)
  800233e:	2201      	movs	r2, #1
- 8002340:	831a      	strh	r2, [r3, #24]
+ 8002340:	835a      	strh	r2, [r3, #26]
 		break;
  8002342:	bf00      	nop
 	}
@@ -5642,12 +5642,12 @@ void ultTriger(int index) {
  800234a:	bd80      	pop	{r7, pc}
  800234c:	2000001c 	.word	0x2000001c
  8002350:	40000800 	.word	0x40000800
- 8002354:	40020000 	.word	0x40020000
+ 8002354:	40020800 	.word	0x40020800
 
 08002358 <TIM4_IRQHandler>:
 
 double getUltCm(int index){
-	return ((double)ultRawValue[index])*(46512/(2000000*65*58));
+	return ((double)ultRawValue[index])/58;
 }
 
 extern "C" void TIM4_IRQHandler(void) {
@@ -7748,8 +7748,8 @@ int main(void) {
  80031dc:	f7ff f9f4 	bl	80025c8 <_Z15InitializeTimerv>
 	Ultrasonic_init();
  80031e0:	f7ff f80c 	bl	80021fc <_Z15Ultrasonic_initv>
-	ultTriger(1);
- 80031e4:	2001      	movs	r0, #1
+	ultTriger(0);
+ 80031e4:	2000      	movs	r0, #0
  80031e6:	f7ff f883 	bl	80022f0 <_Z9ultTrigeri>
 	while (1) {
  80031ea:	e7fe      	b.n	80031ea <main+0x26>
@@ -8116,10 +8116,7 @@ void SysTick_Handler(void)
 {
  8003360:	b480      	push	{r7}
  8003362:	af00      	add	r7, sp, #0
-	/*  TimingDelay_Decrement(); */
-#ifdef USE_STM32L_DISCOVERY
-  TimingDelay_Decrement();
-#endif
+
 }
  8003364:	bf00      	nop
  8003366:	46bd      	mov	sp, r7

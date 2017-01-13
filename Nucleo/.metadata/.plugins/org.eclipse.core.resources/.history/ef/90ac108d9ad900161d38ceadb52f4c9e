@@ -112,9 +112,9 @@ void Ultrasonic_init(void) {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
 
 	TIM_TimeBaseInitTypeDef timerInitStructure;//timer clock 2000khz
-	timerInitStructure.TIM_Prescaler = 1; // 2000khz/2 = 1000khz = kazdu 1 us
+	timerInitStructure.TIM_Prescaler = 46513; // 2000khz/43hz = 46512 pretoze pri 400 cm je 43 hz a chceme vyresetovat
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 30000; // po 30 ms si povie ze to uz je maximum
+	timerInitStructure.TIM_Period = 65534;
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInit(TIM4, &timerInitStructure);
 	TIM_Cmd(TIM4, ENABLE);
@@ -134,15 +134,16 @@ void ultTriger(int index) {
 	case 0:
 		TIM_SetCounter(TIM4, 0);
 		chooseUlt = index;
-		GPIOC->BSRRL = GPIO_Pin_0;
-		for (int i = 0; i < 2; i++); //cca 15 us
 		GPIOC->BSRRH = GPIO_Pin_0;
+		for (int i = 0; i < 100; i++)
+			;
+		GPIOC->BSRRL = GPIO_Pin_0;
 		break;
 	}
 }
 
 double getUltCm(int index){
-	return ((double)ultRawValue[index])/58;
+	return ((double)ultRawValue[index])*(46512/(2000000*65*58));
 }
 
 extern "C" void TIM4_IRQHandler(void) {
@@ -603,7 +604,7 @@ int main(void) {
 	I2C1_Init();
 	InitializeTimer();
 	Ultrasonic_init();
-	ultTriger(0);
+	ultTriger(1);
 	while (1) {
 		/*if (timePosition) {
 		 double speeds[6];
