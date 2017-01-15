@@ -6,6 +6,7 @@ Motor::Motor(uint8_t motorAddr) {
 	this->speedRaw = 0;
 	this->current = 0;
 	this->voltageRaw = 0;
+	this->test = false;
 }
 //------------------------------------------------------------------
 Motor::~Motor() {

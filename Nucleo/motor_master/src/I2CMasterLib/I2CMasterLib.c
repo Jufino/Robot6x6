@@ -105,8 +105,8 @@ void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_
 }
 
 void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceive) {
-	//int timeout_var = 0;
-	while (deviceAddrUseI2c != 0);
+	uint16_t timeout_var = 0;
+	while (deviceAddrUseI2c != 0 && timeout_var++ < DMA_TIMEOUT);
 	deviceAddrUseI2c = slaveAddr;
 	readReg = readAddr;
 

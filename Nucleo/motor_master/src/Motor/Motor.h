@@ -41,7 +41,7 @@ private:
 	int16_t speedRaw;
 	uint16_t voltageRaw;
 	uint16_t current;
-	bool test = false;
+	bool test;
 public:
 	Motor(uint8_t motorAddr);
 	//------------------------------------------------------------------
