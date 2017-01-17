@@ -1,0 +1,21 @@
+/*
+ * Servo.cpp
+ *
+ *  Created on: 12. 1. 2017
+ *      Author: Juraj
+ */
+
+#include "Servo.h"
+
+namespace Servo {
+
+Servo::Servo() {
+	// TODO Auto-generated constructor stub
+
+}
+
+Servo::~Servo() {
+	// TODO Auto-generated destructor stub
+}
+
+} /* namespace Servo */

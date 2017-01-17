@@ -1,0 +1,105 @@
+#include <Ultrasonic/Ultrasonic.h>
+
+volatile int chooseUlt = -1;
+volatile uint16_t ultRawValue[NUMBER_OF_ULTS];
+
+void Ultrasonic_init(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource1);
+
+	EXTI_InitTypeDef EXTI_InitStructure;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+
+	TIM_TimeBaseInitTypeDef timerInitStructure; //timer clock 2000khz
+	timerInitStructure.TIM_Prescaler = 1; // 2000khz/2 = 1000khz = kazdu 1 us
+	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	timerInitStructure.TIM_Period = 30000; // po 30 ms si povie ze to uz je maximum
+	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInit(TIM4, &timerInitStructure);
+	TIM_Cmd(TIM4, ENABLE);
+	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+
+	NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+}
+
+void ultTriger(int index) {
+	if (chooseUlt == -1) {
+		switch (index) {
+		case 0:
+			TIM_SetCounter(TIM4, 0);
+			chooseUlt = index;
+			GPIOC->BSRRL = GPIO_Pin_0;
+			for (int i = 0; i < 2; i++)
+				; //cca 15 us
+			GPIOC->BSRRH = GPIO_Pin_0;
+			break;
+		}
+	}
+}
+
+double getUltCm(int index) {
+	return ((double) ultRawValue[index]) / 58;
+}
+
+uint16_t getUltRaw(int index){
+	return ultRawValue[index];
+}
+
+void Ultrasonic_Pin_Interrupt(void) {
+	if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
+		if ((GPIOC->IDR & GPIO_Pin_1) && GPIO_Pin_1) {
+			TIM_SetCounter(TIM4, 0);
+		} else {
+			//ultRawValue[chooseUlt] = (uint32_t)((double)ultRawValue[chooseUlt] - (LPF_Beta * ((double)ultRawValue[chooseUlt] - (double)TIM_GetCounter(TIM4))));
+			ultRawValue[chooseUlt] = TIM_GetCounter(TIM4);
+			chooseUlt = -1;
+		}
+		EXTI_ClearITPendingBit(EXTI_Line1);
+	}
+}
+
+void Ultrasonic_Timer_Update_Interrupt(void) {
+	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+		if (chooseUlt != -1) {
+			ultRawValue[chooseUlt] = 65535;
+			chooseUlt = -1;
+		}
+	}
+}
