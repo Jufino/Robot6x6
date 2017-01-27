@@ -27,14 +27,24 @@ int main(void) {
            rad2Deg(robotSensors.HMC5883L.yaw),
            rad2Deg(robotSensors.robotPosition.imuAngle.pitch), rad2Deg(robotSensors.robotPosition.imuAngle.roll), rad2Deg(robotSensors.robotPosition.imuAngle.yaw));
     */
-    RobotAcculators robotAcculators = getRobotAcculators();
+    //RobotAcculators robotAcculators = getRobotAcculators();
+ /*   robotAcculators.kinect.roll = (rand() % 30) - 15;
+
     robotAcculators.leds.LedKinect = LED_OFF;
-    printf("set off\n");
+    RobotSensors robotSensors = getRobotSensors();
+    printf("%f %f %f %f\n",robotSensors.kinect.accAxis.x,robotSensors.kinect.accAxis.y,robotSensors.kinect.accAxis.z,robotSensors.kinect.accAngle.roll);
     setRobotAcculators(robotAcculators);
     sleep(1);
-    printf("set red\n");
-    robotAcculators.leds.LedKinect = LED_RED;
-    setRobotAcculators(robotAcculators);
+    robotAcculators.leds.LedKinect = LED_RED;*/
+    
+    /*robotAcculators.leds.LedUp = COLOR_GREEN;
+    robotAcculators.leds.LedMiddle = COLOR_ORANGE;
+    robotAcculators.leds.LedDown = COLOR_RED;
+    setRobotAcculators(robotAcculators);*/
+
+        RobotSensors robotSensors = getRobotSensors();
+    printf("bUp:%d;bMiddle:%d;bDown:%d\n",robotSensors.buttons.buttonUp,robotSensors.buttons.buttonMiddle,robotSensors.buttons.buttonDown);
+
     sleep(1);
   }
   closeRobot();
