@@ -1,5 +1,6 @@
 #include <math.h>
 #include <Motor/Motor.h>
+#include <GY87/GY87.h>
 
 #define numberOfMotors 6
 Motor *motor1 = new Motor(MOTOR1);
@@ -37,8 +38,6 @@ extern "C" {
 #include "stm32l1xx.h"
 }
 
-#define dt 0.025
-
 enum Direction {
 	FORWARD, BACKWARD, ROTATE_CLOCKWISE, ROTATE_ANTICLOCKWISE, STOP
 };
@@ -60,14 +59,15 @@ volatile double z = 0;
 volatile double yaw = 0;
 volatile double roll = 0;
 volatile double pitch = 0;
+volatile double lastDistance[6];
 
 void InitializeTimer(void) {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-	TIM_TimeBaseInitTypeDef timerInitStructure; //nastavit 40 hz
-	timerInitStructure.TIM_Prescaler = 999;
+	TIM_TimeBaseInitTypeDef timerInitStructure; //opakovat kazdych 0.025 s = 40 hz
+	timerInitStructure.TIM_Prescaler = 4999;	//1Mhz/5000 = 200 hz
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 49;
+	timerInitStructure.TIM_Period = 4;
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInit(TIM2, &timerInitStructure);
 	TIM_Cmd(TIM2, ENABLE);
@@ -211,10 +211,27 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			case 107:
 				uintToI2CBuffer(getUltRaw(0));
 				break;
+			case 255:
+				I2C_SendBuffer[0] = slave_address;
+				break;
 			}
 		} else {
 			I2C1_Val = (I2C1_Val << 8) | I2C1->DR;
 			I2C1_NumberOfRecvValues++;
+			if (I2C1_NumberOfRecvValues == 1) {
+				switch (I2C1_RegValue) {
+				case 12:
+					setLed(0, (I2C1_Val & (1 << 1)) == (1 << 1) ? ON : OFF,
+							(I2C1_Val & (1 << 2)) == (1 << 2) ? ON : OFF);
+					setLed(1, (I2C1_Val & (1 << 3)) == (1 << 3) ? ON : OFF,
+							(I2C1_Val & (1 << 4)) == (1 << 4) ? ON : OFF);
+					setLed(2, (I2C1_Val & (1 << 5)) == (1 << 5) ? ON : OFF,
+							(I2C1_Val & (1 << 6)) == (1 << 6) ? ON : OFF);
+					break;
+				case 13:
+					setServo((double) I2C1_Val);
+				}
+			}
 			if (I2C1_NumberOfRecvValues == 2) {
 				switch (I2C1_RegValue) {
 				case 1:
@@ -250,16 +267,6 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 				case 11:
 					goDirection(STOP, (double) I2C1_Val);
 					break;
-				case 12:
-					setLed(0, (I2C1_Val & 0x01) == 0x01 ? ON : OFF,
-							(I2C1_Val & 0x02) == 0x02 ? ON : OFF);
-					setLed(1, (I2C1_Val & 0x04) == 0x04 ? ON : OFF,
-							(I2C1_Val & 0x08) == 0x08 ? ON : OFF);
-					setLed(2, (I2C1_Val & 0x10) == 0x10 ? ON : OFF,
-							(I2C1_Val & 0x20) == 0x20 ? ON : OFF);
-					break;
-				case 13:
-					setServo((double) I2C1_Val);
 				}
 			}
 		}
@@ -339,10 +346,27 @@ extern "C" void DMA1_Channel5_IRQHandler(void) {
 	}
 }
 
+
 extern "C" void TIM2_IRQHandler(void) {
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-		timePosition = true;
+		double speeds[6];
+		for (int i = 0; i < 6; i++) {
+			speeds[i] = (getMotor(i)->getDistance() - lastDistance[i]);
+			lastDistance[i] = getMotor(i)->getDistance();
+		}
+
+		double vL = getAverageOfSimilaryValues(speeds[1], speeds[2], speeds[3]);
+		double vR = getAverageOfSimilaryValues(speeds[4], speeds[5], speeds[6]);
+		double vT = (vL + vR) / 2;
+		double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
+		yaw += omegaT;
+		if (yaw > 2 * M_PI)
+			yaw -= 2 * M_PI;
+		else if (yaw < 0)
+			yaw += 2 * M_PI;
+		x += vT * cos(yaw);
+		y += vT * sin(yaw);
 	}
 }
 
@@ -350,7 +374,6 @@ extern "C" void EXTI9_5_IRQHandler(void) {
 	Buttons_Interrupt();
 }
 
-double lastDistance[6];
 int main(void) {
 	InitializePWMServo();
 	Leds_Init();
@@ -359,39 +382,18 @@ int main(void) {
 	I2C1_Init();
 	InitializeTimer();
 	Ultrasonic_init();
+	GY87 *gy87_1 = new GY87(0x68,0x1E,0x77);
+	bool test = gy87_1->HMC5883LTestConnection();
 	while (1) {
 		ultTriger(0);
-		if (timePosition) {
-			double speeds[6];
-			for (int i = 0; i < 6; i++) {
-				speeds[i] = (getMotor(i)->getDistance() - lastDistance[i]);
-				lastDistance[i] = getMotor(i)->getDistance();
-			}
-
-			double vL = getAverageOfSimilaryValues(speeds[1], speeds[2],
-					speeds[3]);
-			double vR = getAverageOfSimilaryValues(speeds[4], speeds[5],
-					speeds[6]);
-			double vT = (vL + vR) / 2;
-			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
-			yaw += omegaT;
-			if (yaw > 2 * M_PI)
-				yaw -= 2 * M_PI;
-			else if (yaw < 0)
-				yaw += 2 * M_PI;
-			x += vT * cos(yaw);
-			y += vT * sin(yaw);
-			timePosition = false;
-		} else {
-			getMotor(1)->DMADeltaTicksInvoke();
-			getMotor(2)->DMADeltaTicksInvoke();
-			getMotor(3)->DMADeltaTicksInvoke();
-			getMotor(4)->DMADeltaTicksInvoke();
-			getMotor(5)->DMADeltaTicksInvoke();
-			getMotor(6)->DMADeltaTicksInvoke();
-			for (int i = 0; i < 1000; i++)
-				;
-		}
+		getMotor(1)->DMADeltaTicksInvoke();
+		getMotor(2)->DMADeltaTicksInvoke();
+		getMotor(3)->DMADeltaTicksInvoke();
+		getMotor(4)->DMADeltaTicksInvoke();
+		getMotor(5)->DMADeltaTicksInvoke();
+		getMotor(6)->DMADeltaTicksInvoke();
+		for (int i = 0; i < 1000; i++)
+			;
 	}
 }
 
