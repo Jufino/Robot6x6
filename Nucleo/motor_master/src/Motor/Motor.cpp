@@ -68,8 +68,12 @@ void Motor::addDeltaTicks(int16_t data) {
 }
 //------------------------------------------------------------------
 long Motor::getTicks(void) {
-	while (I2C2_getReadRegister() == GETDELTATICKSREG)
-		;
+	uint16_t timeout_var = 0;
+	while (I2C2_getReadRegister() == GETDELTATICKSREG){
+		if(I2C_TIMEOUT < timeout_var++){
+			I2C2_clearAll();
+		}
+	}
 	return this->ticks;
 }
 //------------------------------------------------------------------

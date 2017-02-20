@@ -41,8 +41,8 @@ void Ultrasonic_init(void) {
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
 
-	TIM_TimeBaseInitTypeDef timerInitStructure; //timer clock 2000khz
-	timerInitStructure.TIM_Prescaler = 1; // 2000khz/2 = 1000khz = kazdu 1 us
+	TIM_TimeBaseInitTypeDef timerInitStructure; //timer clock 10000khz
+	timerInitStructure.TIM_Prescaler = 1 ; // 2000khz/2 = 1000khz = kazdu 1 us
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	timerInitStructure.TIM_Period = 30000; // po 30 ms si povie ze to uz je maximum
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
@@ -86,9 +86,9 @@ void Ultrasonic_Pin_Interrupt(void) {
 		if ((GPIOC->IDR & GPIO_Pin_1) && GPIO_Pin_1) {
 			TIM_SetCounter(TIM4, 0);
 		} else {
-			//ultRawValue[chooseUlt] = (uint32_t)((double)ultRawValue[chooseUlt] - (LPF_Beta * ((double)ultRawValue[chooseUlt] - (double)TIM_GetCounter(TIM4))));
-			ultRawValue[chooseUlt] = TIM_GetCounter(TIM4);
-			chooseUlt = -1;
+			ultRawValue[chooseUlt] = (uint32_t)((double)ultRawValue[chooseUlt] - (LPF_Beta * ((double)ultRawValue[chooseUlt] - (double)TIM_GetCounter(TIM4))));
+			//ultRawValue[chooseUlt] = TIM_GetCounter(TIM4);
+			chooseUlt = -2;
 		}
 		EXTI_ClearITPendingBit(EXTI_Line1);
 	}
@@ -97,9 +97,11 @@ void Ultrasonic_Pin_Interrupt(void) {
 void Ultrasonic_Timer_Update_Interrupt(void) {
 	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
-		if (chooseUlt != -1) {
-			ultRawValue[chooseUlt] = 65535;
+		if (chooseUlt >= 0) {
+			ultRawValue[chooseUlt] = 60000;
 			chooseUlt = -1;
 		}
+		else if(chooseUlt < 0)
+			chooseUlt = -1;
 	}
 }

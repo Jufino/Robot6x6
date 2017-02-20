@@ -4,6 +4,7 @@
 #include "stm32l1xx.h"
 
 #define NUMBER_OF_ULTS 1
+#define LPF_Beta 0.70
 
 void Ultrasonic_init(void);
 void ultTriger(int index);

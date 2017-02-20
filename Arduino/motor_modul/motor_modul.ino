@@ -1,7 +1,7 @@
 #include <Wire.h>
 /*I2C adresa*/
 #define I2CDebug false
-#define addressI2C 0x01 //motory cislovane  z lava vzadu 
+#define addressI2C 0x06 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureCurrentAction 50
 #define measureSpeedAction 25
@@ -18,7 +18,7 @@ bool measureStart = false;
 #define numberOfTimer 3              //pocet casovacov
 #define periodVoltageMeasure 1000000L //perioda pre prudovy regulator
 #define periodCurrentRegulator 1500L //perioda pre prudovy regulator
-#define periodSpeedRegulator 200000L //perioda pre rychlostny regulator
+#define periodSpeedRegulator 100000L //perioda pre rychlostny regulator
 /* filter */
 #define LPF_Beta 0.025 //konštanta dolnopriepustného filtra - https://kiritchatterjee.wordpress.com/2014/11/10/a-simple-digital-low-pass-filter-in-c/
 #define useLPF true   //spustenie alebo vypnutie filtrácie prúdu
@@ -32,6 +32,7 @@ volatile bool onCurrentReg = true;
 #define Ispeed 0.27
 #define Kbspeed 0.5
 volatile bool onSpeedReg = true;
+#define maxUspeddReg 500
 /*--------------------------------------------------*/
 /*pomocné premenné*/
 unsigned long last_time = 0;
@@ -168,7 +169,7 @@ void setup() {
   Wire.begin(addressI2C);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
-  //motor(0);
+  motor(0);
 }
 /*--------------------------------------------------*/
 void receiveEvent(int howMany) {
@@ -236,7 +237,7 @@ void requestEvent() {
       data[1] = (measureVoltage >> 8) & 0xFF;
       Wire.write(data, 2);
       break;
-    case 255:
+    case 111:
       data[0] = addressI2C;
       Wire.write(data, 1);
       break;
@@ -313,28 +314,31 @@ void loop() {
     double speedWheel = numberTick - numberTickLast;
     numberTickLast = numberTick;
     measureSpeed = (int)speedWheel;
+//    Serial.print(averageMeasureCurrent);
+//    Serial.print("/");
+//    Serial.println(speedWheel);
     /*--------------------------------------------------*/
     if (onSpeedReg) {
       /*PI regulator rychlosti*/
       double e = pozadSpeed - speedWheel;
       regSpeedIsum += Ispeed * e;
       if (pozadSpeed >= 0) {
-        if (uLastSpeed > 500) regSpeedIsum += -uLastSpeed + 500;
+        if (uLastSpeed > maxUspeddReg) regSpeedIsum += -uLastSpeed + maxUspeddReg;
         else if (uLastSpeed < 0) regSpeedIsum += -uLastSpeed + 0;
       }
       else {
-        if (uLastSpeed < -500) regSpeedIsum += -uLastSpeed - 500;
+        if (uLastSpeed < -maxUspeddReg) regSpeedIsum += -uLastSpeed - maxUspeddReg;
         else if (uLastSpeed > 0) regSpeedIsum += -uLastSpeed + 0;
       }
       if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
       double u = e * Pspeed + regSpeedIsum;
       uLastSpeed = u;
       if (pozadSpeed >= 0) {
-        if (u > 500) u = 500;
+        if (u > maxUspeddReg) u = maxUspeddReg;
         else if (u < 0) u = 0;
       }
       else {
-        if (u < -500) u = -500;
+        if (u < -maxUspeddReg) u = -maxUspeddReg;
         else if (u > 0) u = 0;
       }
       pozadCurrent = u;

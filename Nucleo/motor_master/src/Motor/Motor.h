@@ -32,7 +32,7 @@ const uint8_t MOTORSADDR[] = { MOTOR1, MOTOR2, MOTOR3, MOTOR4, MOTOR5, MOTOR6 };
 #define wheelDiameter 86
 #define lengthBetweenLeftAndRightWheel 250
 #define numberTicksOfWheel 120 //overit
-#define periodSpeedRegulator 0.25
+#define periodSpeedRegulator 0.1
 //------------------------------------------------------------------
 class Motor {
 private:
