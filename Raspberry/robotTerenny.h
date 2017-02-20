@@ -27,6 +27,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include "libfreenect.h"
+#include "libfreenect_sync.h"
 
 using namespace std;
 using namespace cv;
@@ -46,26 +47,26 @@ extern "C" {
 #define SENSORS_WIFI 0
 #define SENSORS_PORT 1213
 
-#define SYNC_MIN_TIME 1 // 1 ms
-#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*10
+#define SYNC_MIN_TIME 1000 // 1 ms
+#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*100
 #define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
-#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*60
-#define SYNC_LEDS_TIME              SYNC_MIN_TIME*20
-#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*20
+#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*100
+#define SYNC_LEDS_TIME              SYNC_MIN_TIME*100
+#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*60
 
 #define ENABLE_I2C 1        //ok
-#define ENABLE_MOTORS 0
+#define ENABLE_MOTORS 1
 #define ENABLE_ULTRASONIC 0 //ok
-#define ENABLE_LEDS 0       //ok
+#define ENABLE_LEDS 1       //ok
 #define ENABLE_BUTTONS 1    //ok
 #define ENABLE_POSSITION 0
 
 #define SYNC_KINECTACCULATORS_TIME SYNC_MIN_TIME*10
 #define SYNC_KINECTSENSORS_TIME    SYNC_MIN_TIME*20
 
-#define ENABLE_KINECTACCULATORS 1
-#define ENABLE_KINECTSENSORS 1
-#define ENABLE_KINECTCAMERA 0 
+#define ENABLE_KINECTACCULATORS 0
+#define ENABLE_KINECTSENSORS 0
+#define ENABLE_KINECTCAMERA 0
 
 #define CAMERA_WIFI  0
 #define CAMERA_PORT  1212
@@ -105,6 +106,7 @@ typedef enum {
   KINECT_TAG,
   SENSOR_CONN_TAG,
   CAMERA_CONN_TAG,
+  MOTOR_TAG,
   NUCLEO_TAG
 } log_tag_t;
 
@@ -238,8 +240,9 @@ void setMotorPowerSupply(bool state);
 void closeMotorPowerSupply(void);
 
 bool nucleoTestConnection(void);
+char motorsTestConnection(void);
 void setServo(int angle);
-void setMove(direction_t direction, unsigned char speed);
+void setMove(direction_t direction, unsigned int speed);
 void setLeds(color_t ledUpColor, color_t ledMiddleColor, color_t ledDownColor);
 unsigned int getUltrasonicRaw(void);
 double getUltrasonic(void);

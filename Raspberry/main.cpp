@@ -27,23 +27,32 @@ int main(void) {
            rad2Deg(robotSensors.HMC5883L.yaw),
            rad2Deg(robotSensors.robotPosition.imuAngle.pitch), rad2Deg(robotSensors.robotPosition.imuAngle.roll), rad2Deg(robotSensors.robotPosition.imuAngle.yaw));
     */
-    //RobotAcculators robotAcculators = getRobotAcculators();
- /*   robotAcculators.kinect.roll = (rand() % 30) - 15;
-
-    robotAcculators.leds.LedKinect = LED_OFF;
+    RobotAcculators robotAcculators = getRobotAcculators();
     RobotSensors robotSensors = getRobotSensors();
-    printf("%f %f %f %f\n",robotSensors.kinect.accAxis.x,robotSensors.kinect.accAxis.y,robotSensors.kinect.accAxis.z,robotSensors.kinect.accAngle.roll);
-    setRobotAcculators(robotAcculators);
-    sleep(1);
-    robotAcculators.leds.LedKinect = LED_RED;*/
-    
-    /*robotAcculators.leds.LedUp = COLOR_GREEN;
+    /*   robotAcculators.kinect.roll = (rand() % 30) - 15;
+
+       robotAcculators.leds.LedKinect = LED_OFF;
+       RobotSensors robotSensors = getRobotSensors();
+       printf("%f %f %f %f\n",robotSensors.kinect.accAxis.x,robotSensors.kinect.accAxis.y,robotSensors.kinect.accAxis.z,robotSensors.kinect.accAngle.roll);
+       setRobotAcculators(robotAcculators);
+       sleep(1);
+       robotAcculators.leds.LedKinect = LED_RED;*/
+    robotAcculators.robotDirection = FORWARD;
+    if (robotSensors.buttons.buttonUp)
+      robotAcculators.robotSpeed = 300;
+    else if (robotSensors.buttons.buttonMiddle)
+      robotAcculators.robotSpeed = 500;
+    else if (robotSensors.buttons.buttonDown)
+      robotAcculators.robotSpeed = 1000;
+    else
+      robotAcculators.robotSpeed = 0;
+    robotAcculators.leds.LedUp = COLOR_GREEN;
     robotAcculators.leds.LedMiddle = COLOR_ORANGE;
     robotAcculators.leds.LedDown = COLOR_RED;
-    setRobotAcculators(robotAcculators);*/
+    setRobotAcculators(robotAcculators);
 
-        RobotSensors robotSensors = getRobotSensors();
-    printf("bUp:%d;bMiddle:%d;bDown:%d\n",robotSensors.buttons.buttonUp,robotSensors.buttons.buttonMiddle,robotSensors.buttons.buttonDown);
+
+    printf("bUp:%d;bMiddle:%d;bDown:%d\n", robotSensors.buttons.buttonUp, robotSensors.buttons.buttonMiddle, robotSensors.buttons.buttonDown);
 
     sleep(1);
   }
