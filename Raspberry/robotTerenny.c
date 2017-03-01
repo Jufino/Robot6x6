@@ -1,7 +1,7 @@
 #include "robotTerenny.h"
 
 freenect_context *ctx;  // pointer to the freenect context
-freenect_device *dev;  // pointer to the device
+freenect_device *kinect_dev;  // pointer to the device
 
 int i2cHandle;
 unsigned char lastAddr = 0x00;
@@ -13,7 +13,6 @@ bool onAllThreads = true;
 bool onWifiCameraStill = true;
 bool onWifiSensorStill = true;
 
-VideoCapture cameraKinect( CV_CAP_OPENNI );
 char imageChooseKinect = 0;
 char depthChooseKinect = 0;
 Mat depth1Kinect;
@@ -43,8 +42,7 @@ typedef union {
                                            (Linux-specific) */
 } semun;
 
-void charTag(log_tag_t tag, char *buffer)
-{
+void charTag(log_tag_t tag, char *buffer) {
   switch (tag) {
   case SEMAFOR_TAG:
     sprintf(buffer, "SEMAFOR");
@@ -64,30 +62,50 @@ void charTag(log_tag_t tag, char *buffer)
   case NUCLEO_TAG:
     sprintf(buffer, "NUCLEO");
     break;
+  case MOTOR_TAG:
+    sprintf(buffer, "MOTOR");
+    break;
   }
-
 }
 
-void LOGError(log_tag_t tag, char text[]) {
+void LOGError(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_ERROR) {
     char buffer[50];
+    char timeStr[20];
+
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    strftime(timeStr, sizeof(timeStr), "%D %T", tm);
+
     charTag(tag, buffer);
-    printf("LOGError:%s/%s\n", buffer, text);
+    printf("%s - LOGError:%s/%s\n", timeStr, buffer, text);
   }
 }
 
-void LOGInfo(log_tag_t tag, char text[]) {
+void LOGInfo(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_INFO) {
     char buffer[50];
+    char timeStr[20];
+
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    strftime(timeStr, sizeof(timeStr), "%D %T", tm);
+
     charTag(tag, buffer);
-    printf("LOGInfo:%s/%s\n", buffer, text);
+    printf("%s - LOGInfo:%s/%s\n", timeStr, buffer, text);
   }
 }
-void LOGInfoDetail(log_tag_t tag, char text[]) {
+void LOGInfoDetail(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_INFO_DETAIL) {
     char buffer[50];
+    char timeStr[20];
+
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    strftime(timeStr, sizeof(timeStr), "%D %T", tm);
+
     charTag(tag, buffer);
-    printf("LOGInfoDetail:%s/%s\n", buffer, text);
+    printf("%s - LOGInfoDetail:%s/%s\n", timeStr, buffer, text);
   }
 }
 
@@ -128,8 +146,70 @@ void semRem(int sem_id) {
   semctl(sem_id, 0, IPC_RMID, NULL);
 }
 
+void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
+{
+  LOGInfo(KINECT_TAG, "GET depth");
+  static IplImage *image = 0;
+  if (!image) image = cvCreateImage(cvSize(640, 480), 8, 3);
+  uint16_t *depth = (uint16_t*)v_depth;
+  unsigned char *depth_mid = (unsigned char*)(image->imageData);
+  int i;
+  for (i = 0; i < 640 * 480; i++) {
+    int lb = depth[i] % 256;
+    int ub = depth[i] / 256;
+    switch (ub) {
+    case 0:
+      depth_mid[3 * i + 2] = 255;
+      depth_mid[3 * i + 1] = 255 - lb;
+      depth_mid[3 * i + 0] = 255 - lb;
+      break;
+    case 1:
+      depth_mid[3 * i + 2] = 255;
+      depth_mid[3 * i + 1] = lb;
+      depth_mid[3 * i + 0] = 0;
+      break;
+    case 2:
+      depth_mid[3 * i + 2] = 255 - lb;
+      depth_mid[3 * i + 1] = 255;
+      depth_mid[3 * i + 0] = 0;
+      break;
+    case 3:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 255;
+      depth_mid[3 * i + 0] = lb;
+      break;
+    case 4:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 255 - lb;
+      depth_mid[3 * i + 0] = 255;
+      break;
+    case 5:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 0;
+      depth_mid[3 * i + 0] = 255 - lb;
+      break;
+    default:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 0;
+      depth_mid[3 * i + 0] = 0;
+      break;
+    }
+  }
+  semWait(sem_id, CAMERA_DEPTH_KINECT1);
+  depth1Kinect = cvarrToMat(image).clone();
+  semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+  depthChooseKinect = 1;
+  semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+  semPost(sem_id, CAMERA_DEPTH_KINECT1);
+}
+
+void *kinectProcess(void *arg) {
+  while (onAllThreads && freenect_process_events(ctx) >= 0);
+  return 0;
+}
+
 void initRobot(void) {
-  sem_id = semCreate(getpid(), 9);
+  sem_id = semCreate(getpid(), 16);
   semInit(sem_id, CAMERA_VARIABLE_L, 1);
   semInit(sem_id, CAMERA_IMAGE_L1, 1);
   semInit(sem_id, CAMERA_IMAGE_L2, 1);
@@ -138,6 +218,12 @@ void initRobot(void) {
   semInit(sem_id, CAMERA_IMAGE_R2, 1);
   semInit(sem_id, ROBOTSENSORS, 1);
   semInit(sem_id, ROBOTACCULATORS, 1);
+  semInit(sem_id, CAMERA_DEPTH_KINECT1, 1);
+  semInit(sem_id, CAMERA_DEPTH_KINECT2, 1);
+  semInit(sem_id, CAMERA_IMAGE_KINECT1, 1);
+  semInit(sem_id, CAMERA_IMAGE_KINECT2, 1);
+  semInit(sem_id, CAMERA_VARIABLE_KINECTIMAGE, 1);
+  semInit(sem_id, CAMERA_VARIABLE_KINECTDEPTH, 1);
   semInit(sem_id, I2C, 1);
 
   initMotorPowerSupply();
@@ -157,8 +243,32 @@ void initRobot(void) {
     setLeds(COLOR_OFF, COLOR_OFF, COLOR_OFF);
 
   if (ENABLE_MOTORS) {
+    char testValue = motorsTestConnection();
+    for (int i = 0; i < 6; i++) {
+      if (testValue & (1 << i) && (1 << i)) {
+        char buffer [50];
+        sprintf (buffer, "Connection %d ok.", i + 1);
+        LOGInfo(MOTOR_TAG, buffer);
+      }
+      else {
+        char buffer [50];
+        sprintf (buffer, "Connection %d failed.", i + 1);
+        LOGInfo(MOTOR_TAG, buffer);
+      }
+    }
+
     setMove(STOP, 0);
     setMotorPowerSupply(true);
+  }
+
+  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
+    if (!initKinect()) {
+      LOGError(KINECT_TAG, "Init failed.");
+      exit(0);
+    }
+    else {
+      LOGInfo(KINECT_TAG, "Init ok.");
+    }
   }
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
@@ -184,8 +294,6 @@ void initRobot(void) {
   }
 
   if (ENABLE_KINECTCAMERA == 1) {
-    cameraKinect.open( CAP_OPENNI );
-    cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_VGA_30HZ );
     pthread_t threadImgAndDepthKinect;
     pthread_create(&threadImgAndDepthKinect, NULL, &getImgAndDephKinect, NULL);
   }
@@ -254,34 +362,28 @@ void initRobot(void) {
   }
   if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
 
-  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
-    if (!initKinect()) {
-      LOGError(KINECT_TAG, "Init failed.");
-      exit(0);
-    }
-    else {
-      LOGInfo(KINECT_TAG, "Init ok.");
-    }
-  }
-
   pthread_t threadModules;
   pthread_create(&threadModules, NULL, &syncModules, NULL);
   signal(SIGINT, sigctrl);
-
 }
 
 void closeRobot(void) {
   onAllThreads = false;
+
   if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
+    freenect_stop_depth(kinect_dev);
+    //freenect_stop_video(kinect_dev);
+
+    freenect_close_device(kinect_dev);
     freenect_shutdown(ctx);
   }
   if (ENABLE_MOTORS) {
     setMove(STOP, 0);
   }
   if (ENABLE_I2C) {
-
     closeI2C();
   }
+
   semRem(sem_id);
 
   closeMotorPowerSupply();
@@ -321,6 +423,9 @@ char writeRegisterAndValueU8(unsigned char addr, unsigned char reg, unsigned cha
   data[1] = value;
   if (setDevice(addr) == 0) {
     while (write(i2cHandle, data, 2) != 2) {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
+      LOGError(I2C_TAG, buffer);
       if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
     }
     if (errorTimeout < I2C_WRITE_TIMEOUT)
@@ -329,12 +434,9 @@ char writeRegisterAndValueU8(unsigned char addr, unsigned char reg, unsigned cha
       char buffer [50];
       sprintf (buffer, "addr:%i, write register %i,val %i, errorTimeout:%i\n", (int)addr, (int)reg, (int)value, (int)errorTimeout);
       LOGError(I2C_TAG, buffer);
-      return -1;
     }
   }
-  else {
-    return -1;
-  }
+  return -1;
 }
 
 char writeRegisterAndValueU16(unsigned char addr, unsigned char reg, unsigned int value) {
@@ -344,7 +446,10 @@ char writeRegisterAndValueU16(unsigned char addr, unsigned char reg, unsigned in
   data[1] = (value >> 8) & 0xFF;
   data[2] = value & 0xFF;
   if (setDevice(addr) == 0) {
-    while (write(i2cHandle, data, 2) != 2) {
+    while (write(i2cHandle, data, 3) != 3) {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
+      LOGError(I2C_TAG, buffer);
       if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
     }
     if (errorTimeout < I2C_WRITE_TIMEOUT)
@@ -353,12 +458,9 @@ char writeRegisterAndValueU16(unsigned char addr, unsigned char reg, unsigned in
       char buffer [50];
       sprintf (buffer, "addr:%i, write register %i,val %i, errorTimeout:%i", (int)addr, (int)reg, (int)value, (int)errorTimeout);
       LOGError(I2C_TAG, buffer);
-      return -1;
     }
   }
-  else {
-    return -1;
-  }
+  return -1;
 }
 
 char writeRegisterAndValueS16(unsigned char addr, unsigned char reg, int value) {
@@ -368,7 +470,10 @@ char writeRegisterAndValueS16(unsigned char addr, unsigned char reg, int value) 
   data[1] = (value >> 8) & 0xFF;
   data[2] = value & 0xFF;
   if (setDevice(addr) == 0) {
-    while (write(i2cHandle, data, 2) != 2) {
+    while (write(i2cHandle, data, 3) != 3) {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
+      LOGError(I2C_TAG, buffer);
       if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
     }
     if (errorTimeout < I2C_WRITE_TIMEOUT)
@@ -377,12 +482,9 @@ char writeRegisterAndValueS16(unsigned char addr, unsigned char reg, int value) 
       char buffer [50];
       sprintf (buffer, "addr:%i, write register %i,val %i, errorTimeout:%i", (int)addr, (int)reg, (int)value, (int)errorTimeout);
       LOGError(I2C_TAG, buffer);
-      return -1;
     }
   }
-  else {
-    return -1;
-  }
+  return -1;
 }
 
 char writeRegister(unsigned char addr, unsigned char reg) {
@@ -402,12 +504,9 @@ char writeRegister(unsigned char addr, unsigned char reg) {
       char buffer [50];
       sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
       LOGError(I2C_TAG, buffer);
-      return -1;
     }
   }
-  else {
-    return -1;
-  }
+  return -1;
 }
 
 unsigned int readRegister16(unsigned char addr, unsigned char reg) {
@@ -469,12 +568,21 @@ bool initKinect() {
 
   //freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
 
-  if (freenect_open_device(ctx, &dev, 0) < 0)
+  if (freenect_open_device(ctx, &kinect_dev, 0) < 0)
   {
     LOGError(KINECT_TAG, "Open failed.");
     freenect_shutdown(ctx);
     return false;
   }
+  //freenect_set_video_callback(f_dev, rgb_cb);
+  freenect_set_depth_callback(kinect_dev, depth_cb);
+// freenect_set_video_mode(dev, freenect_find_video_mode(FREENECT_RESOLUTION_LOW, FREENECT_VIDEO_RGB));
+  freenect_set_depth_mode(kinect_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_LOW, FREENECT_DEPTH_10BIT));
+  freenect_start_depth(kinect_dev);
+  //freenect_start_video(f_dev);
+  //freenect_set_video_callback(f_dev, rgb_cb);
+  pthread_t threadKinectProcess;
+  pthread_create(&threadKinectProcess, NULL, &kinectProcess, NULL);
   return true;
 }
 
@@ -484,17 +592,15 @@ Mat getImageKinect(void) {
   semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
   imageChooseMainKinect = imageChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-  if (imageChooseMainKinect != 0) {
-    if (imageChooseMainKinect == 1) {
-      semWait(sem_id, CAMERA_IMAGE_KINECT1);
-      imgMatKinect = img1Kinect.clone();
-      semPost(sem_id, CAMERA_IMAGE_KINECT1);
-    }
-    else if (imageChooseMainKinect == 2) {
-      semWait(sem_id, CAMERA_IMAGE_KINECT2);
-      imgMatKinect = img2Kinect.clone();
-      semPost(sem_id, CAMERA_IMAGE_KINECT2);
-    }
+  if (imageChooseMainKinect == 1) {
+    semWait(sem_id, CAMERA_IMAGE_KINECT1);
+    imgMatKinect = img1Kinect.clone();
+    semPost(sem_id, CAMERA_IMAGE_KINECT1);
+  }
+  else if (imageChooseMainKinect == 2) {
+    semWait(sem_id, CAMERA_IMAGE_KINECT2);
+    imgMatKinect = img2Kinect.clone();
+    semPost(sem_id, CAMERA_IMAGE_KINECT2);
   }
   return imgMatKinect;
 }
@@ -505,17 +611,15 @@ Mat getDepthKinect(void) {
   semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
   depthChooseMainKinect = depthChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-  if (depthChooseMainKinect != 0) {
-    if (depthChooseMainKinect == 1) {
-      semWait(sem_id, CAMERA_DEPTH_KINECT1);
-      depthMatKinect = depth1Kinect.clone();
-      semPost(sem_id, CAMERA_DEPTH_KINECT1);
-    }
-    else if (depthChooseMainKinect == 2) {
-      semWait(sem_id, CAMERA_DEPTH_KINECT2);
-      depthMatKinect = depth2Kinect.clone();
-      semPost(sem_id, CAMERA_DEPTH_KINECT2);
-    }
+  if (depthChooseMainKinect == 1) {
+    semWait(sem_id, CAMERA_DEPTH_KINECT1);
+    depthMatKinect = depth1Kinect.clone();
+    semPost(sem_id, CAMERA_DEPTH_KINECT1);
+  }
+  else if (depthChooseMainKinect == 2) {
+    semWait(sem_id, CAMERA_DEPTH_KINECT2);
+    depthMatKinect = depth2Kinect.clone();
+    semPost(sem_id, CAMERA_DEPTH_KINECT2);
   }
   return depthMatKinect;
 }
@@ -526,21 +630,19 @@ Mat getImageLeft(void) {
   semWait(sem_id, CAMERA_VARIABLE_L);
   imageChooseMainL = imageChooseL;
   semPost(sem_id, CAMERA_VARIABLE_L);
-  if (imageChooseMainL != 0) {
-    if (imageChooseMainL == 1) {
-      semWait(sem_id, CAMERA_IMAGE_L1);
-      semWait(sem_id, ROBOTSENSORS);
-      imgMatL = cvarrToMat(img1L);
-      semPost(sem_id, ROBOTSENSORS);
-      semPost(sem_id, CAMERA_IMAGE_L1);
-    }
-    else if (imageChooseMainL == 2) {
-      semWait(sem_id, CAMERA_IMAGE_L2);
-      semWait(sem_id, ROBOTSENSORS);
-      imgMatL = cvarrToMat(img2L);
-      semPost(sem_id, ROBOTSENSORS);
-      semPost(sem_id, CAMERA_IMAGE_L2);
-    }
+  if (imageChooseMainL == 1) {
+    semWait(sem_id, CAMERA_IMAGE_L1);
+    semWait(sem_id, ROBOTSENSORS);
+    imgMatL = cvarrToMat(img1L);
+    semPost(sem_id, ROBOTSENSORS);
+    semPost(sem_id, CAMERA_IMAGE_L1);
+  }
+  else if (imageChooseMainL == 2) {
+    semWait(sem_id, CAMERA_IMAGE_L2);
+    semWait(sem_id, ROBOTSENSORS);
+    imgMatL = cvarrToMat(img2L);
+    semPost(sem_id, ROBOTSENSORS);
+    semPost(sem_id, CAMERA_IMAGE_L2);
   }
   return imgMatL;
 }
@@ -551,17 +653,15 @@ Mat getImageRight(void) {
   semWait(sem_id, CAMERA_VARIABLE_R);
   imageChooseMainR = imageChooseR;
   semPost(sem_id, CAMERA_VARIABLE_R);
-  if (imageChooseMainR != 0) {
-    if (imageChooseMainR == 1) {
-      semWait(sem_id, CAMERA_IMAGE_R1);
-      imgMatR = cvarrToMat(img1R);
-      semPost(sem_id, CAMERA_IMAGE_R1);
-    }
-    else if (imageChooseMainR == 2) {
-      semWait(sem_id, CAMERA_IMAGE_R2);
-      imgMatR = cvarrToMat(img2R);
-      semPost(sem_id, CAMERA_IMAGE_R2);
-    }
+  if (imageChooseMainR == 1) {
+    semWait(sem_id, CAMERA_IMAGE_R1);
+    imgMatR = cvarrToMat(img1R);
+    semPost(sem_id, CAMERA_IMAGE_R1);
+  }
+  else if (imageChooseMainR == 2) {
+    semWait(sem_id, CAMERA_IMAGE_R2);
+    imgMatR = cvarrToMat(img2R);
+    semPost(sem_id, CAMERA_IMAGE_R2);
   }
   return imgMatR;
 }
@@ -643,29 +743,33 @@ bool nucleoTestConnection(void) {
   return value;
 }
 
+char motorsTestConnection(void) {
+  return readRegister8(STM32_ADDRESS, 254);
+}
+
 void setServo(int angle) {
   semWait(sem_id, I2C);
   writeRegisterAndValueU8(STM32_ADDRESS, 13, angle);
   semPost(sem_id, I2C);
 }
 
-void setMove(direction_t direction, unsigned char speed) {
+void setMove(direction_t direction, unsigned int speed) {
   semWait(sem_id, I2C);
   switch (direction) {
   case FORWARD:
-    writeRegisterAndValueU8(STM32_ADDRESS, 7, speed);
+    writeRegisterAndValueU16(STM32_ADDRESS, 7, speed);
     break;
   case BACKWARD:
-    writeRegisterAndValueU8(STM32_ADDRESS, 8, speed);
+    writeRegisterAndValueU16(STM32_ADDRESS, 8, speed);
     break;
   case CLOCKWISE:
-    writeRegisterAndValueU8(STM32_ADDRESS, 9, speed);
+    writeRegisterAndValueU16(STM32_ADDRESS, 9, speed);
     break;
   case ANTICLOCKWISE:
-    writeRegisterAndValueU8(STM32_ADDRESS, 10, speed);
+    writeRegisterAndValueU16(STM32_ADDRESS, 10, speed);
     break;
   default:
-    writeRegisterAndValueU8(STM32_ADDRESS, 11, speed);
+    writeRegisterAndValueU16(STM32_ADDRESS, 11, speed);
   }
   semPost(sem_id, I2C);
 }
@@ -746,53 +850,118 @@ double deg2Rad(double angle) {
   return angle * (M_PI / 180);
 }
 
-void *getImgAndDephKinect(void *arg) {
-  while (onAllThreads) {
-    bool imageReady = true;//cameraKinect.get( CV_CAP_PROP_OPENNI_IMAGE_GENERATOR_PRESENT ) != 0;
-    bool depthReady = cameraKinect.get( CV_CAP_OPENNI_DEPTH_GENERATOR  ) != 0;
-    if (imageReady || depthReady) {
-      cameraKinect.grab();
-      if (depthReady) {
-        semWait(sem_id, CAMERA_DEPTH_KINECT1);
-        cameraKinect.retrieve( depth1Kinect, CV_CAP_OPENNI_DEPTH_MAP );
-        semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-        depthChooseKinect = 1;
-        semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-        semPost(sem_id, CAMERA_DEPTH_KINECT1);
-      }
-      if (imageReady) {
-        semWait(sem_id, CAMERA_IMAGE_KINECT1);
-        cameraKinect.retrieve( img1Kinect, CV_CAP_OPENNI_BGR_IMAGE );
-        semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-        imageChooseKinect = 1;
-        semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-        semPost(sem_id, CAMERA_IMAGE_KINECT1);
-      }
+IplImage *freenect_sync_get_depth_cv(int index)
+{
+  static IplImage *image = 0;
+  static char *data = 0;
+  if (!image) image = cvCreateImageHeader(cvSize(640, 480), 16, 1);
+  unsigned int timestamp;
+  if (freenect_sync_get_depth((void**)&data, &timestamp, index, FREENECT_DEPTH_10BIT))
+    return NULL;
+  cvSetData(image, data, 640 * 2);
+  return image;
+}
 
-      cameraKinect.grab();
-      if (depthReady) {
-        semWait(sem_id, CAMERA_DEPTH_KINECT2);
-        cameraKinect.retrieve( depth2Kinect, CV_CAP_OPENNI_DEPTH_MAP );
-        semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-        depthChooseKinect = 2;
-        semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-        semPost(sem_id, CAMERA_DEPTH_KINECT2);
-      }
-      if (imageReady) {
-        semWait(sem_id, CAMERA_IMAGE_KINECT2);
-        cameraKinect.retrieve( img2Kinect, CV_CAP_OPENNI_BGR_IMAGE );
-        semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-        imageChooseKinect = 2;
-        semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-        semPost(sem_id, CAMERA_IMAGE_KINECT2);
-      }
+IplImage *freenect_sync_get_rgb_cv(int index)
+{
+  static IplImage *image = 0;
+  static char *data = 0;
+  if (!image) image = cvCreateImageHeader(cvSize(640, 480), 8, 3);
+  unsigned int timestamp;
+  if (freenect_sync_get_video((void**)&data, &timestamp, index, FREENECT_VIDEO_RGB))
+    return NULL;
+  cvSetData(image, data, 640 * 3);
+  return image;
+}
+
+IplImage *freenect_sync_get_depth_cvTransform(int index)
+{
+  IplImage *depth = freenect_sync_get_depth_cv(index);
+  static IplImage *image = 0;
+  if (!image) image = cvCreateImage(cvSize(640, 480), 8, 3);
+  unsigned char *depth_mid = (unsigned char*)(image->imageData);
+  int i;
+  for (i = 0; i < 640 * 480; i++) {
+    int lb = ((short *)depth->imageData)[i] % 256;
+    int ub = ((short *)depth->imageData)[i] / 256;
+    switch (ub) {
+    case 0:
+      depth_mid[3 * i + 2] = 255;
+      depth_mid[3 * i + 1] = 255 - lb;
+      depth_mid[3 * i + 0] = 255 - lb;
+      break;
+    case 1:
+      depth_mid[3 * i + 2] = 255;
+      depth_mid[3 * i + 1] = lb;
+      depth_mid[3 * i + 0] = 0;
+      break;
+    case 2:
+      depth_mid[3 * i + 2] = 255 - lb;
+      depth_mid[3 * i + 1] = 255;
+      depth_mid[3 * i + 0] = 0;
+      break;
+    case 3:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 255;
+      depth_mid[3 * i + 0] = lb;
+      break;
+    case 4:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 255 - lb;
+      depth_mid[3 * i + 0] = 255;
+      break;
+    case 5:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 0;
+      depth_mid[3 * i + 0] = 255 - lb;
+      break;
+    default:
+      depth_mid[3 * i + 2] = 0;
+      depth_mid[3 * i + 1] = 0;
+      depth_mid[3 * i + 0] = 0;
+      break;
     }
   }
-  return 0;
+  return image;
+}
+
+void *getImgAndDephKinect(void *arg) {
+  while (onAllThreads && cvWaitKey(10) < 0) {
+    semWait(sem_id, CAMERA_DEPTH_KINECT1);
+    //depth1Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
+    semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+    depthChooseKinect = 1;
+    semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+    semPost(sem_id, CAMERA_DEPTH_KINECT1);
+
+    semWait(sem_id, CAMERA_IMAGE_KINECT1);
+    img1Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
+    semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+    imageChooseKinect = 1;
+    semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+    semPost(sem_id, CAMERA_IMAGE_KINECT1);
+
+    cvWaitKey(10);
+
+    semWait(sem_id, CAMERA_DEPTH_KINECT2);
+    //depth2Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
+    semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+    depthChooseKinect = 2;
+    semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+    semPost(sem_id, CAMERA_DEPTH_KINECT2);
+
+    semWait(sem_id, CAMERA_IMAGE_KINECT2);
+    img2Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
+    semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+    imageChooseKinect = 2;
+    semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+    semPost(sem_id, CAMERA_IMAGE_KINECT2);
+  }
+  return NULL;
 }
 
 void *getImgL(void *arg) {
-  while (onAllThreads) {
+  while (onAllThreads && cvWaitKey(10) < 0) {
     //nacitanie obrazka z lavej kamery
     semWait(sem_id, CAMERA_IMAGE_L1);
     img1L = cvQueryFrame(cameraL);
@@ -801,6 +970,8 @@ void *getImgL(void *arg) {
     semPost(sem_id, CAMERA_VARIABLE_L);
     semPost(sem_id, CAMERA_IMAGE_L1);
 
+    cvWaitKey(10);
+
     semWait(sem_id, CAMERA_IMAGE_L2);
     img2L = cvQueryFrame(cameraL);
     semWait(sem_id, CAMERA_VARIABLE_L);
@@ -808,17 +979,19 @@ void *getImgL(void *arg) {
     semPost(sem_id, CAMERA_VARIABLE_L);
     semPost(sem_id, CAMERA_IMAGE_L2);
   }
-  return 0;
+  return NULL;
 }
 
 void *getImgR(void *arg) {
-  while (onAllThreads) {
+  while (onAllThreads && cvWaitKey(10) < 0) {
     semWait(sem_id, CAMERA_IMAGE_R1);
     img1R = cvQueryFrame(cameraR);
     semWait(sem_id, CAMERA_VARIABLE_R);
     imageChooseR = 1;
     semPost(sem_id, CAMERA_VARIABLE_R);
     semPost(sem_id, CAMERA_IMAGE_R1);
+
+    cvWaitKey(10);
 
     semWait(sem_id, CAMERA_IMAGE_R2);
     img2R = cvQueryFrame(cameraR);
@@ -827,7 +1000,7 @@ void *getImgR(void *arg) {
     semPost(sem_id, CAMERA_VARIABLE_R);
     semPost(sem_id, CAMERA_IMAGE_R2);
   }
-  return 0;
+  return NULL;
 }
 
 void *cameraNetworkConnection(void *arg) {
@@ -840,17 +1013,30 @@ void *cameraNetworkConnection(void *arg) {
       break;
     }
     char buffer [50];
-    sprintf (buffer, "recv data : %s\n", recvdata);
+    sprintf (buffer, "recv data : %s", recvdata);
     LOGInfo(CAMERA_CONN_TAG, buffer);
-    if (strcmp(recvdata, "imgL\n") == 0)     sendMatImage(getImageLeft(), 80);
-    else if (strcmp(recvdata, "imgR\n") == 0) sendMatImage(getImageRight(), 80);
-    else if (strcmp(recvdata, "imgK\n") == 0) sendMatImage(getImageKinect(), 80);
-    else if (strcmp(recvdata, "depK\n") == 0) sendMatImage(getDepthKinect(), 80);
+    if (strcmp(recvdata, "imgL\n") == 0) {
+      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img left sync.");
+      sendMatImage(getImageLeft(), 80);
+    }
+    else if (strcmp(recvdata, "imgR\n") == 0) {
+      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img right sync.");
+      sendMatImage(getImageRight(), 80);
+    }
+    else if (strcmp(recvdata, "imgK\n") == 0) {
+      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img kinect sync.");
+      sendMatImage(getImageKinect(), 80);
+    }
+    else if (strcmp(recvdata, "depK\n") == 0) {
+      LOGInfoDetail(SENSOR_CONN_TAG, "Depth img kinect sync.");
+      sendMatImage(getDepthKinect(), 80);
+    }
   }
-  return 0;
+  return NULL;
 }
 
 void *sensorsNetworkConnection(void *arg) {
+
   while (onWifiSensorStill) {
     char recvdata[30];
     int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
@@ -860,83 +1046,95 @@ void *sensorsNetworkConnection(void *arg) {
       break;
     }
     if (strcmp(recvdata, "sensor\n") == 0) {
+      LOGInfoDetail(SENSOR_CONN_TAG, "Sensor wifi sync.");
       //semWait(sem_id, 1);
       //sendMatImage(robotSensors.camera.imgLeft,80);
       //semPost(sem_id, 1);
     }
   }
-  return 0;
+  return NULL;
 }
 
 void *syncUltrasonic(void *arg) {
+  LOGInfoDetail(NUCLEO_TAG, "Start:Ultrasonic sync.");
   double value = getUltrasonic();
   semWait(sem_id, ROBOTSENSORS);
   robotSensors.ultrasonic = value;
   semPost(sem_id, ROBOTSENSORS);
-  return 0;
+  LOGInfoDetail(NUCLEO_TAG, "End:Ultrasonic sync.");
+  return NULL;
 }
 
 void *syncLeds(void *arg) {
+  LOGInfoDetail(NUCLEO_TAG, "Start:Leds sync.");
   semWait(sem_id, ROBOTACCULATORS);
   color_t LedUp = robotAcculators.leds.LedUp;
   color_t LedMiddle = robotAcculators.leds.LedMiddle;
   color_t LedDown = robotAcculators.leds.LedDown;
   semPost(sem_id, ROBOTACCULATORS);
   setLeds(LedUp, LedMiddle, LedDown);
-  return 0;
+  LOGInfoDetail(NUCLEO_TAG, "End:Leds sync.");
+  return NULL;
 }
 
 void *syncMotors(void *arg) {
+  LOGInfoDetail(NUCLEO_TAG, "Start:Motors sync.");
   direction_t  robotDirection = robotAcculators.robotDirection;
   unsigned int robotSpeed = robotAcculators.robotSpeed;
   semWait(sem_id, ROBOTACCULATORS);
   setMove(robotDirection, robotSpeed );
   semPost(sem_id, ROBOTACCULATORS);
-  return 0;
+  LOGInfoDetail(NUCLEO_TAG, "End:Motors sync.");
+  return NULL;
 }
 
 void *syncPossition(void *arg) {
+  LOGInfoDetail(NUCLEO_TAG, "Start:Possition sync.");
   semWait(sem_id, ROBOTSENSORS);
-
-//get possition
-
+  //get possition
   semPost(sem_id, ROBOTSENSORS);
-  return 0;
+  LOGInfoDetail(NUCLEO_TAG, "End:Possition sync.");
+  return NULL;
 }
 
 void *syncButtons(void *arg) {
+  LOGInfoDetail(NUCLEO_TAG, "Start:Buttons sync.");
   unsigned char buttons = getButtons();
   semWait(sem_id, ROBOTSENSORS);
   robotSensors.buttons.buttonDown = (buttons & 0x01) && 0x01;
   robotSensors.buttons.buttonMiddle = (buttons & 0x02) && 0x02;
   robotSensors.buttons.buttonUp = (buttons & 0x04) && 0x04;
   semPost(sem_id, ROBOTSENSORS);
-  return 0;
+  LOGInfoDetail(NUCLEO_TAG, "End:Buttons sync.");
+  return NULL;
 }
 
 void *syncKinectAcculators(void *arg) {
+  LOGInfoDetail(KINECT_TAG, "Start:Motor sync.");
   semWait(sem_id, ROBOTACCULATORS);
   //freenect_set_tilt_degs(dev, robotAcculators.kinect.roll);
-  freenect_set_led(dev, robotAcculators.leds.LedKinect);
+  freenect_set_led(kinect_dev, robotAcculators.leds.LedKinect);
   semPost(sem_id, ROBOTACCULATORS);
-  return 0;
+  LOGInfoDetail(KINECT_TAG, "End:Motor sync.");
+  return NULL;
 }
 
 void *syncKinectSensors(void *arg) {
+  LOGInfoDetail(KINECT_TAG, "Start:Sensor sync.");
   freenect_raw_tilt_state *state = 0;
   // Get the raw accelerometer values and tilt data
-  state = freenect_get_tilt_state(dev);
+  state = freenect_get_tilt_state(kinect_dev);
   semWait(sem_id, ROBOTSENSORS);
   // Get the processed accelerometer values (calibrated to gravity)
   freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
   robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
   semPost(sem_id, ROBOTSENSORS);
-  return 0;
+  LOGInfoDetail(KINECT_TAG, "End:Sensor sync.");
+  return NULL;
 }
 
 #define numberOfModules 7
 void *syncModules(void *arg) {
-  pthread_t threads[numberOfModules];
   unsigned long timeRunThread[numberOfModules];
   for (int i = 0; i < numberOfModules; i++) {
     timeRunThread[i] = 0;
@@ -944,56 +1142,64 @@ void *syncModules(void *arg) {
   int threadIndex = 0;
   struct timespec tstart = {0, 0}, tend = {0, 0};
   while (onAllThreads) {
-    threadIndex = 0;
+
     clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-    if (ENABLE_MOTORS && timeRunThread[threadIndex] > SYNC_MOTORS_TIME) {
-      LOGInfoDetail(NUCLEO_TAG, "Motors sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncMotors, NULL);
-      timeRunThread[threadIndex++] = 0;
+    threadIndex = 0;
+    if (ENABLE_MOTORS && (timeRunThread[threadIndex] > SYNC_MOTORS_TIME)) {
+      syncMotors(NULL);
+      timeRunThread[threadIndex] = 0;
+    }
+    threadIndex++;
+
+    if (ENABLE_ULTRASONIC && (timeRunThread[threadIndex] > SYNC_ULTRASONIC_TIME)) {
+      syncUltrasonic(NULL);
+      timeRunThread[threadIndex] = 0;
+
+    }
+    threadIndex++;
+
+    if (ENABLE_LEDS && (timeRunThread[threadIndex] > SYNC_LEDS_TIME)) {
+      syncLeds(NULL);
+      timeRunThread[threadIndex] = 0;
+
+    }
+    threadIndex++;
+
+    if (ENABLE_BUTTONS && (timeRunThread[threadIndex] > SYNC_BUTTONS_TIME)) {
+      syncButtons(NULL);
+      timeRunThread[threadIndex] = 0;
+
+    }
+    threadIndex++;
+
+    if (ENABLE_POSSITION && (timeRunThread[threadIndex] > SYNC_POSSITION_TIME)) {
+      syncPossition(NULL);
+      timeRunThread[threadIndex] = 0;
+
+    }
+    threadIndex++;
+
+    if (ENABLE_KINECTACCULATORS && (timeRunThread[threadIndex] > SYNC_KINECTACCULATORS_TIME)) {
+      syncKinectAcculators(NULL);
+      timeRunThread[threadIndex] = 0;
+
+    }
+    threadIndex++;
+
+    if (ENABLE_KINECTSENSORS && (timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME)) {
+      syncKinectSensors(NULL);
+      timeRunThread[threadIndex] = 0;
     }
 
-    if (ENABLE_ULTRASONIC && timeRunThread[threadIndex] > SYNC_ULTRASONIC_TIME) {
-      LOGInfoDetail(NUCLEO_TAG, "Ultrasonic sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncUltrasonic, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
-
-    if (ENABLE_LEDS && timeRunThread[threadIndex] > SYNC_LEDS_TIME) {
-      LOGInfoDetail(NUCLEO_TAG, "Leds sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncLeds, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
-
-    if (ENABLE_BUTTONS && timeRunThread[threadIndex] > SYNC_BUTTONS_TIME) {
-      LOGInfoDetail(NUCLEO_TAG, "Buttons sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncButtons, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
-
-    if (ENABLE_POSSITION && timeRunThread[threadIndex] > SYNC_POSSITION_TIME) {
-      LOGInfoDetail(NUCLEO_TAG, "Possition sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncPossition, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
-
-    if (ENABLE_KINECTACCULATORS && timeRunThread[threadIndex] > SYNC_KINECTACCULATORS_TIME) {
-      LOGInfoDetail(KINECT_TAG, "Motor sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncKinectAcculators, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
-
-    if (ENABLE_KINECTSENSORS && timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME) {
-      LOGInfoDetail(KINECT_TAG, "Sensor sync.");
-      pthread_create(&threads[threadIndex], NULL, &syncKinectSensors, NULL);
-      timeRunThread[threadIndex++] = 0;
-    }
     usleep(SYNC_MIN_TIME);
     clock_gettime(CLOCK_MONOTONIC, &tend);
 
-    unsigned long deltaTimeRun = (tend.tv_nsec - tstart.tv_nsec) / 1000000;
+    unsigned long deltaTimeRun = ((tend.tv_nsec - tstart.tv_nsec) / 1000);
+
     for (int i = 0; i < numberOfModules; i++) {
-      timeRunThread[i] += deltaTimeRun;
+      if (timeRunThread[i] < SYNC_MIN_TIME * 1000)
+        timeRunThread[i] += deltaTimeRun;
     }
   }
   return 0;
@@ -1003,6 +1209,7 @@ void sigctrl(int param) {
   closeRobot();
   exit(param);
 }
+
 void sigpipe(int param) {
   closeRobot();
   exit(param);
