@@ -10,6 +10,6 @@ void InitializePWMServo(void);
 
 void setServoRaw(uint32_t value);
 
-void setServo(double angle);
+void setServo(int16_t angle);
 
 #endif /* SERVO_H_ */

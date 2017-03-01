@@ -1,9 +1,7 @@
 #include <I2CMasterLib/I2CMasterLib.h>
 
-#define I2C_READ_TIMEOUT 10000
-uint32_t I2C_Rx_Buffer[10];
-uint8_t deviceAddrUseI2c = 0;
-uint8_t readReg = 0;
+volatile static uint8_t readReg = 0;
+volatile static uint32_t I2C_Rx_Buffer[5];
 
 void I2C2_initDMA(void) {
 	NVIC_InitTypeDef NVIC_InitStructure;
@@ -30,31 +28,6 @@ void I2C2_initDMA(void) {
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
-}
-
-uint8_t I2C2_getDeviceAddress(void) {
-	return deviceAddrUseI2c;
-}
-
-void I2C2_clearDeviceAddress(void) {
-	deviceAddrUseI2c = 0;
-}
-
-uint32_t I2C2_getRxBuffer(int index) {
-	return I2C_Rx_Buffer[index];
-}
-
-uint8_t I2C2_getReadRegister(void) {
-	return readReg;
-}
-
-void I2C2_clearReadRegister(void) {
-	readReg = 0;
-}
-
-void I2C2_clearAll(void){
-	I2C2_clearReadRegister();
-	I2C2_clearDeviceAddress();
 }
 
 void I2C2_Init(void) {
@@ -89,26 +62,29 @@ void I2C2_Init(void) {
 	I2C2_initDMA();
 }
 
-void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_t writeAddr) {
+void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,
+		uint8_t writeAddr) {
 	uint16_t timeout_var = 0;
 
 	I2C_GenerateSTART(I2C2, ENABLE);
 
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)){
-		if(I2C_TIMEOUT < timeout_var++){
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	I2C_Send7bitAddress(I2C2, slaveAddr, I2C_Direction_Transmitter);
 
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)){
-		if(I2C_TIMEOUT < timeout_var++){
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	I2C_SendData(I2C2, writeAddr);
 	for (int i = 0; i < length; i++) {
@@ -116,8 +92,9 @@ void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_
 		for (int x = 0; x < 1000; x++)
 			;
 	}
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)){
-		if(I2C_TIMEOUT < timeout_var++){
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
 			return;
 		}
 	}
@@ -126,11 +103,12 @@ void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_
 
 }
 
-void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceive) {
+void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,
+		uint8_t numberBytesReceive) {
 	uint16_t timeout_var = 0;
-	while (deviceAddrUseI2c != 0 && timeout_var++ < DMA_TIMEOUT);
-	timeout_var=0;
-	deviceAddrUseI2c = slaveAddr;
+	while (readReg != 0 && timeout_var++ < DMA_TIMEOUT)
+		;
+	timeout_var = 0;
 	readReg = readAddr;
 
 	/* Disable DMA channel*/
@@ -139,13 +117,14 @@ void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceiv
 	DMA_SetCurrDataCounter(DMA1_Channel5, numberBytesReceive);
 
 	/* While the bus is busy */
-	while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Enable DMA NACK automatic generation */
 	I2C_DMALastTransferCmd(I2C2, ENABLE); //Note this one, very important
@@ -154,27 +133,29 @@ void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceiv
 	I2C_GenerateSTART(I2C2, ENABLE);
 
 	/* Test on EV5 and clear it */
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Send MPU6050 address for write */
 	I2C_Send7bitAddress(I2C2, slaveAddr, I2C_Direction_Transmitter);
 
 	/* Test on EV6 and clear it */
 	while (!I2C_CheckEvent(I2C2,
-	I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
 
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Clear EV6 by setting again the PE bit */
 	I2C_Cmd(I2C2, ENABLE);
@@ -183,54 +164,94 @@ void I2C2_DMA_Read(uint8_t slaveAddr, uint8_t readAddr,uint8_t numberBytesReceiv
 	I2C_SendData(I2C2, readAddr);
 
 	/* Test on EV8 and clear it */
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Send STRAT condition a second time */
 	I2C_GenerateSTART(I2C2, ENABLE);
 
 	/* Test on EV5 and clear it */
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Send MPU6050 address for read */
 	I2C_Send7bitAddress(I2C2, slaveAddr, I2C_Direction_Receiver);
 
 	/* Test on EV6 and clear it */
-	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED)){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED)) {
+		if (I2C_TIMEOUT < timeout_var++) {
+			I2C2_Init();
+			readReg = 0;
 			return;
 		}
 	}
-	timeout_var=0;
+	timeout_var = 0;
 
 	/* Start DMA to receive data from I2C */
 	DMA_Cmd(DMA1_Channel5, ENABLE);
 	I2C_DMACmd(I2C2, ENABLE);
 }
 
-void I2C2_WriteRegisterValue(uint8_t slaveAddr,uint8_t regAddr,uint8_t val){
+void I2C2_DMA_Stop(){
+	DMA_ClearFlag(DMA1_FLAG_TC5);
+	I2C_DMACmd(I2C2, DISABLE);
+	I2C_GenerateSTOP(I2C2, ENABLE);
+	DMA_Cmd(DMA1_Channel5, DISABLE);
+	I2C2_clearReadRegister();
+}
+
+void I2C2_WriteRegisterValue(uint8_t slaveAddr, uint8_t regAddr, uint8_t val) {
 	uint8_t tmp[1];
 	tmp[0] = val;
 	I2C2_BytesWrite(slaveAddr, tmp, 1, regAddr);
 }
 
-uint8_t I2C2_ReadRegister8(uint8_t slaveAddr,uint8_t regAddr){
-
+void I2C2_clearReadRegister(){
+	readReg = 0;
 }
 
-uint8_t I2C2_ReadRegisterBit(uint8_t slaveAddr,uint8_t regAddr, uint8_t pin){
+uint8_t I2C2_ReadRegister8(uint8_t slaveAddr, uint8_t regAddr) {
+	I2C2_DMA_Read(slaveAddr, regAddr, 1);
+	uint16_t timeout = 0;
+	uint8_t wait = readReg;
+	while (wait != 0){
+		for(int i=0;i<10;i++);
+		wait = readReg;
+		if(timeout++ > DMA_TIMEOUT){
+			I2C2_DMA_Stop();
+			return 0;
+		}
+	}
+	return I2C_Rx_Buffer[0];
+}
 
+uint16_t I2C2_ReadRegister16(uint8_t slaveAddr, uint8_t regAddr) {
+	I2C2_DMA_Read(slaveAddr, regAddr, 2);
+	uint16_t timeout = 0;
+	uint8_t wait = readReg;
+	while (wait != 0){
+		for(int i=0;i<10;i++);
+		wait = readReg;
+		if(timeout++ > DMA_TIMEOUT){
+			I2C2_DMA_Stop();
+			return 0;
+		}
+	}
+	return I2C_Rx_Buffer[0];
+}
 
+uint8_t I2C2_ReadRegisterBit(uint8_t slaveAddr, uint8_t regAddr, uint8_t pin) {
+	return (I2C2_ReadRegister8(slaveAddr, regAddr) & (1 << pin)) && (1 << pin);
 }

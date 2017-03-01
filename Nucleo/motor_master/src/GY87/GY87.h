@@ -111,9 +111,7 @@ private:
 	double mgPerDigit = 0.92f;
 	double rangePerDigit = 0.0f;
 	double dpsPerDigit = 0.0f;
-	unsigned char I2CAddressMPU6050;
-	unsigned char I2CAddressHMC5883L;
-	unsigned char I2CAddressBMP180;
+
 
 	typedef enum {
 		MPU6050_CLOCK_KEEP_RESET = 0b111,
@@ -199,7 +197,9 @@ private:
 
 	double kalmanCalculate(int indexKalman, double acc, double gy, double dt);
 public:
-
+	unsigned char I2CAddressMPU6050;
+	unsigned char I2CAddressHMC5883L;
+	unsigned char I2CAddressBMP180;
 	GY87(unsigned char I2CAddressMPU6050, unsigned char I2CAddressHMC5883L,
 			unsigned char I2CAddressBMP180);
 

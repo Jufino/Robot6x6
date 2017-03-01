@@ -27,7 +27,7 @@ const uint8_t MOTORSADDR[] = { MOTOR1, MOTOR2, MOTOR3, MOTOR4, MOTOR5, MOTOR6 };
 #define GETCURRENTREG 2
 #define GETDELTATICKSREG 3
 #define GETVOLTAGEREG 4
-#define GETWHO_I_AM 255
+#define GETWHO_I_AM 111
 //------------------------------------------------------------------
 #define wheelDiameter 86
 #define lengthBetweenLeftAndRightWheel 250
@@ -41,15 +41,14 @@ private:
 	int16_t speedRaw;
 	uint16_t voltageRaw;
 	uint16_t current;
-	bool test;
 public:
 	Motor(uint8_t motorAddr);
 	//------------------------------------------------------------------
 	virtual ~Motor();
 
-	void setSpeedMotor(double mPerSec);
+	void setSpeedMotor(int16_t mPerSec);
 	//------------------------------------------------------------------
-	void setAngleSpeedMotor(double anglePerSec);
+	void setAngleSpeedMotor(int16_t anglePerSec);
 	//------------------------------------------------------------------
 	void setSpeedRawMotor(int16_t data);
 	//------------------------------------------------------------------
@@ -66,6 +65,8 @@ public:
 	void DMASpeedInvoke(void);
 	//------------------------------------------------------------------
 	void addDeltaTicks(int16_t data);
+	//------------------------------------------------------------------
+	void setTicks(long ticks);
 	//------------------------------------------------------------------
 	double getDistance(void);
 	//------------------------------------------------------------------

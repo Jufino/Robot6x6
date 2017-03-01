@@ -1,7 +1,8 @@
 #include <Wire.h>
 /*I2C adresa*/
 #define I2CDebug false
-#define addressI2C 0x06 //motory cislovane  z lava vzadu 
+#define speedAndCurrentDebug false
+#define addressI2C 0x01 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureCurrentAction 50
 #define measureSpeedAction 25
@@ -53,6 +54,11 @@ volatile char c = -1;
 volatile int measureSpeed = 0;
 volatile double averageMeasureCurrent = 0;
 volatile unsigned int measureVoltage = 0;
+byte measureSpeedToSend[2];
+byte currentToSend[2];
+byte numberTickToSend[2];
+byte voltageToSend[2];
+byte addressI2CToSend[] = {addressI2C};
 /*--------------------------------------------------*/
 void encoderMotor() {
   char pinA = digitalRead(2);
@@ -109,6 +115,8 @@ void encoderMotor() {
   else {
     combLast = comb;
   }
+  numberTickToSend[0] = (numberTickForI2C & 0xFF);
+  numberTickToSend[1] = (numberTickForI2C >> 8) & 0xFF;
 }
 /*--------------------------------------------------*/
 SIGNAL(TIMER1_OVF_vect)
@@ -135,7 +143,7 @@ void motor(int pwm) {
 }
 /*--------------------------------------------------*/
 void setup() {
-  if (measureDebugCurrent || measureDebugSpeed || I2CDebug)
+  if (measureDebugCurrent || measureDebugSpeed || I2CDebug || speedAndCurrentDebug)
     Serial.begin(9600);
 
   pinMode(10, OUTPUT);
@@ -212,34 +220,26 @@ void receiveEvent(int howMany) {
 }
 /*--------------------------------------------------*/
 void requestEvent() {
-  byte data[2];
-  unsigned int current;
   switch (c) {
     case 1:
-      data[0] = (measureSpeed & 0xFF);
-      data[1] = (measureSpeed >> 8) & 0xFF;
-      Wire.write(data, 2);
+      Wire.write(measureSpeedToSend, 2);
       break;
     case 2:
-      current = averageMeasureCurrent;
-      data[0] = (current & 0xFF);
-      data[1] = (current >> 8) & 0xFF;
-      Wire.write(data, 2);
+      Wire.write(currentToSend, 2);
       break;
     case 3:
-      data[0] = (numberTickForI2C & 0xFF);
-      data[1] = (numberTickForI2C >> 8) & 0xFF;
+      Wire.write(numberTickToSend, 2);
+      Serial.print(numberTickForI2C, DEC);
+      Serial.print("/");
       numberTickForI2C = 0;
-      Wire.write(data, 2);
+      numberTickToSend[0] = 0;
+      numberTickToSend[1] = 0;
       break;
     case 4:
-      data[0] = (measureVoltage & 0xFF);
-      data[1] = (measureVoltage >> 8) & 0xFF;
-      Wire.write(data, 2);
+      Wire.write(voltageToSend, 2);
       break;
     case 111:
-      data[0] = addressI2C;
-      Wire.write(data, 1);
+      Wire.write(addressI2CToSend, 1);
       break;
   }
   if (I2CDebug) {
@@ -302,6 +302,10 @@ void loop() {
     else {
       averageMeasureCurrent = ((double)(sumCurrent / timesCurrentMeasure)) * (5 / 1.023);
     }
+    //priprava dat pre i2c
+    currentToSend[0] = ((unsigned int)averageMeasureCurrent & 0xFF);
+    currentToSend[1] = ((unsigned int)averageMeasureCurrent >> 8) & 0xFF;
+    //-----------------
     sumCurrent = 0;
     timesCurrentMeasure = 0;
     periodDone = false;
@@ -314,9 +318,15 @@ void loop() {
     double speedWheel = numberTick - numberTickLast;
     numberTickLast = numberTick;
     measureSpeed = (int)speedWheel;
-//    Serial.print(averageMeasureCurrent);
-//    Serial.print("/");
-//    Serial.println(speedWheel);
+    //priprava dat pre i2c
+    measureSpeedToSend[0] = (measureSpeed & 0xFF);
+    measureSpeedToSend[1] = (measureSpeed >> 8) & 0xFF;
+    //------
+    if (speedAndCurrentDebug) {
+      Serial.print(averageMeasureCurrent);
+      Serial.print("/");
+      Serial.println(speedWheel);
+    }
     /*--------------------------------------------------*/
     if (onSpeedReg) {
       /*PI regulator rychlosti*/
@@ -404,6 +414,8 @@ void loop() {
   /*meranie napatia*/
   if (time_integral[2] >= periodVoltageMeasure) {
     measureVoltage = analogRead(A2);
+    voltageToSend[0] = (measureVoltage & 0xFF);
+    voltageToSend[1] = (measureVoltage >> 8) & 0xFF;
     time_integral[2] = 0;
   }
   /*--------------------------------------------------*/
