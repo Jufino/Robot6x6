@@ -1,0 +1,18 @@
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.Form1.resources
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.Properties.Resources.resources
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\bin\Debug\webcam.exe
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\bin\Debug\webcam.pdb
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.exe
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.pdb
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.csprojResolveAssemblyReference.cache
+C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.csproj.GenerateResource.Cache
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.exe
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.pdb
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\bin\Debug\webcam.exe
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\bin\Debug\webcam.pdb
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.csprojResolveAssemblyReference.cache
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.Form1.resources
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.Properties.Resources.resources
+C:\Users\Juraj\Documents\Visual Studio 2008\Projects\webcam\webcam\obj\Debug\webcam.csproj.GenerateResource.Cache
+C:\Users\Juraj\Documents\GitHub\Robot6x6\webcam_console\webcam\obj\Debug\webcam.exe
+C:\Users\Juraj\Documents\GitHub\Robot6x6\webcam_console\webcam\obj\Debug\webcam.pdb
