@@ -65,6 +65,9 @@ void charTag(log_tag_t tag, char *buffer) {
   case MOTOR_TAG:
     sprintf(buffer, "MOTOR");
     break;
+  case ROBOT_TAG:
+    sprintf(buffer, "ROBOT");
+    break;
   }
 }
 
@@ -368,6 +371,7 @@ void initRobot(void) {
 }
 
 void closeRobot(void) {
+  LOGInfo(ROBOT_TAG, "Robot closing...");
   onAllThreads = false;
 
   if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
@@ -512,11 +516,13 @@ char writeRegister(unsigned char addr, unsigned char reg) {
 unsigned int readRegister16(unsigned char addr, unsigned char reg) {
   if (writeRegister(addr, reg) == 0) {
     char data[2];
+
     if (read(i2cHandle, data, 2) != 2) {
       char buffer [50];
       sprintf (buffer, "addr:%i, read register %i", (int)addr, (int)reg);
       LOGError(I2C_TAG, buffer);
     }
+
     return (data[0] << 8) | (data[1] & 0xFF);
   }
   else return 0;
@@ -525,12 +531,29 @@ unsigned int readRegister16(unsigned char addr, unsigned char reg) {
 signed int readRegister16s(unsigned char addr, unsigned char reg) {
   if (writeRegister(addr, reg) == 0) {
     signed char data[2];
+
     if (read(i2cHandle, data, 2) != 2) {
       char buffer [50];
       sprintf (buffer, "addr:%i, read register %i", (int)addr, (int)reg);
       LOGError(I2C_TAG, buffer);
     }
+
     return (data[0] << 8) | (data[1] & 0xFF);
+  }
+  else return 0;
+}
+
+signed long readRegister32s(unsigned char addr, unsigned char reg) {
+  if (writeRegister(addr, reg) == 0) {
+    signed char data[4];
+
+    if (read(i2cHandle, data, 4) != 4) {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, read register %i", (int)addr, (int)reg);
+      LOGError(I2C_TAG, buffer);
+    }
+
+    return (((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) | ((data[2] & 0xFF) << 8) | (data[3] & 0xFF));
   }
   else return 0;
 }
@@ -538,11 +561,13 @@ signed int readRegister16s(unsigned char addr, unsigned char reg) {
 unsigned char readRegister8(unsigned char addr, unsigned char reg) {
   if (writeRegister(addr, reg) == 0) {
     signed char data[1];
+
     if (read(i2cHandle, data, 1) != 1) {
       char buffer [50];
       sprintf (buffer, "addr:%i, read register %i", (int)addr, (int)reg);
       LOGError(I2C_TAG, buffer);
     }
+
     return data[0];
   }
   else return 0;
@@ -769,7 +794,7 @@ void setMove(direction_t direction, unsigned int speed) {
     writeRegisterAndValueU16(STM32_ADDRESS, 10, speed);
     break;
   default:
-    writeRegisterAndValueU16(STM32_ADDRESS, 11, speed);
+    writeRegister(STM32_ADDRESS, 11);
   }
   semPost(sem_id, I2C);
 }
@@ -836,6 +861,26 @@ unsigned char getButtons(void) {
   unsigned char value = readRegister8(STM32_ADDRESS, 106);
   semPost(sem_id, I2C);
   return value;
+}
+
+Axis_struct getPossitionAxis(void) {
+  Axis_struct axis;
+  semWait(sem_id, I2C);
+  axis.x = readRegister32s(STM32_ADDRESS, 100);
+  axis.y = readRegister32s(STM32_ADDRESS, 101);
+  axis.z = readRegister32s(STM32_ADDRESS, 102);
+  semPost(sem_id, I2C);
+  return axis;
+}
+
+Angle3d_struct getPossitionAngle3d(void) {
+  Angle3d_struct angle3d;
+  semWait(sem_id, I2C);
+  angle3d.roll = ((double)readRegister16(STM32_ADDRESS, 103))/10000;
+  angle3d.pitch = ((double)readRegister16(STM32_ADDRESS, 104))/10000;
+  angle3d.yaw = ((double)readRegister16(STM32_ADDRESS, 105))/10000;
+  semPost(sem_id, I2C);
+  return angle3d;
 }
 
 double dist(double a, double b) {
@@ -1090,8 +1135,15 @@ void *syncMotors(void *arg) {
 
 void *syncPossition(void *arg) {
   LOGInfoDetail(NUCLEO_TAG, "Start:Possition sync.");
+  Axis_struct axis = getPossitionAxis();
+  Angle3d_struct angle = getPossitionAngle3d();
   semWait(sem_id, ROBOTSENSORS);
-  //get possition
+  robotSensors.robotPosition.axisPossition.x = axis.x;
+  robotSensors.robotPosition.axisPossition.y = axis.y;
+  robotSensors.robotPosition.axisPossition.z = axis.z;
+  robotSensors.robotPosition.anglePossition.roll = angle.roll;
+  robotSensors.robotPosition.anglePossition.pitch = angle.pitch;
+  robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
   semPost(sem_id, ROBOTSENSORS);
   LOGInfoDetail(NUCLEO_TAG, "End:Possition sync.");
   return NULL;
@@ -1152,53 +1204,61 @@ void *syncModules(void *arg) {
     }
     threadIndex++;
 
+    usleep(SYNC_MIN_TIME / numberOfModules);
+
     if (ENABLE_ULTRASONIC && (timeRunThread[threadIndex] > SYNC_ULTRASONIC_TIME)) {
       syncUltrasonic(NULL);
       timeRunThread[threadIndex] = 0;
-
     }
     threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
 
     if (ENABLE_LEDS && (timeRunThread[threadIndex] > SYNC_LEDS_TIME)) {
       syncLeds(NULL);
       timeRunThread[threadIndex] = 0;
-
     }
     threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
 
     if (ENABLE_BUTTONS && (timeRunThread[threadIndex] > SYNC_BUTTONS_TIME)) {
       syncButtons(NULL);
       timeRunThread[threadIndex] = 0;
-
     }
     threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
 
     if (ENABLE_POSSITION && (timeRunThread[threadIndex] > SYNC_POSSITION_TIME)) {
       syncPossition(NULL);
       timeRunThread[threadIndex] = 0;
-
     }
     threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
 
     if (ENABLE_KINECTACCULATORS && (timeRunThread[threadIndex] > SYNC_KINECTACCULATORS_TIME)) {
       syncKinectAcculators(NULL);
       timeRunThread[threadIndex] = 0;
-
     }
     threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
 
     if (ENABLE_KINECTSENSORS && (timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME)) {
       syncKinectSensors(NULL);
       timeRunThread[threadIndex] = 0;
     }
 
-    usleep(SYNC_MIN_TIME);
+    usleep(SYNC_MIN_TIME / numberOfModules);
+
     clock_gettime(CLOCK_MONOTONIC, &tend);
 
     unsigned long deltaTimeRun = ((tend.tv_nsec - tstart.tv_nsec) / 1000);
 
     for (int i = 0; i < numberOfModules; i++) {
-      if (timeRunThread[i] < SYNC_MIN_TIME * 1000)
+      if (timeRunThread[i] <= SYNC_MIN_TIME * 1000)
         timeRunThread[i] += deltaTimeRun;
     }
   }

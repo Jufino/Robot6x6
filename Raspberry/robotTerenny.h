@@ -48,18 +48,18 @@ extern "C" {
 #define SENSORS_PORT 1213
 
 #define SYNC_MIN_TIME 1000 // 1 ms
-#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*100
-#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
-#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*100
-#define SYNC_LEDS_TIME              SYNC_MIN_TIME*100
-#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*60
+#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*50
+#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*200
+#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*50
+#define SYNC_LEDS_TIME              SYNC_MIN_TIME*50
+#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*50
 
 #define ENABLE_I2C 1        //ok
-#define ENABLE_MOTORS 1
-#define ENABLE_ULTRASONIC 0 //ok
-#define ENABLE_LEDS 1       //ok
+#define ENABLE_MOTORS 1    //ok
+#define ENABLE_ULTRASONIC 1 //ok
+#define ENABLE_LEDS 1      //ok
 #define ENABLE_BUTTONS 1    //ok
-#define ENABLE_POSSITION 0
+#define ENABLE_POSSITION 1  //ok
 
 #define SYNC_KINECTACCULATORS_TIME SYNC_MIN_TIME*10
 #define SYNC_KINECTSENSORS_TIME    SYNC_MIN_TIME*20
@@ -80,7 +80,7 @@ extern "C" {
 
 #define ENABLE_LOG_ERROR 1
 #define ENABLE_LOG_INFO 1
-#define ENABLE_LOG_INFO_DETAIL 1
+#define ENABLE_LOG_INFO_DETAIL 0
 
 typedef enum {
   CAMERA_VARIABLE_L,
@@ -107,7 +107,8 @@ typedef enum {
   SENSOR_CONN_TAG,
   CAMERA_CONN_TAG,
   MOTOR_TAG,
-  NUCLEO_TAG
+  NUCLEO_TAG,
+  ROBOT_TAG
 } log_tag_t;
 
 //ostatne
