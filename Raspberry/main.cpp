@@ -51,8 +51,9 @@ int main(void) {
     robotAcculators.leds.LedDown = COLOR_RED;
     setRobotAcculators(robotAcculators);
 
+    printf("x: %f, y: %f, z: %f,roll: %f, pitch: %f, yaw: %f\n",robotSensors.robotPosition.axisPossition.x,robotSensors.robotPosition.axisPossition.y,robotSensors.robotPosition.axisPossition.z,robotSensors.robotPosition.anglePossition.roll,robotSensors.robotPosition.anglePossition.pitch,robotSensors.robotPosition.anglePossition.yaw);
 
-    printf("bUp:%d;bMiddle:%d;bDown:%d\n", robotSensors.buttons.buttonUp, robotSensors.buttons.buttonMiddle, robotSensors.buttons.buttonDown);
+    //printf("bUp:%d;bMiddle:%d;bDown:%d\n", robotSensors.buttons.buttonUp, robotSensors.buttons.buttonMiddle, robotSensors.buttons.buttonDown);
 
     sleep(1);
   }
