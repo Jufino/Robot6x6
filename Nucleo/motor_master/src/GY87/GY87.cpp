@@ -13,12 +13,16 @@ GY87::GY87(unsigned char I2CAddressMPU6050, unsigned char I2CAddressHMC5883L,
 	this->I2CAddressHMC5883L = I2CAddressHMC5883L;
 	this->I2CAddressBMP180 = I2CAddressBMP180;
 
+	bool test = MPU6050TestConnection();
+
 	setMPU6050ScaleSetting(MPU6050_SCALE_2000DPS);
 	setMPU6050RangeSetting(MPU6050_RANGE_2G);
 	setMPU6050DLPFModeSetting(MPU6050_DLPF_3);
 	setMPU6050I2CMasterModeEnabledSetting(false);
 	setMPU6050I2CBypassEnabledSetting(true) ;
 	setMPU6050SleepEnabledSetting(false);
+	bool test1 = getMPU6050I2CBypassEnabledSetting();
+	bool test2 = getMPU6050I2CMasterModeEnabledSetting();
 
 	setHMC5883LMeasurementSetting(HMC5883L_NORMAL);
 	setHMC5883LSampleSetting(HMC5883L_SAMPLES_8);
@@ -63,7 +67,7 @@ GY87::hmc5883l_dataRate_t getHMC5883LRateSetting(void) {
 }*/
 
 void GY87::setHMC5883LRateSetting(hmc5883l_dataRate_t datarate) {
-	char oldRegister = 0;//readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_A) & 0b11100011;
+	char oldRegister = I2C2_ReadRegister8(I2CAddressHMC5883L, HMC5883L_REG_CONFIG_A) & 0b11100011;
 	I2C2_WriteRegisterValue(this->I2CAddressHMC5883L,HMC5883L_REG_CONFIG_A, oldRegister | (datarate << 2));
 }
 
@@ -102,7 +106,7 @@ hmc5883l_mode_t GY87::getHMC5883LReadModeSetting(void) {
 }
 */
 void GY87::setHMC5883LReadModeSetting(hmc5883l_mode_t mode) {
-	char oldRegister = 0;//readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_MODE) & 0b10000000;
+	char oldRegister = I2C2_ReadRegister8(I2CAddressHMC5883L, HMC5883L_REG_MODE) & 0b10000000;
 	I2C2_WriteRegisterValue(this->I2CAddressHMC5883L,HMC5883L_REG_MODE, oldRegister | mode);
 }
 
@@ -111,10 +115,14 @@ bool GY87::getHMC5883LHighI2CSpeedSetting(bool status) {
 }
 
 void GY87::setHMC5883LHighI2CSpeedSetting(bool status) {
-	char oldRegister = 0;//readRegister8(HMC5883L_ADDRESS, HMC5883L_REG_CONFIG_B) & 0b00000011;
+	char oldRegister = I2C2_ReadRegister8(I2CAddressHMC5883L, HMC5883L_REG_CONFIG_B) & 0b00000011;
 	if (status)
 	oldRegister |= 0x80;
 	I2C2_WriteRegisterValue(this->I2CAddressHMC5883L,HMC5883L_REG_CONFIG_B, oldRegister);
+}
+
+bool GY87::MPU6050TestConnection(void) {
+	return I2C2_ReadRegister8(this->I2CAddressMPU6050, MPU6050_REG_WHO_AM_I) && this->I2CAddressMPU6050;
 }
 
 /*
@@ -173,9 +181,7 @@ GY87::HMC5883L_struct getHMC5883LNorm(void) {
 	return HMC5883L;
 }
 
-GY87::bool MPU6050TestConnection(void) {
-	return readRegister8(MPU6050_ADDRESS, MPU6050_REG_WHO_AM_I) && MPU6050_ADDRESS;
-}
+
 
 GY87::void callibrateMPU6050Gyroscope(int samples) {
 	double sumX = 0;
@@ -294,21 +300,21 @@ GY87::mpu6050_range_t getMPU6050RangeSetting(void) {
 
 void GY87::setMPU6050DHPFModeSetting(mpu6050_dhpf_t dhpf)
 {
-	char oldRegister = 0;//readRegister8(MPU6050_ADDRESS, MPU6050_REG_ACCEL_CONFIG) & 0b11111000;
+	char oldRegister = I2C2_ReadRegister8(this->I2CAddressMPU6050, MPU6050_REG_ACCEL_CONFIG) & 0b11111000;
 	oldRegister |= dhpf;
 	I2C2_WriteRegisterValue(this->I2CAddressMPU6050,MPU6050_REG_ACCEL_CONFIG, oldRegister);
 }
 
 void GY87::setMPU6050DLPFModeSetting(mpu6050_dlpf_t dlpf)
 {
-	char oldRegister = 0;//readRegister8(MPU6050_ADDRESS, MPU6050_REG_CONFIG) & 0b11111000;
+	char oldRegister = I2C2_ReadRegister8(this->I2CAddressMPU6050, MPU6050_REG_CONFIG) & 0b11111000;
 	oldRegister |= dlpf;
 	I2C2_WriteRegisterValue(this->I2CAddressMPU6050,MPU6050_REG_CONFIG, oldRegister);
 }
 
 void GY87::setMPU6050ClockSourceSetting(mpu6050_clockSource_t source)
 {
-	char oldRegister = 0;//readRegister8(MPU6050_ADDRESS, MPU6050_REG_PWR_MGMT_1) & 0b11111000;
+	char oldRegister = I2C2_ReadRegister8(this->I2CAddressMPU6050, MPU6050_REG_PWR_MGMT_1) & 0b11111000;
 	oldRegister |= source;
 	I2C2_WriteRegisterValue(this->I2CAddressMPU6050,MPU6050_REG_PWR_MGMT_1, oldRegister);
 }
@@ -341,7 +347,7 @@ void GY87::setMPU6050I2CMasterModeEnabledSetting(bool state)
 {
 	char oldRegister = I2C2_ReadRegister8(this->I2CAddressMPU6050, MPU6050_REG_USER_CTRL) & !(1 << 5);
 	if (state)
-	oldRegister |= (1 << 5);
+		oldRegister |= (1 << 5);
 	I2C2_WriteRegisterValue(this->I2CAddressMPU6050,MPU6050_REG_USER_CTRL, oldRegister);
 }
 

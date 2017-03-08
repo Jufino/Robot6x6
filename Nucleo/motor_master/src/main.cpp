@@ -9,6 +9,7 @@ Motor *motor3 = new Motor(MOTOR3);
 Motor *motor4 = new Motor(MOTOR4);
 Motor *motor5 = new Motor(MOTOR5);
 Motor *motor6 = new Motor(MOTOR6);
+
 Motor *getMotor(int i) {
 	switch (i) {
 	case 1:
@@ -43,19 +44,12 @@ enum Direction {
 };
 
 #define I2C1_MAX_SEND_BUFFER 4
-uint16_t I2C1_RegValue;
-bool I2C1_RecvRegDone = false;
-int16_t I2C1_Val;
-uint16_t I2C1_NumberOfRecvValues = 0;
-uint8_t I2C_IndexSendBuffer = 0;
-uint8_t I2C_SendBuffer[I2C1_MAX_SEND_BUFFER];
+volatile uint8_t motorTestValue = 0;
+volatile int16_t x_diff = 0;
+volatile long x = 0;
+volatile int16_t y_diff = 0;
+volatile long y = 0;
 
-uint16_t timePoc = 0;
-
-volatile bool timePosition = false;
-volatile double x = 0;
-volatile double y = 0;
-volatile double z = 0;
 volatile double yaw = 0;
 volatile double roll = 0;
 volatile double pitch = 0;
@@ -65,9 +59,9 @@ void InitializeTimer(void) {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
 	TIM_TimeBaseInitTypeDef timerInitStructure; //opakovat kazdych 0.025 s = 40 hz
-	timerInitStructure.TIM_Prescaler = 4999;	//1Mhz/5000 = 200 hz
+	timerInitStructure.TIM_Prescaler = 49999;	//1Mhz/50000 = 20 hz
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 4;
+	timerInitStructure.TIM_Period = 100;
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInit(TIM2, &timerInitStructure);
 	TIM_Cmd(TIM2, ENABLE);
@@ -81,37 +75,19 @@ void InitializeTimer(void) {
 	NVIC_Init(&nvicStructure);
 }
 
-void longToI2CBuffer(long number) {
-	for (int i = 0; i < 4; i++) {
-		I2C_SendBuffer[i] = (number >> ((3 - i) * 8)) & 0xFF;
-	}
-}
-
-void intToI2CBuffer(int16_t number) {
-	for (int i = 0; i < 2; i++) {
-		I2C_SendBuffer[i] = (number >> ((1 - i) * 8)) & 0xFF;
-	}
-}
-
-void uintToI2CBuffer(uint16_t number) {
-	for (int i = 0; i < 2; i++) {
-		I2C_SendBuffer[i] = (number >> ((1 - i) * 8)) & 0xFF;
-	}
-}
-
-void speedL(double mmPerSec) {
+void speedL(int16_t mmPerSec) {
 	getMotor(1)->setSpeedMotor(mmPerSec);
 	getMotor(2)->setSpeedMotor(mmPerSec);
 	getMotor(3)->setSpeedMotor(mmPerSec);
 }
 
-void speedR(double mmPerSec) {
+void speedR(int16_t mmPerSec) {
 	getMotor(4)->setSpeedMotor(mmPerSec);
 	getMotor(5)->setSpeedMotor(mmPerSec);
 	getMotor(6)->setSpeedMotor(mmPerSec);
 }
 
-void goDirection(Direction dir, double mmPerSec) {
+void goDirection(Direction dir, int16_t mmPerSec) {
 	switch (dir) {
 	case FORWARD:
 		speedL(mmPerSec);
@@ -134,7 +110,6 @@ void goDirection(Direction dir, double mmPerSec) {
 		speedR(0);
 		break;
 	}
-
 }
 
 double getAverageOfSimilaryValues(double val1, double val2, double val3) {
@@ -157,133 +132,183 @@ extern "C" void TIM4_IRQHandler(void) {
 	Ultrasonic_Timer_Update_Interrupt();
 }
 
+#define I2C1_BufferSize 10
+volatile uint16_t I2C1_Buffer[I2C1_BufferSize];
+volatile uint8_t I2C1_BufferIndex = 0;
+volatile uint8_t I2C1_NumberBytesToSend = 0;
+volatile uint8_t I2C1_Transmitter = 0;
+volatile uint8_t I2C1_CommunicationByPeriod = 1;
+
 extern "C" void I2C1_ER_IRQHandler(void) {
 	if (I2C_GetITStatus(I2C1, I2C_IT_AF)) {
 		I2C_ClearITPendingBit(I2C1, I2C_IT_AF);
+		I2C1_BufferIndex = 0;
+		I2C1_NumberBytesToSend = 0;
 	}
 }
 
 extern "C" void I2C1_EV_IRQHandler(void) {
+	I2C1_CommunicationByPeriod = 1;
+	uint16_t value;
 	//ev1
 	while ((I2C_SR1_ADDR & I2C1->SR1) == I2C_SR1_ADDR) {
+		I2C1_BufferIndex = 0;
 		I2C1->SR1;
 		I2C1->SR2;
+		I2C1_Transmitter = (I2C_SR2_TRA & I2C1->SR2) == I2C_SR2_TRA;
+		if(I2C1_Transmitter == 1){
+			if (I2C1_BufferIndex < I2C1_BufferSize) {	//EV3-1
+				I2C1->DR = I2C1_Buffer[I2C1_BufferIndex++];
+			} else {
+				I2C1->SR1 |= I2C_SR1_AF;
+			}
+			if (I2C1_BufferIndex >= I2C1_NumberBytesToSend) {
+				I2C1->SR1 |= I2C_SR1_AF;
+			}
+		}
 	}
+
 	//ev2
 	while ((I2C_SR1_RXNE & I2C1->SR1) == I2C_SR1_RXNE) {
-		if (!I2C1_RecvRegDone) {
-			I2C1_RegValue = I2C1->DR;
-			I2C1_RecvRegDone = true;
-			I2C1_Val = 0;
-			I2C1_NumberOfRecvValues = 0;
-			I2C_IndexSendBuffer = 0;
-			switch (I2C1_RegValue) {
-			case 100:
-				longToI2CBuffer(x);
-				break;
-			case 101:
-				longToI2CBuffer(y);
-				break;
-			case 102:
-				longToI2CBuffer(z);
-				break;
-			case 103:
-				longToI2CBuffer(roll * 10000);
-				break;
-			case 104:
-				longToI2CBuffer(pitch * 10000);
-				break;
-			case 105:
-				longToI2CBuffer(yaw * 10000);
-				break;
-			case 106:
-				I2C_SendBuffer[0] = 0;
-				I2C_SendBuffer[1] = 0;
-				I2C_SendBuffer[2] = 0;
-				I2C_SendBuffer[3] = 0;
-				if (buttons[0])
-					I2C_SendBuffer[0] |= 1;
-				if (buttons[1])
-					I2C_SendBuffer[0] |= 2;
-				if (buttons[2])
-					I2C_SendBuffer[0] |= 4;
-				break;
-			case 107:
-				uintToI2CBuffer(getUltRaw(0));
-				break;
-			case 255:
-				I2C_SendBuffer[0] = slave_address;
-				break;
+		I2C1_Buffer[I2C1_BufferIndex++] = I2C1->DR;
+		switch (I2C1_Buffer[0]) {
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+			if (I2C1_BufferIndex == 3)
+				getMotor(I2C1_Buffer[0])->setSpeedMotor(
+						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			break;
+		case 7:
+			if (I2C1_BufferIndex == 2)
+				goDirection(FORWARD, I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			break;
+		case 8:
+			if (I2C1_BufferIndex == 2)
+				goDirection(BACKWARD, I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			break;
+		case 9:
+			if (I2C1_BufferIndex == 2)
+				goDirection(ROTATE_CLOCKWISE,
+						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			break;
+		case 10:
+			if (I2C1_BufferIndex == 2)
+				goDirection(ROTATE_ANTICLOCKWISE,
+						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			break;
+		case 11:
+			goDirection(STOP, 0);
+			break;
+		case 12:
+			if (I2C1_BufferIndex == 2) {
+				setLed(0, (I2C1_Buffer[1] & (1 << 1)) == (1 << 1) ? ON : OFF,
+						(I2C1_Buffer[1] & (1 << 2)) == (1 << 2) ? ON : OFF);
+				setLed(1, (I2C1_Buffer[1] & (1 << 3)) == (1 << 3) ? ON : OFF,
+						(I2C1_Buffer[1] & (1 << 4)) == (1 << 4) ? ON : OFF);
+				setLed(2, (I2C1_Buffer[1] & (1 << 5)) == (1 << 5) ? ON : OFF,
+						(I2C1_Buffer[1] & (1 << 6)) == (1 << 6) ? ON : OFF);
 			}
-		} else {
-			I2C1_Val = (I2C1_Val << 8) | I2C1->DR;
-			I2C1_NumberOfRecvValues++;
-			if (I2C1_NumberOfRecvValues == 1) {
-				switch (I2C1_RegValue) {
-				case 12:
-					setLed(0, (I2C1_Val & (1 << 1)) == (1 << 1) ? ON : OFF,
-							(I2C1_Val & (1 << 2)) == (1 << 2) ? ON : OFF);
-					setLed(1, (I2C1_Val & (1 << 3)) == (1 << 3) ? ON : OFF,
-							(I2C1_Val & (1 << 4)) == (1 << 4) ? ON : OFF);
-					setLed(2, (I2C1_Val & (1 << 5)) == (1 << 5) ? ON : OFF,
-							(I2C1_Val & (1 << 6)) == (1 << 6) ? ON : OFF);
-					break;
-				case 13:
-					setServo((double) I2C1_Val);
-				}
+			break;
+		case 13:
+			if (I2C1_BufferIndex == 3) {
+				setServo(I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
 			}
-			if (I2C1_NumberOfRecvValues == 2) {
-				switch (I2C1_RegValue) {
-				case 1:
-					getMotor(1)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 2:
-					getMotor(2)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 3:
-					getMotor(3)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 4:
-					getMotor(4)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 5:
-					getMotor(5)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 6:
-					getMotor(6)->setSpeedMotor((double) I2C1_Val);
-					break;
-				case 7:
-					goDirection(FORWARD, (double) I2C1_Val);
-					break;
-				case 8:
-					goDirection(BACKWARD, (double) I2C1_Val);
-					break;
-				case 9:
-					goDirection(ROTATE_CLOCKWISE, (double) I2C1_Val);
-					break;
-				case 10:
-					goDirection(ROTATE_ANTICLOCKWISE, (double) I2C1_Val);
-					break;
-				case 11:
-					goDirection(STOP, (double) I2C1_Val);
-					break;
-				}
-			}
+			break;
+		case 100:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 103:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 104:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 105:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 106:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex] = 0;
+			if (buttons[0])
+				I2C1_Buffer[I2C1_BufferIndex] |= 1;
+			if (buttons[1])
+				I2C1_Buffer[I2C1_BufferIndex] |= 2;
+			if (buttons[2])
+				I2C1_Buffer[I2C1_BufferIndex] |= 4;
+			I2C1_BufferIndex++;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 107:
+			I2C1_BufferIndex = 0;
+			value = getUltRaw(0);
+			I2C1_Buffer[I2C1_BufferIndex++] = value>>8 ;
+			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 254:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = motorTestValue & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 255:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = slave_address & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
 		}
 	}
-//ev3
+
+	//ev3
 	while ((I2C_SR1_TXE & I2C1->SR1) == I2C_SR1_TXE) {
-		if (I2C_IndexSendBuffer < I2C1_MAX_SEND_BUFFER) {
-			I2C1->DR = I2C_SendBuffer[I2C_IndexSendBuffer++];
-		} else {
-			I2C1->SR1 |= I2C_SR1_AF;
-		}
+			if (I2C1_BufferIndex < I2C1_BufferSize) {
+				I2C1->DR = I2C1_Buffer[I2C1_BufferIndex++];
+			} else {
+				I2C1->SR1 |= I2C_SR1_AF;
+			}
+			if (I2C1_BufferIndex >= I2C1_NumberBytesToSend) {
+				I2C1->SR1 |= I2C_SR1_AF;
+			}
 	}
-//ev4
-	while ((I2C1->SR1 & I2C_SR1_STOPF) == I2C_SR1_STOPF) {
-		I2C1_RecvRegDone = false;
-		I2C1->SR1;
-		I2C1->CR1 |= 0x1;
+
+	if (I2C1_Transmitter == 0) {
+		//ev4
+		while ((I2C1->SR1 & I2C_SR1_STOPF) == I2C_SR1_STOPF) {
+			I2C1_BufferIndex = 0;
+			I2C1->SR1;
+			I2C1->CR1 |= 0x1;
+		}
 	}
 }
 
@@ -293,80 +318,23 @@ extern "C" void DMA1_Channel5_IRQHandler(void) {
 		I2C_DMACmd(I2C2, DISABLE);
 		I2C_GenerateSTOP(I2C2, ENABLE);
 		DMA_Cmd(DMA1_Channel5, DISABLE);
-
-		if (I2C2_getReadRegister() == GETDELTATICKSREG) {
-			for (int i = 1; i <= numberOfMotors; i++) {
-				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
-					getMotor(i)->addDeltaTicks((int16_t) I2C2_getRxBuffer(0));
-					I2C2_clearReadRegister();
-					I2C2_clearDeviceAddress();
-					break;
-				}
-			}
-		} else if (I2C2_getReadRegister() == GETVOLTAGEREG) {
-			for (int i = 1; i <= numberOfMotors; i++) {
-				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
-					getMotor(i)->setVoltageRaw((uint16_t) I2C2_getRxBuffer(0));
-					I2C2_clearReadRegister();
-					I2C2_clearDeviceAddress();
-					break;
-				}
-			}
-		} else if (I2C2_getReadRegister() == GETCURRENTREG) {
-			for (int i = 1; i <= numberOfMotors; i++) {
-				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
-					getMotor(i)->setCurrent((uint16_t) I2C2_getRxBuffer(0));
-					I2C2_clearReadRegister();
-					I2C2_clearDeviceAddress();
-					break;
-				}
-			}
-		} else if (I2C2_getReadRegister() == GETSPEEDREG) {
-			for (int i = 1; i <= numberOfMotors; i++) {
-				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
-					getMotor(i)->setSpeedRaw((int16_t) I2C2_getRxBuffer(0));
-					I2C2_clearReadRegister();
-					I2C2_clearDeviceAddress();
-					break;
-				}
-			}
-		} else if (I2C2_getReadRegister() == GETWHO_I_AM) {
-			for (int i = 1; i <= numberOfMotors; i++) {
-				if (MOTORSADDR[i - 1] == I2C2_getDeviceAddress()) {
-					getMotor(i)->setTestValue((int8_t) I2C2_getRxBuffer(0));
-					I2C2_clearReadRegister();
-					I2C2_clearDeviceAddress();
-					break;
-				}
-			}
-		} else {
-			I2C2_clearReadRegister();
-			I2C2_clearDeviceAddress();
-		}
+		I2C2_clearReadRegister();
 	}
 }
 
-
+volatile uint8_t timerDone = 0;
+long x_last = 0;
+long y_last = 0;
 extern "C" void TIM2_IRQHandler(void) {
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-		double speeds[6];
-		for (int i = 0; i < 6; i++) {
-			speeds[i] = (getMotor(i)->getDistance() - lastDistance[i]);
-			lastDistance[i] = getMotor(i)->getDistance();
+		timerDone++;
+		if (!I2C1_CommunicationByPeriod) {
+			I2C1_BufferIndex = 0;
+			I2C1_Init();
+		} else {
+			I2C1_CommunicationByPeriod = 0;
 		}
-
-		double vL = getAverageOfSimilaryValues(speeds[1], speeds[2], speeds[3]);
-		double vR = getAverageOfSimilaryValues(speeds[4], speeds[5], speeds[6]);
-		double vT = (vL + vR) / 2;
-		double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
-		yaw += omegaT;
-		if (yaw > 2 * M_PI)
-			yaw -= 2 * M_PI;
-		else if (yaw < 0)
-			yaw += 2 * M_PI;
-		x += vT * cos(yaw);
-		y += vT * sin(yaw);
 	}
 }
 
@@ -375,23 +343,73 @@ extern "C" void EXTI9_5_IRQHandler(void) {
 }
 
 int main(void) {
+	for (unsigned int i = 0; i < 100000; i++)
+		;
 	InitializePWMServo();
 	Leds_Init();
 	Buttons_Init();
-	I2C2_Init();
-	I2C1_Init();
-	InitializeTimer();
 	Ultrasonic_init();
-	GY87 *gy87_1 = new GY87(0x68,0x1E,0x77);
-	bool test = gy87_1->HMC5883LTestConnection();
+
+	I2C1_Init();
+	I2C2_Init();
+	motorTestValue = 0;
+	for (int i = 0; i < numberOfMotors; i++) {
+		if (getMotor(i + 1)->isTestOk()) {
+			motorTestValue |= (1 << i);
+		}
+	}
+
+	InitializeTimer();
+//
+//	gy87_1 = new GY87(0xD1, 0x1E<<1, 0x77);
+//	bool test = gy87_1->HMC5883LTestConnection();
 	while (1) {
 		ultTriger(0);
-		getMotor(1)->DMADeltaTicksInvoke();
-		getMotor(2)->DMADeltaTicksInvoke();
-		getMotor(3)->DMADeltaTicksInvoke();
-		getMotor(4)->DMADeltaTicksInvoke();
-		getMotor(5)->DMADeltaTicksInvoke();
-		getMotor(6)->DMADeltaTicksInvoke();
+		for (int i = 1; i <= numberOfMotors / 2; i++) {
+			getMotor(i)->DMADeltaTicksInvoke();
+			for (int x = 0; x < 1000; x++)
+				;
+			getMotor(i + 3)->DMADeltaTicksInvoke();
+			for (int x = 0; x < 1000; x++)
+				;
+		}
+		if (timerDone > 0) {
+			double speeds[6];
+			for (int i = 1; i <= numberOfMotors; i++) {
+				speeds[i - 1] = (getMotor(i)->getDistance()
+						- lastDistance[i - 1]);
+				lastDistance[i - 1] = getMotor(i)->getDistance();
+			}
+
+			double vL = getAverageOfSimilaryValues(speeds[0], speeds[1],
+					speeds[2]);
+			double vR = getAverageOfSimilaryValues(speeds[3], speeds[4],
+					speeds[5]);
+			double vT = (vL + vR) / 2;
+
+			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
+			yaw += omegaT;
+			if (yaw > 2 * M_PI)
+				yaw -= 2 * M_PI;
+			else if (yaw < 0)
+				yaw += 2 * M_PI;
+			x += (long) (vT * cos(yaw));
+			y += (long) (vT * sin(yaw));
+
+			x_diff += (int16_t) (x - x_last);
+			x_last = x;
+			y_diff += (int16_t) (y - y_last);
+			y_last = y;
+
+			//ochrana proti chybam na i2c
+			//if (pocI2CEventTime > 1) {
+
+			//	pocI2CEventTime = 0;
+			//} else {
+			//	pocI2CEventTime++;
+			//}
+			timerDone = 0;
+		}
 		for (int i = 0; i < 1000; i++)
 			;
 	}

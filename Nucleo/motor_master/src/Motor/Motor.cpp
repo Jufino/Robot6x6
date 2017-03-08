@@ -6,24 +6,22 @@ Motor::Motor(uint8_t motorAddr) {
 	this->speedRaw = 0;
 	this->current = 0;
 	this->voltageRaw = 0;
-	this->test = false;
 }
 //------------------------------------------------------------------
 Motor::~Motor() {
 
 }
 //------------------------------------------------------------------
-void Motor::setSpeedMotor(double mmPerSec) {
+void Motor::setSpeedMotor(int16_t mmPerSec) {
 	int16_t speedRaw =
-			(mmPerSec * (numberTicksOfWheel / (M_PI * wheelDiameter)))
-					/ periodSpeedRegulator;
+			((double)mmPerSec * (numberTicksOfWheel*periodSpeedRegulator) / (M_PI * wheelDiameter));
+
 	setSpeedRawMotor(speedRaw);
 }
 //------------------------------------------------------------------
-void Motor::setAngleSpeedMotor(double anglePerSec) {
+void Motor::setAngleSpeedMotor(int16_t anglePerSec) {
 	setSpeedRawMotor(
-			(int16_t) ((anglePerSec * (numberTicksOfWheel / 360))
-					/ periodSpeedRegulator));
+			(int16_t) (((double)anglePerSec * periodSpeedRegulator) * (numberTicksOfWheel / 360)));
 }
 //------------------------------------------------------------------
 void Motor::setSpeedRawMotor(int16_t data) {
@@ -48,19 +46,19 @@ void Motor::setPWMMotor(int16_t data) {
 }
 //------------------------------------------------------------------
 void Motor::DMADeltaTicksInvoke(void) {
-	I2C2_DMA_Read(this->motorAddr, GETDELTATICKSREG, 2);
+	addDeltaTicks(I2C2_ReadRegister16(this->motorAddr, GETDELTATICKSREG));
 }
 //------------------------------------------------------------------
 void Motor::DMACurrentInvoke(void) {
-	I2C2_DMA_Read(this->motorAddr, GETCURRENTREG, 2);
+	setCurrent(I2C2_ReadRegister16(this->motorAddr, GETCURRENTREG));
 }
 //------------------------------------------------------------------
 void Motor::DMAVoltageInvoke(void) {
-	I2C2_DMA_Read(this->motorAddr, GETVOLTAGEREG, 2);
+	setVoltageRaw(I2C2_ReadRegister16(this->motorAddr, GETVOLTAGEREG));
 }
 //------------------------------------------------------------------
 void Motor::DMASpeedInvoke(void) {
-	I2C2_DMA_Read(this->motorAddr, GETSPEEDREG, 2);
+	setSpeedRaw(I2C2_ReadRegister16(this->motorAddr, GETSPEEDREG));
 }
 //------------------------------------------------------------------
 void Motor::addDeltaTicks(int16_t data) {
@@ -68,13 +66,11 @@ void Motor::addDeltaTicks(int16_t data) {
 }
 //------------------------------------------------------------------
 long Motor::getTicks(void) {
-	uint16_t timeout_var = 0;
-	while (I2C2_getReadRegister() == GETDELTATICKSREG){
-		if(I2C_TIMEOUT < timeout_var++){
-			I2C2_clearAll();
-		}
-	}
 	return this->ticks;
+}
+//------------------------------------------------------------------
+void Motor::setTicks(long ticks){
+	this->ticks = ticks;
 }
 //------------------------------------------------------------------
 double Motor::getDistance(void) {
@@ -86,8 +82,6 @@ void Motor::setSpeedRaw(int16_t speedRaw) {
 }
 //------------------------------------------------------------------
 int16_t Motor::getSpeedRaw(void) {
-	while (I2C2_getReadRegister() == GETSPEEDREG)
-		;
 	return this->speedRaw;
 }
 //------------------------------------------------------------------
@@ -106,14 +100,10 @@ void Motor::setVoltageRaw(uint16_t voltageRaw) {
 }
 //------------------------------------------------------------------
 uint16_t Motor::getVoltageRaw(void) {
-	while (I2C2_getReadRegister() == GETVOLTAGEREG)
-		;
 	return this->voltageRaw;
 }
 //------------------------------------------------------------------
 double Motor::getVoltage(void) {
-	while (I2C2_getReadRegister() == GETVOLTAGEREG)
-		;
 	return (double) this->voltageRaw * (25 / 1023);
 }
 //------------------------------------------------------------------
@@ -122,23 +112,12 @@ void Motor::setCurrent(uint16_t current) {
 }
 //------------------------------------------------------------------
 uint16_t Motor::getCurrent(void) {
-	while (I2C2_getReadRegister() == GETCURRENTREG)
-		;
 	return this->current;
 }
 //------------------------------------------------------------------
 bool Motor::isTestOk(void) {
-	while (I2C2_getReadRegister() == GETWHO_I_AM)
-		;
-	return this->test;
-}
-//------------------------------------------------------------------
-void Motor::DMATestInvoke(void) {
-	I2C2_DMA_Read(this->motorAddr, GETWHO_I_AM, 1);
-}
-//------------------------------------------------------------------
-void Motor::setTestValue(uint8_t value) {
-	this->test = value == this->motorAddr;
+	uint8_t addr = I2C2_ReadRegister8(this->motorAddr, GETWHO_I_AM);
+	return addr == (this->motorAddr>>1);
 }
 //------------------------------------------------------------------
 

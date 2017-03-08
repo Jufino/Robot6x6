@@ -44,12 +44,12 @@ void setServoRaw(uint32_t value) {
 	TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
 }
 
-void setServo(double angle) {
+void setServo(int16_t angle) {
 	if (angle < 0)
 		angle = 0;
 	else if (angle > 180)
 		angle = 180;
-	uint32_t value = ((SERVO_MAX - SERVO_MIN) / 180) * angle + SERVO_MIN;
+	uint32_t value = ((SERVO_MAX - SERVO_MIN) / 180) * (double)angle + SERVO_MIN;
 
 	/* PWM1 Mode configuration: Channel1 */
 	TIM_OCInitTypeDef TIM_OCInitStructure;
