@@ -35,7 +35,6 @@ using namespace cv;
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <serial.h>
 extern "C" {
 #include <gpio.h>
 }
@@ -66,9 +65,9 @@ extern "C" {
 
 #define ENABLE_KINECTACCULATORS 0
 #define ENABLE_KINECTSENSORS 0
-#define ENABLE_KINECTCAMERA 0
+#define ENABLE_KINECTCAMERA 1
 
-#define CAMERA_WIFI  0
+#define CAMERA_WIFI  1
 #define CAMERA_PORT  1212
 #define CAMERA_HEIGHT 240
 #define CAMERA_WIDTH 320
@@ -217,7 +216,7 @@ unsigned int readRegister16(unsigned char addr, unsigned char reg);
 signed int readRegister16s(unsigned char addr, unsigned char reg);
 unsigned char readRegister8(unsigned char addr, unsigned char reg);
 
-bool initKinect();
+bool initKinect(unsigned char imageMode);
 
 Mat getImageKinect(void);
 Mat getDepthKinect(void);
@@ -228,6 +227,10 @@ Mat getImage(void);
 void sendMatImage(Mat img, int quality);
 int getCameraClientsock(void);
 void closeCameraConnection(void);
+
+void *waitForCameraConnection(void *arg);
+
+void *waitForSensorConnection(void *arg);
 
 int getSensorsClientsock(void);
 void closeSensorConnection(void);

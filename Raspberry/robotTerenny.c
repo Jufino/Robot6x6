@@ -20,6 +20,8 @@ Mat depth2Kinect;
 Mat img1Kinect;
 Mat img2Kinect;
 
+VideoCapture cameraKinect;
+
 CvCapture* cameraL;
 char imageChooseL = 0;
 IplImage *img1L;
@@ -41,6 +43,68 @@ typedef union {
   struct seminfo *__buf; /* Buffer for IPC_INFO
                                            (Linux-specific) */
 } semun;
+
+static void colorizeDisparity( const Mat& gray, Mat& rgb, double maxDisp = -1.f, float S = 1.f, float V = 1.f )
+{
+  CV_Assert( !gray.empty() );
+  CV_Assert( gray.type() == CV_8UC1 );
+
+  if ( maxDisp <= 0 )
+  {
+    maxDisp = 0;
+    minMaxLoc( gray, 0, &maxDisp );
+  }
+
+  rgb.create( gray.size(), CV_8UC3 );
+  rgb = Scalar::all(0);
+  if ( maxDisp < 1 )
+    return;
+
+  for ( int y = 0; y < gray.rows; y++ )
+  {
+    for ( int x = 0; x < gray.cols; x++ )
+    {
+      uchar d = gray.at<uchar>(y, x);
+      unsigned int H = ((uchar)maxDisp - d) * 240 / (uchar)maxDisp;
+
+      unsigned int hi = (H / 60) % 6;
+      float f = H / 60.f - H / 60;
+      float p = V * (1 - S);
+      float q = V * (1 - f * S);
+      float t = V * (1 - (1 - f) * S);
+
+      Point3f res;
+
+      if ( hi == 0 ) //R = V,  G = t,  B = p
+        res = Point3f( p, t, V );
+      if ( hi == 1 ) // R = q, G = V,  B = p
+        res = Point3f( p, V, q );
+      if ( hi == 2 ) // R = p, G = V,  B = t
+        res = Point3f( t, V, p );
+      if ( hi == 3 ) // R = p, G = q,  B = V
+        res = Point3f( V, q, p );
+      if ( hi == 4 ) // R = t, G = p,  B = V
+        res = Point3f( V, p, t );
+      if ( hi == 5 ) // R = V, G = p,  B = q
+        res = Point3f( q, p, V );
+
+      uchar b = (uchar)(std::max(0.f, std::min (res.x, 1.f)) * 255.f);
+      uchar g = (uchar)(std::max(0.f, std::min (res.y, 1.f)) * 255.f);
+      uchar r = (uchar)(std::max(0.f, std::min (res.z, 1.f)) * 255.f);
+
+      rgb.at<Point3_<uchar> >(y, x) = Point3_<uchar>(b, g, r);
+    }
+  }
+}
+
+static float getMaxDisparity( VideoCapture& capture )
+{
+  const int minDistance = 400; // mm
+  float b = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_BASELINE ); // mm
+  float F = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_FOCAL_LENGTH ); // pixels
+  return b * F / minDistance;
+}
+
 
 void charTag(log_tag_t tag, char *buffer) {
   switch (tag) {
@@ -73,7 +137,7 @@ void charTag(log_tag_t tag, char *buffer) {
 
 void LOGError(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_ERROR) {
-    char buffer[50];
+    char buffer[255];
     char timeStr[20];
 
     time_t t = time(NULL);
@@ -87,7 +151,7 @@ void LOGError(log_tag_t tag, const char text[]) {
 
 void LOGInfo(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_INFO) {
-    char buffer[50];
+    char buffer[255];
     char timeStr[20];
 
     time_t t = time(NULL);
@@ -100,7 +164,7 @@ void LOGInfo(log_tag_t tag, const char text[]) {
 }
 void LOGInfoDetail(log_tag_t tag, const char text[]) {
   if (ENABLE_LOG_INFO_DETAIL) {
-    char buffer[50];
+    char buffer[255];
     char timeStr[20];
 
     time_t t = time(NULL);
@@ -264,8 +328,8 @@ void initRobot(void) {
     setMotorPowerSupply(true);
   }
 
-  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
-    if (!initKinect()) {
+  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS || ENABLE_KINECTCAMERA) {
+    if (!initKinect(0)) {
       LOGError(KINECT_TAG, "Init failed.");
       exit(0);
     }
@@ -273,6 +337,8 @@ void initRobot(void) {
       LOGInfo(KINECT_TAG, "Init ok.");
     }
   }
+
+
 
   if (NUMBER_OF_CAMERA == 1 || NUMBER_OF_CAMERA == 2) {
     cameraL = cvCaptureFromCAM(INDEX_CAMERA_LEFT);
@@ -302,38 +368,49 @@ void initRobot(void) {
   }
 
   if (SENSORS_WIFI) {
-    struct sockaddr_in server;
-    if ((sensorsServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-      LOGError(SENSOR_CONN_TAG, "socket() failed.");
-      exit(1);
-    }
-    memset(&server, 0, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(SENSORS_PORT);
-    server.sin_addr.s_addr = INADDR_ANY;
-    if (bind(sensorsServersock, (struct sockaddr *)&server, sizeof(server)) == -1) {
-      LOGError(SENSOR_CONN_TAG, "bind() failed.");
-      exit(1);
-    }
-    if (listen(sensorsServersock, 10) == -1) {
-      LOGError(SENSOR_CONN_TAG, "listen() failed.");
-      exit(1);
-    }
-    char buffer [50];
-    sprintf (buffer, "Cakanie spojenia pre snimace na porte: %d\n", SENSORS_PORT);
-    LOGInfo(SENSOR_CONN_TAG, buffer);
-    if ((sensorsClientsock = accept(sensorsServersock, NULL, NULL)) == -1) {
-      LOGError(SENSOR_CONN_TAG, "accept() failed.");
-      exit(1);
-    }
-    sprintf (buffer, "Spojenie na porte %d ok.\n", SENSORS_PORT);
-    LOGInfo(SENSOR_CONN_TAG, buffer);
-    pthread_t vlaknoSensors;
-    pthread_create(&vlaknoSensors, NULL, &sensorsNetworkConnection, NULL);
+    pthread_t waitForSensorConnectionThread;
+    pthread_create(&waitForSensorConnectionThread, NULL, &waitForSensorConnection, NULL);
   }
 
   if (CAMERA_WIFI) {
-    struct sockaddr_in server1;
+    pthread_t waitForCameraConnectionThread;
+    pthread_create(&waitForCameraConnectionThread, NULL, &waitForCameraConnection, NULL);
+  }
+  if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
+
+  pthread_t threadModules;
+  pthread_create(&threadModules, NULL, &syncModules, NULL);
+  signal(SIGINT, sigctrl);
+}
+
+void closeRobot(void) {
+  LOGInfo(ROBOT_TAG, "Robot closing...");
+  onAllThreads = false;
+
+/*  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
+    freenect_stop_depth(kinect_dev);
+    //freenect_stop_video(kinect_dev);
+
+    freenect_close_device(kinect_dev);
+    freenect_shutdown(ctx);
+  }*/
+  if (ENABLE_MOTORS) {
+    setMove(STOP, 0);
+  }
+  if (ENABLE_I2C) {
+    closeI2C();
+  }
+
+  semRem(sem_id);
+
+  closeMotorPowerSupply();
+
+  if (CAMERA_WIFI == 1 && onWifiCameraStill) closeCameraConnection();
+  if (SENSORS_WIFI == 1 && onWifiSensorStill) closeSensorConnection();
+}
+
+void *waitForCameraConnection(void *arg) {
+      struct sockaddr_in server1;
     if ((cameraServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
       LOGError(CAMERA_CONN_TAG, "socket() failed.");
       exit(1);
@@ -351,10 +428,10 @@ void initRobot(void) {
       exit(1);
     }
     char buffer [50];
-    sprintf (buffer, "Cakanie spojenia pre kameru na porte: %d\n", CAMERA_PORT);
-    LOGInfo(SENSOR_CONN_TAG, buffer);
+    sprintf (buffer, "Cakanie spojenia pre kameru na porte: %d", CAMERA_PORT);
+    LOGInfo(CAMERA_CONN_TAG, buffer);
     if ((cameraClientsock = accept(cameraServersock, NULL, NULL)) == -1) {
-      LOGError(CAMERA_CONN_TAG, "accept() failed.\n");
+      LOGError(CAMERA_CONN_TAG, "accept() failed.");
       exit(1);
     }
     sprintf (buffer, "Spojenie na porte %d ok.", CAMERA_PORT);
@@ -362,38 +439,35 @@ void initRobot(void) {
 
     pthread_t vlaknoCamera;
     pthread_create(&vlaknoCamera, NULL, &cameraNetworkConnection, NULL);
-  }
-  if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
-
-  pthread_t threadModules;
-  pthread_create(&threadModules, NULL, &syncModules, NULL);
-  signal(SIGINT, sigctrl);
 }
 
-void closeRobot(void) {
-  LOGInfo(ROBOT_TAG, "Robot closing...");
-  onAllThreads = false;
-
-  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS) {
-    freenect_stop_depth(kinect_dev);
-    //freenect_stop_video(kinect_dev);
-
-    freenect_close_device(kinect_dev);
-    freenect_shutdown(ctx);
-  }
-  if (ENABLE_MOTORS) {
-    setMove(STOP, 0);
-  }
-  if (ENABLE_I2C) {
-    closeI2C();
-  }
-
-  semRem(sem_id);
-
-  closeMotorPowerSupply();
-
-  if (CAMERA_WIFI == 1 && onWifiCameraStill) closeCameraConnection();
-  if (SENSORS_WIFI == 1 && onWifiSensorStill) closeSensorConnection();
+void *waitForSensorConnection(void *arg) {
+      struct sockaddr_in server;
+    if ((sensorsServersock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      LOGError(SENSOR_CONN_TAG, "socket() failed.");
+      exit(1);
+    }
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(SENSORS_PORT);
+    server.sin_addr.s_addr = INADDR_ANY;
+    if (bind(sensorsServersock, (struct sockaddr *)&server, sizeof(server)) == -1) {
+      LOGError(SENSOR_CONN_TAG, "bind() failed.");
+      exit(1);
+    }
+    if (listen(sensorsServersock, 10) == -1) {
+      LOGError(SENSOR_CONN_TAG, "listen() failed.");
+      exit(1);
+    }
+    char buffer [50];
+    sprintf (buffer, "Cakanie spojenia pre snimace na porte: %d", SENSORS_PORT);
+    LOGInfo(SENSOR_CONN_TAG, buffer);
+    if ((sensorsClientsock = accept(sensorsServersock, NULL, NULL)) == -1) {
+      LOGError(SENSOR_CONN_TAG, "accept() failed.");
+      exit(1);
+    }
+    sprintf (buffer, "Spojenie na porte %d ok.", SENSORS_PORT);
+    LOGInfo(SENSOR_CONN_TAG, buffer);
 }
 
 void initI2C(void) {
@@ -573,41 +647,86 @@ unsigned char readRegister8(unsigned char addr, unsigned char reg) {
   else return 0;
 }
 
-bool initKinect() {
-  if (freenect_init(&ctx, NULL) < 0)
-  {
-    LOGError(KINECT_TAG, "Init failed.");
-    exit(EXIT_FAILURE);
-  }
-// set the highest log level so we can see what is going on
-  freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
+bool initKinect(unsigned char imageMode) {
+  cameraKinect.open( CAP_OPENNI2 );
+  if ( !cameraKinect.isOpened() )
+    cameraKinect.open( CAP_OPENNI );
 
-  int nr_devices = freenect_num_devices (ctx);
-  char buffer [50];
-  sprintf (buffer, "Number of kinects detected is %d.", nr_devices);
+  if ( !cameraKinect.isOpened() )
+  {
+    return false;
+  }
+  bool modeRes = false;
+  switch ( imageMode )
+  {
+  case 0:
+    modeRes = cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_VGA_30HZ );
+    break;
+  case 1:
+    modeRes = cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_SXGA_15HZ );
+    break;
+  case 2:
+    modeRes = cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_SXGA_30HZ );
+    break;
+  case 3:
+    modeRes = cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_QVGA_30HZ );
+    break;
+  case 4:
+    modeRes = cameraKinect.set( CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE, CAP_OPENNI_QVGA_60HZ );
+    break;
+  default:
+    LOGError(KINECT_TAG, "Unsupported image mode property.");
+  }
+  if (!modeRes)
+    LOGError(KINECT_TAG, "This image mode is not supported by the device, the default value (CV_CAP_OPENNI_SXGA_15HZ) will be used.");
+
+  char buffer [150];
+  sprintf (buffer, "\nDepth generator output mode:\nFRAME_WIDTH\t:%f\nFRAME_HEIGHT\t:%f\nFRAME_MAX_DEPTH\t:%f mm\nFPS\t\t:%f\nREGISTRATION\t:%f", cameraKinect.get( CAP_PROP_FRAME_WIDTH ), cameraKinect.get( CAP_PROP_FRAME_HEIGHT ), cameraKinect.get( CAP_PROP_OPENNI_FRAME_MAX_DEPTH ), cameraKinect.get( CAP_PROP_FPS ), cameraKinect.get( CAP_PROP_OPENNI_REGISTRATION ) );
   LOGInfo(KINECT_TAG, buffer);
 
-  if (freenect_init(&ctx, NULL) < 0) {
-    return false;
-  }
-
-  //freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
-
-  if (freenect_open_device(ctx, &kinect_dev, 0) < 0)
+  if ( cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR_PRESENT ) )
   {
-    LOGError(KINECT_TAG, "Open failed.");
-    freenect_shutdown(ctx);
-    return false;
+    sprintf (buffer, "\nImage generator output mode:\nFRAME_WIDTH\t:%f\nFRAME_HEIGHT\t:%f\nFPS\t:%f", cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FRAME_WIDTH ), cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FRAME_HEIGHT ), cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FPS ));
+    LOGInfo(KINECT_TAG, buffer);
   }
-  //freenect_set_video_callback(f_dev, rgb_cb);
-  freenect_set_depth_callback(kinect_dev, depth_cb);
-// freenect_set_video_mode(dev, freenect_find_video_mode(FREENECT_RESOLUTION_LOW, FREENECT_VIDEO_RGB));
-  freenect_set_depth_mode(kinect_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_LOW, FREENECT_DEPTH_10BIT));
-  freenect_start_depth(kinect_dev);
-  //freenect_start_video(f_dev);
-  //freenect_set_video_callback(f_dev, rgb_cb);
-  pthread_t threadKinectProcess;
-  pthread_create(&threadKinectProcess, NULL, &kinectProcess, NULL);
+
+
+
+  /*  if (freenect_init(&ctx, NULL) < 0)
+    {
+      LOGError(KINECT_TAG, "Init failed.");
+      exit(EXIT_FAILURE);
+    }
+  // set the highest log level so we can see what is going on
+    freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
+
+    int nr_devices = freenect_num_devices (ctx);
+    char buffer [50];
+    sprintf (buffer, "Number of kinects detected is %d.", nr_devices);
+    LOGInfo(KINECT_TAG, buffer);
+
+    if (freenect_init(&ctx, NULL) < 0) {
+      return false;
+    }
+
+    //freenect_set_log_level(ctx, FREENECT_LOG_SPEW);
+
+    if (freenect_open_device(ctx, &kinect_dev, 0) < 0)
+    {
+      LOGError(KINECT_TAG, "Open failed.");
+      freenect_shutdown(ctx);
+      return false;
+    }
+    //freenect_set_video_callback(f_dev, rgb_cb);
+    freenect_set_depth_callback(kinect_dev, depth_cb);
+  // freenect_set_video_mode(dev, freenect_find_video_mode(FREENECT_RESOLUTION_LOW, FREENECT_VIDEO_RGB));
+    freenect_set_depth_mode(kinect_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_LOW, FREENECT_DEPTH_10BIT));
+    freenect_start_depth(kinect_dev);
+    //freenect_start_video(f_dev);
+    //freenect_set_video_callback(f_dev, rgb_cb);
+    pthread_t threadKinectProcess;
+    pthread_create(&threadKinectProcess, NULL, &kinectProcess, NULL);*/
+
   return true;
 }
 
@@ -720,13 +839,18 @@ RobotSensors getRobotSensors(void) {
 void sendMatImage(Mat img, int quality) {
   vector<uchar> buff;
   vector<int> param = vector<int>(2);
-  param[0] = CV_IMWRITE_JPEG_QUALITY;
+  param[0] = 1;
   param[1] = quality;
   imencode(".jpg", img, buff, param);
-  char len[10];
-  sprintf(len, "%.8d", buff.size());
+  char len[21];
+  sprintf(len, "%.20d", buff.size());
   send(cameraClientsock, len, strlen(len), 0);
   send(cameraClientsock, &buff[0], buff.size(), 0);
+ 
+//  char buffer [50];
+//  sprintf (buffer, "\nlength:%s\ndata[0]:%d\ndata[1]:%d\ndata[2]:%d\ndata[3]:%d\n",len, buff[0], buff[1], buff[2], buff[3]);
+//  LOGInfo(CAMERA_CONN_TAG, buffer);
+ 
   buff.clear();
 }
 
@@ -876,9 +1000,9 @@ Axis_struct getPossitionAxis(void) {
 Angle3d_struct getPossitionAngle3d(void) {
   Angle3d_struct angle3d;
   semWait(sem_id, I2C);
-  angle3d.roll = ((double)readRegister16(STM32_ADDRESS, 103))/10000;
-  angle3d.pitch = ((double)readRegister16(STM32_ADDRESS, 104))/10000;
-  angle3d.yaw = ((double)readRegister16(STM32_ADDRESS, 105))/10000;
+  angle3d.roll = ((double)readRegister16(STM32_ADDRESS, 103)) / 10000;
+  angle3d.pitch = ((double)readRegister16(STM32_ADDRESS, 104)) / 10000;
+  angle3d.yaw = ((double)readRegister16(STM32_ADDRESS, 105)) / 10000;
   semPost(sem_id, I2C);
   return angle3d;
 }
@@ -971,36 +1095,60 @@ IplImage *freenect_sync_get_depth_cvTransform(int index)
 }
 
 void *getImgAndDephKinect(void *arg) {
+  Mat depthMap;
+  const float scaleFactor = 0.05f;
   while (onAllThreads && cvWaitKey(10) < 0) {
-    semWait(sem_id, CAMERA_DEPTH_KINECT1);
-    //depth1Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
-    semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-    depthChooseKinect = 1;
-    semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-    semPost(sem_id, CAMERA_DEPTH_KINECT1);
-
-    semWait(sem_id, CAMERA_IMAGE_KINECT1);
-    img1Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
-    semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-    imageChooseKinect = 1;
-    semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-    semPost(sem_id, CAMERA_IMAGE_KINECT1);
+    if ( !cameraKinect.grab() )
+    {
+      LOGError(KINECT_TAG, "Problem grap frames.");
+    }
+    else
+    {
+      semWait(sem_id, CAMERA_DEPTH_KINECT1);
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+        depthMap.convertTo( depth1Kinect, CV_8UC1, scaleFactor );
+        //depth1Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
+        semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+        depthChooseKinect = 1;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+      }
+      semPost(sem_id, CAMERA_DEPTH_KINECT1);
+      semWait(sem_id, CAMERA_IMAGE_KINECT1);
+      if (cameraKinect.retrieve( img1Kinect, CAP_OPENNI_BGR_IMAGE )) {
+        //img1Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
+        semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+        imageChooseKinect = 1;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+      }
+      semPost(sem_id, CAMERA_IMAGE_KINECT1);
+    }
 
     cvWaitKey(10);
+    if ( !cameraKinect.grab() )
+    {
+      LOGError(KINECT_TAG, "Problem grap frames.");
+    }
+    else
+    {
+      semWait(sem_id, CAMERA_DEPTH_KINECT2);
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+        depthMap.convertTo( depth2Kinect, CV_8UC1, scaleFactor );
+        //depth2Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
+        semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+        depthChooseKinect = 2;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
+      }
+      semPost(sem_id, CAMERA_DEPTH_KINECT2);
 
-    semWait(sem_id, CAMERA_DEPTH_KINECT2);
-    //depth2Kinect = cvarrToMat(freenect_sync_get_depth_cvTransform(0)).clone();
-    semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-    depthChooseKinect = 2;
-    semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
-    semPost(sem_id, CAMERA_DEPTH_KINECT2);
-
-    semWait(sem_id, CAMERA_IMAGE_KINECT2);
-    img2Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
-    semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-    imageChooseKinect = 2;
-    semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
-    semPost(sem_id, CAMERA_IMAGE_KINECT2);
+      semWait(sem_id, CAMERA_IMAGE_KINECT2);
+      if (cameraKinect.retrieve( img2Kinect, CAP_OPENNI_BGR_IMAGE )) {
+        //img2Kinect = cvarrToMat(freenect_sync_get_rgb_cv(0)).clone();
+        semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+        imageChooseKinect = 2;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
+      }
+      semPost(sem_id, CAMERA_IMAGE_KINECT2);
+    }
   }
   return NULL;
 }
@@ -1049,8 +1197,8 @@ void *getImgR(void *arg) {
 }
 
 void *cameraNetworkConnection(void *arg) {
-  while (onWifiCameraStill) {
-    char recvdata[30];
+  while (onAllThreads && onWifiCameraStill) {
+    char recvdata[10];
     int bytes = recv(getCameraClientsock(), recvdata, 10, 0);
     if (bytes == 0) {
       onWifiCameraStill = false;
@@ -1058,8 +1206,14 @@ void *cameraNetworkConnection(void *arg) {
       break;
     }
     char buffer [50];
-    sprintf (buffer, "recv data : %s", recvdata);
-    LOGInfo(CAMERA_CONN_TAG, buffer);
+    sprintf (buffer, "recv data : %s",recvdata);
+    for(int i=0;i<50;i++){
+      if(buffer[i] =='\n'){
+        buffer[i] = '\0';
+        break;
+      }
+    }
+    LOGInfoDetail(CAMERA_CONN_TAG, buffer);
     if (strcmp(recvdata, "imgL\n") == 0) {
       LOGInfoDetail(SENSOR_CONN_TAG, "RGB img left sync.");
       sendMatImage(getImageLeft(), 80);
@@ -1082,7 +1236,7 @@ void *cameraNetworkConnection(void *arg) {
 
 void *sensorsNetworkConnection(void *arg) {
 
-  while (onWifiSensorStill) {
+  while (onAllThreads && onWifiSensorStill) {
     char recvdata[30];
     int bytes = recv(getCameraClientsock(), recvdata, 4, 0);
     if (bytes == 0) {
@@ -1165,7 +1319,7 @@ void *syncKinectAcculators(void *arg) {
   LOGInfoDetail(KINECT_TAG, "Start:Motor sync.");
   semWait(sem_id, ROBOTACCULATORS);
   //freenect_set_tilt_degs(dev, robotAcculators.kinect.roll);
-  freenect_set_led(kinect_dev, robotAcculators.leds.LedKinect);
+  //freenect_set_led(kinect_dev, robotAcculators.leds.LedKinect);
   semPost(sem_id, ROBOTACCULATORS);
   LOGInfoDetail(KINECT_TAG, "End:Motor sync.");
   return NULL;
@@ -1178,8 +1332,8 @@ void *syncKinectSensors(void *arg) {
   state = freenect_get_tilt_state(kinect_dev);
   semWait(sem_id, ROBOTSENSORS);
   // Get the processed accelerometer values (calibrated to gravity)
-  freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
-  robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
+  //freenect_get_mks_accel(state, &robotSensors.kinect.accAxis.x, &robotSensors.kinect.accAxis.y, &robotSensors.kinect.accAxis.z);
+  //robotSensors.kinect.accAngle.roll = freenect_get_tilt_degs(state);
   semPost(sem_id, ROBOTSENSORS);
   LOGInfoDetail(KINECT_TAG, "End:Sensor sync.");
   return NULL;
