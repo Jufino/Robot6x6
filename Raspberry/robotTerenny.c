@@ -10,6 +10,10 @@ bool onAllThreads = true;
 bool onWifiCameraStill = true;
 bool onWifiSensorStill = true;
 
+#define numberOfPriorities 3
+bool priorityVisible[numberOfPriorities];
+
+XN_USB_DEV_HANDLE dev;
 VideoCapture cameraKinect;
 char imageChooseKinect = 0;
 char depthChooseKinect = 0;
@@ -84,8 +88,8 @@ void LOGError(log_tag_t tag, const char text[]) {
   }
 }
 
-void LOGInfo(log_tag_t tag, const char text[]) {
-  if (ENABLE_LOG_INFO) {
+void LOGInfo(log_tag_t tag, unsigned char priority, const char text[]) {
+  if (ENABLE_LOG_INFO && priorityVisible[priority]) {
     char buffer[255];
     char timeStr[20];
 
@@ -94,20 +98,7 @@ void LOGInfo(log_tag_t tag, const char text[]) {
     strftime(timeStr, sizeof(timeStr), "%D %T", tm);
 
     charTag(tag, buffer);
-    printf("%s - LOGInfo:%s/%s\n", timeStr, buffer, text);
-  }
-}
-void LOGInfoDetail(log_tag_t tag, const char text[]) {
-  if (ENABLE_LOG_INFO_DETAIL) {
-    char buffer[255];
-    char timeStr[20];
-
-    time_t t = time(NULL);
-    struct tm *tm = localtime(&t);
-    strftime(timeStr, sizeof(timeStr), "%D %T", tm);
-
-    charTag(tag, buffer);
-    printf("%s - LOGInfoDetail:%s/%s\n", timeStr, buffer, text);
+    printf("%s - LOGInfo(%d):%s/%s\n", timeStr, priority, buffer, text);
   }
 }
 
@@ -149,6 +140,10 @@ void semRem(int sem_id) {
 }
 
 void initRobot(void) {
+  priorityVisible[0] = true;
+  priorityVisible[1] = false;
+  priorityVisible[2] = false;
+
   sem_id = semCreate(getpid(), 16);
   semInit(sem_id, CAMERA_VARIABLE_L, 1);
   semInit(sem_id, CAMERA_IMAGE_L1, 1);
@@ -174,7 +169,7 @@ void initRobot(void) {
       exit(0);
     }
     else {
-      LOGInfo(I2C_TAG, "Connection ok.");
+      LOGInfo(I2C_TAG, 0, "Connection ok.");
     }
   }
 
@@ -184,7 +179,7 @@ void initRobot(void) {
       exit(0);
     }
     else {
-      LOGInfo(NUCLEO_TAG, "Connection ok.");
+      LOGInfo(NUCLEO_TAG, 0, "Connection ok.");
     }
   }
 
@@ -197,12 +192,12 @@ void initRobot(void) {
       if (testValue & (1 << i) && (1 << i)) {
         char buffer [50];
         sprintf (buffer, "Connection %d ok.", i + 1);
-        LOGInfo(MOTOR_TAG, buffer);
+        LOGInfo(MOTOR_TAG, 0, buffer);
       }
       else {
         char buffer [50];
         sprintf (buffer, "Connection %d failed.", i + 1);
-        LOGInfo(MOTOR_TAG, buffer);
+        LOGInfo(MOTOR_TAG, 0, buffer);
       }
     }
 
@@ -210,13 +205,13 @@ void initRobot(void) {
     setMotorPowerSupply(true);
   }
 
-  if (ENABLE_KINECTACCULATORS || ENABLE_KINECTSENSORS || ENABLE_KINECTCAMERA) {
+  if (ENABLE_KINECTCAMERA) {
     if (!initKinect(0)) {
-      LOGError(KINECT_TAG, "Connection failed.");
+      LOGError(KINECT_TAG, "Connection camera failed.");
       exit(0);
     }
     else {
-      LOGInfo(KINECT_TAG, "Connection ok.");
+      LOGInfo(KINECT_TAG, 0, "Connection camera ok.");
     }
   }
 
@@ -247,6 +242,21 @@ void initRobot(void) {
     pthread_create(&threadImgAndDepthKinect, NULL, &syncKinectFrames, NULL);
   }
 
+  if (ENABLE_KINECTMOTOR == 1 || ENABLE_KINECTLED == 1) {
+    XnStatus rc = XN_STATUS_OK;
+    rc = xnUSBInit();
+    if (rc != XN_STATUS_OK) {
+      LOGError(KINECT_TAG, xnGetStatusString(rc) );
+    }
+    rc = xnUSBOpenDevice(VID_MICROSOFT, PID_NUI_MOTOR, NULL, NULL, &dev);
+    if (rc != XN_STATUS_OK) {
+      LOGError(KINECT_TAG, xnGetStatusString(rc) );
+    }
+    else {
+      LOGInfo(KINECT_TAG, 0, "Connection acculators ok.");
+    }
+  }
+
   if (SENSORS_WIFI) {
     pthread_t waitForSensorConnectionThread;
     pthread_create(&waitForSensorConnectionThread, NULL, &waitForSensorConnection, NULL);
@@ -264,8 +274,15 @@ void initRobot(void) {
 }
 
 void closeRobot(void) {
-  LOGInfo(ROBOT_TAG, "Closing ...");
+  LOGInfo(ROBOT_TAG, 0, "Closing...");
   onAllThreads = false;
+
+  if (ENABLE_KINECTLED == 1 || ENABLE_KINECTMOTOR == 1) {
+    XnStatus rc = xnUSBCloseDevice(dev);
+    if (rc != XN_STATUS_OK) {
+      LOGError(KINECT_TAG, xnGetStatusString(rc) );
+    }
+  }
 
   if (ENABLE_MOTORS) {
     setMove(STOP, 0);
@@ -302,13 +319,13 @@ void *waitForCameraConnection(void *arg) {
   }
   char buffer [50];
   sprintf (buffer, "Waiting for camera connection on port %d.", CAMERA_PORT);
-  LOGInfo(CAMERA_CONN_TAG, buffer);
+  LOGInfo(CAMERA_CONN_TAG, 0, buffer);
   if ((cameraClientsock = accept(cameraServersock, NULL, NULL)) == -1) {
     LOGError(CAMERA_CONN_TAG, "Accept() failed.");
     return NULL;
   }
   sprintf (buffer, "Connection on port %d ok.", CAMERA_PORT);
-  LOGInfo(CAMERA_CONN_TAG, buffer);
+  LOGInfo(CAMERA_CONN_TAG, 0, buffer);
 
   pthread_t vlaknoCamera;
   pthread_create(&vlaknoCamera, NULL, &syncCameraNetworkConnection, NULL);
@@ -335,13 +352,13 @@ void *waitForSensorConnection(void *arg) {
   }
   char buffer [50];
   sprintf (buffer, "Waiting for sensor connection on port %d.", SENSORS_PORT);
-  LOGInfo(SENSOR_CONN_TAG, buffer);
+  LOGInfo(SENSOR_CONN_TAG, 0, buffer);
   if ((sensorsClientsock = accept(sensorsServersock, NULL, NULL)) == -1) {
     LOGError(SENSOR_CONN_TAG, "Accept() failed.");
     return NULL;
   }
   sprintf (buffer, "Connection on port %d ok.", SENSORS_PORT);
-  LOGInfo(SENSOR_CONN_TAG, buffer);
+  LOGInfo(SENSOR_CONN_TAG, 0, buffer);
   return NULL;
 }
 
@@ -557,12 +574,12 @@ bool initKinect(unsigned char imageMode) {
 
   char buffer [150];
   sprintf (buffer, "\nDepth generator output mode:\nFRAME_WIDTH\t:%f\nFRAME_HEIGHT\t:%f\nFRAME_MAX_DEPTH\t:%f mm\nFPS\t\t:%f\nREGISTRATION\t:%f", cameraKinect.get( CAP_PROP_FRAME_WIDTH ), cameraKinect.get( CAP_PROP_FRAME_HEIGHT ), cameraKinect.get( CAP_PROP_OPENNI_FRAME_MAX_DEPTH ), cameraKinect.get( CAP_PROP_FPS ), cameraKinect.get( CAP_PROP_OPENNI_REGISTRATION ) );
-  LOGInfo(KINECT_TAG, buffer);
+  LOGInfo(KINECT_TAG, 0, buffer);
 
   if ( cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR_PRESENT ) )
   {
     sprintf (buffer, "\nImage generator output mode:\nFRAME_WIDTH\t:%f\nFRAME_HEIGHT\t:%f\nFPS\t:%f", cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FRAME_WIDTH ), cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FRAME_HEIGHT ), cameraKinect.get( CAP_OPENNI_IMAGE_GENERATOR + CAP_PROP_FPS ));
-    LOGInfo(KINECT_TAG, buffer);
+    LOGInfo(KINECT_TAG, 0, buffer);
   }
 
   return true;
@@ -684,13 +701,13 @@ void sendMatImage(Mat img, int quality) {
 }
 
 void closeCameraConnection(void) {
-  LOGInfo(CAMERA_CONN_TAG, "Closing...");
+  LOGInfo(CAMERA_CONN_TAG, 0, "Closing...");
   close(cameraServersock);
   close(cameraClientsock);
 }
 
 void closeSensorConnection(void) {
-  LOGInfo(SENSOR_CONN_TAG, "Closing...");
+  LOGInfo(SENSOR_CONN_TAG, 0, "Closing...");
   close(sensorsServersock);
   close(sensorsClientsock);
 }
@@ -876,13 +893,14 @@ void *syncImageRight(void *arg) {
 void *syncCameraNetworkConnection(void *arg) {
   int bytes = 10;
   char recvdata[10];
-  LOGInfoDetail(SENSOR_CONN_TAG, "Start:Camera sync by network.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "Start:Camera sync by network.");
   while (bytes != 0 && onAllThreads && onWifiCameraStill) {
     bytes = recv(cameraClientsock, recvdata, 10, 0);
     if (bytes == 0) {
       onWifiCameraStill = false;
       closeCameraConnection();
       onWifiCameraStill = true;
+      sleep(2);
       pthread_t waitForCameraConnectionThread;
       pthread_create(&waitForCameraConnectionThread, NULL, &waitForCameraConnection, NULL);
 
@@ -896,30 +914,30 @@ void *syncCameraNetworkConnection(void *arg) {
         break;
       }
     }
-    LOGInfoDetail(CAMERA_CONN_TAG, buffer);
+    LOGInfo(CAMERA_CONN_TAG, 2, buffer);
     if (strcmp(recvdata, "imgL\n") == 0) {
-      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img left sync.");
+      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img left sync.");
       sendMatImage(getImageLeft(), 80);
     }
     else if (strcmp(recvdata, "imgR\n") == 0) {
-      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img right sync.");
+      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img right sync.");
       sendMatImage(getImageRight(), 80);
     }
     else if (strcmp(recvdata, "imgK\n") == 0) {
-      LOGInfoDetail(SENSOR_CONN_TAG, "RGB img kinect sync.");
+      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img kinect sync.");
       sendMatImage(getImageKinect(), 80);
     }
     else if (strcmp(recvdata, "depK\n") == 0) {
-      LOGInfoDetail(SENSOR_CONN_TAG, "Depth img kinect sync.");
+      LOGInfo(SENSOR_CONN_TAG, 1, "Depth img kinect sync.");
       sendMatImage(getDepthKinect(), 80);
     }
   }
-  LOGInfoDetail(SENSOR_CONN_TAG, "End:Camera sync by network.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "End:Camera sync by network.");
   return NULL;
 }
 
 void *syncSensorNetworkConnection(void *arg) {
-  LOGInfoDetail(SENSOR_CONN_TAG, "Start:Sensor sync by network.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "Start:Sensor sync by network.");
   char recvdata[10];
   int bytes = 10;
   while (bytes != 0 && onAllThreads && onWifiSensorStill) {
@@ -928,6 +946,7 @@ void *syncSensorNetworkConnection(void *arg) {
       onWifiSensorStill = false;
       closeSensorConnection();
       onWifiSensorStill = true;
+      sleep(2);
       pthread_t waitForSensorConnectionThread;
       pthread_create(&waitForSensorConnectionThread, NULL, &waitForSensorConnection, NULL);
       break;
@@ -941,19 +960,19 @@ void *syncSensorNetworkConnection(void *arg) {
         break;
       }
     }
-    LOGInfoDetail(SENSOR_CONN_TAG, buffer);
+    LOGInfo(SENSOR_CONN_TAG, 2, buffer);
 
     if (strcmp(recvdata, "sensor\n") == 0) {
-      LOGInfoDetail(SENSOR_CONN_TAG, "Sensor wifi sync.");
+      LOGInfo(SENSOR_CONN_TAG, 1, "Sensor wifi sync.");
     }
   }
-  LOGInfoDetail(SENSOR_CONN_TAG, "End:Sensor sync by network.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "End:Sensor sync by network.");
   return NULL;
 }
 
 void *syncKinectFrames(void *arg) {
   Mat depthMap;
-  LOGInfoDetail(SENSOR_CONN_TAG, "Start:Kinect sync frames.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "Start:Kinect sync frames.");
   while (onAllThreads && cvWaitKey(10) < 0) {
     if ( !cameraKinect.grab() )
     {
@@ -1003,45 +1022,45 @@ void *syncKinectFrames(void *arg) {
       semPost(sem_id, CAMERA_IMAGE_KINECT2);
     }
   }
-  LOGInfoDetail(SENSOR_CONN_TAG, "End:Kinect sync frames.");
+  LOGInfo(SENSOR_CONN_TAG, 1, "End:Kinect sync frames.");
   return NULL;
 }
 
 void *syncUltrasonic(void *arg) {
-  LOGInfoDetail(NUCLEO_TAG, "Start:Ultrasonic sync.");
+  LOGInfo(NUCLEO_TAG, 1, "Start:Ultrasonic sync.");
   double value = getUltrasonic();
   semWait(sem_id, ROBOTSENSORS);
   robotSensors.ultrasonic = value;
   semPost(sem_id, ROBOTSENSORS);
-  LOGInfoDetail(NUCLEO_TAG, "End:Ultrasonic sync.");
+  LOGInfo(NUCLEO_TAG, 1, "End:Ultrasonic sync.");
   return NULL;
 }
 
 void *syncLeds(void *arg) {
-  LOGInfoDetail(NUCLEO_TAG, "Start:Leds sync.");
+  LOGInfo(NUCLEO_TAG, 1, "Start:Leds sync.");
   semWait(sem_id, ROBOTACCULATORS);
   color_t LedUp = robotAcculators.leds.LedUp;
   color_t LedMiddle = robotAcculators.leds.LedMiddle;
   color_t LedDown = robotAcculators.leds.LedDown;
   semPost(sem_id, ROBOTACCULATORS);
   setLeds(LedUp, LedMiddle, LedDown);
-  LOGInfoDetail(NUCLEO_TAG, "End:Leds sync.");
+  LOGInfo(NUCLEO_TAG, 1, "End:Leds sync.");
   return NULL;
 }
 
 void *syncMotors(void *arg) {
-  LOGInfoDetail(NUCLEO_TAG, "Start:Motors sync.");
+  LOGInfo(NUCLEO_TAG, 1, "Start:Motors sync.");
   direction_t  robotDirection = robotAcculators.robotDirection;
   unsigned int robotSpeed = robotAcculators.robotSpeed;
   semWait(sem_id, ROBOTACCULATORS);
   setMove(robotDirection, robotSpeed );
   semPost(sem_id, ROBOTACCULATORS);
-  LOGInfoDetail(NUCLEO_TAG, "End:Motors sync.");
+  LOGInfo(NUCLEO_TAG, 1, "End:Motors sync.");
   return NULL;
 }
 
 void *syncPossition(void *arg) {
-  LOGInfoDetail(NUCLEO_TAG, "Start:Possition sync.");
+  LOGInfo(NUCLEO_TAG, 1, "Start:Possition sync.");
   Axis_struct axis = getPossitionAxis();
   Angle3d_struct angle = getPossitionAngle3d();
   semWait(sem_id, ROBOTSENSORS);
@@ -1052,45 +1071,109 @@ void *syncPossition(void *arg) {
   robotSensors.robotPosition.anglePossition.pitch = angle.pitch;
   robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
   semPost(sem_id, ROBOTSENSORS);
-  LOGInfoDetail(NUCLEO_TAG, "End:Possition sync.");
+  LOGInfo(NUCLEO_TAG, 1, "End:Possition sync.");
   return NULL;
 }
 
 void *syncButtons(void *arg) {
-  LOGInfoDetail(NUCLEO_TAG, "Start:Buttons sync.");
+  LOGInfo(NUCLEO_TAG, 1, "Start:Buttons sync.");
   unsigned char buttons = getButtons();
   semWait(sem_id, ROBOTSENSORS);
   robotSensors.buttons.buttonDown = (buttons & 0x01) && 0x01;
   robotSensors.buttons.buttonMiddle = (buttons & 0x02) && 0x02;
   robotSensors.buttons.buttonUp = (buttons & 0x04) && 0x04;
   semPost(sem_id, ROBOTSENSORS);
-  LOGInfoDetail(NUCLEO_TAG, "End:Buttons sync.");
+  LOGInfo(NUCLEO_TAG, 1, "End:Buttons sync.");
   return NULL;
 }
 
-void *syncKinectAcculators(void *arg) {
-  LOGInfoDetail(KINECT_TAG, "Start:Motor sync.");
+void *syncKinectMotor(void *arg) {
+  //https://openkinect.org/wiki/Protocol_Documentation#Control_Packet_Structure
+  unsigned char empty[1];
+  LOGInfo(KINECT_TAG, 1, "Start:Motor sync.");
   semWait(sem_id, ROBOTACCULATORS);
-
-  //TODO dorobit
-
+  int angle = robotAcculators.kinect.roll * 2;
   semPost(sem_id, ROBOTACCULATORS);
-  LOGInfoDetail(KINECT_TAG, "End:Motor sync.");
+
+  XnStatus rc = XN_STATUS_OK;
+  rc = xnUSBSendControl(dev,
+                        XN_USB_CONTROL_TYPE_VENDOR,
+                        0x31,
+                        (XnUInt16)angle,
+                        0x0,
+                        empty,
+                        0x0, 0);
+  if (rc != XN_STATUS_OK) {
+    LOGError(KINECT_TAG, xnGetStatusString(rc) );
+  }
+
+  LOGInfo(KINECT_TAG, 1, "End:Motor sync.");
+  return NULL;
+}
+
+void *syncKinectLed(void *arg) {
+  //https://openkinect.org/wiki/Protocol_Documentation#Control_Packet_Structure
+  unsigned char empty[1];
+  LOGInfo(KINECT_TAG, 1, "Start:Led sync.");
+  semWait(sem_id, ROBOTACCULATORS);
+  ledKinect_t led = robotAcculators.ledKinect;
+  semPost(sem_id, ROBOTACCULATORS);
+
+  XnStatus rc = XN_STATUS_OK;
+  rc = xnUSBSendControl(dev,
+                        XN_USB_CONTROL_TYPE_VENDOR,
+                        0x06,
+                        (XnUInt16)led,
+                        0x0,
+                        empty,
+                        0x0, 0);
+  if (rc != XN_STATUS_OK) {
+    LOGError(KINECT_TAG, xnGetStatusString(rc) );
+  }
+
+  LOGInfo(KINECT_TAG, 1, "End:Led sync.");
   return NULL;
 }
 
 void *syncKinectSensors(void *arg) {
-  LOGInfoDetail(KINECT_TAG, "Start:Sensor sync.");
+  LOGInfo(KINECT_TAG, 1, "Start:Sensor sync.");
+  XnUInt32 nBufferSize = 10;
+  XnUChar * pBuffer = new XnUChar[nBufferSize];
+  XnUInt32 pnBytesReceived;
+  XnStatus rc = XN_STATUS_OK;
+  rc = xnUSBReceiveControl(dev,
+                           XN_USB_CONTROL_TYPE_VENDOR,
+                           0x32,
+                           0x0,
+                           0x0,
+                           pBuffer,
+                           nBufferSize,
+                           &pnBytesReceived,
+                           0);
+  if (rc != XN_STATUS_OK) {
+    LOGError(KINECT_TAG, xnGetStatusString(rc) );
+  }
+
+  //prepocitane na zrychlenie
+  double x = ((double)(((uint16_t)pBuffer[2] << 8) | pBuffer[3])) / 819;
+  double y = ((double)(((uint16_t)pBuffer[4] << 8) | pBuffer[5])) / 819;
+  double z = ((double)(((uint16_t)pBuffer[6] << 8) | pBuffer[7])) / 819;
+
   semWait(sem_id, ROBOTSENSORS);
 
-  //TODO dorobit
+  robotSensors.kinect.accAxis.x = x;
+  robotSensors.kinect.accAxis.y = y;
+  robotSensors.kinect.accAxis.z = z;
+  robotSensors.kinect.accAngle.roll = pBuffer[8] / 2;
+
+  robotSensors.kinect.motorStatus = (motorStatusKinect_t)pBuffer[9];
 
   semPost(sem_id, ROBOTSENSORS);
-  LOGInfoDetail(KINECT_TAG, "End:Sensor sync.");
+  LOGInfo(KINECT_TAG, 1, "End:Sensor sync.");
   return NULL;
 }
 
-#define numberOfModules 7
+#define numberOfModules 8
 void *syncModules(void *arg) {
   unsigned long timeRunThread[numberOfModules];
   for (int i = 0; i < numberOfModules; i++) {
@@ -1143,8 +1226,14 @@ void *syncModules(void *arg) {
 
     usleep(SYNC_MIN_TIME / numberOfModules);
 
-    if (ENABLE_KINECTACCULATORS && (timeRunThread[threadIndex] > SYNC_KINECTACCULATORS_TIME)) {
-      syncKinectAcculators(NULL);
+    if (ENABLE_KINECTMOTOR && (timeRunThread[threadIndex] > SYNC_KINECTMOTOR_TIME)) {
+      syncKinectMotor(NULL);
+      timeRunThread[threadIndex] = 0;
+    }
+    threadIndex++;
+
+    if (ENABLE_KINECTLED && (timeRunThread[threadIndex] > SYNC_KINECTLED_TIME)) {
+      syncKinectLed(NULL);
       timeRunThread[threadIndex] = 0;
     }
     threadIndex++;
@@ -1192,7 +1281,7 @@ double deg2Rad(double angle) {
   return angle * (M_PI / 180);
 }
 
-static void colorizeDisparity( const Mat& gray, Mat& rgb, double maxDisp = -1.f, float S = 1.f, float V = 1.f ) {
+static void colorizeDisparity( const Mat & gray, Mat & rgb, double maxDisp = -1.f, float S = 1.f, float V = 1.f ) {
   CV_Assert( !gray.empty() );
   CV_Assert( gray.type() == CV_8UC1 );
 
@@ -1244,7 +1333,7 @@ static void colorizeDisparity( const Mat& gray, Mat& rgb, double maxDisp = -1.f,
   }
 }
 
-static float getMaxDisparity( VideoCapture& capture ) {
+static float getMaxDisparity( VideoCapture & capture ) {
   const int minDistance = 400; // mm
   float b = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_BASELINE ); // mm
   float F = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_FOCAL_LENGTH ); // pixels
