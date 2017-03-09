@@ -10,12 +10,12 @@ all:
 	sudo make main
 
 main:main.cpp
-	$(CPP) -I/usr/local/include/libfreenect main.cpp -lrobotTerenny -lfreenect -lfreenect_sync -lgpio -lusb-1.0  -lm -lrt -lpthread -o main $(OFLAGS)
+	$(CPP) -I/usr/local/include/libfreenect main.cpp -lrobotTerenny -lgpio -lusb-1.0  -lm -lrt -lpthread -o main $(OFLAGS)
 
 TARGET=robotTerenny
 
 robotTerenny:robotTerenny.c
-	$(CPP) -I/usr/local/include/libfreenect -c robotTerenny.c -lfreenect -lfreenect_sync -lgpio -lusb-1.0 -lm -lrt -lpthread $(OFLAGS)
+	$(CPP) -I/usr/local/include/libfreenect -c robotTerenny.c -lgpio -lusb-1.0 -lm -lrt -lpthread $(OFLAGS)
 
 install: $(TARGET)
 	$(CROSS_COMPILE)ar rcs lib$(TARGET).a robotTerenny.o
