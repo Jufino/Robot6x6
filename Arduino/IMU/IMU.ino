@@ -13,7 +13,7 @@ GY87 gy87;
 #define printDegree 1
 #define printCalibrate 1
 #define pocMaxValue 10
-bool callibrateCompassOn = true;
+bool callibrateCompassOn = false;
 bool callibrateGyOn = false;
 int minX = 0;
 int maxX = 0;
@@ -38,6 +38,10 @@ byte addressI2CToSend[] = {addressI2C};
 
 void setup()
 {
+  Wire.begin(addressI2C);
+  Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent);
+
   delay(500);
   if (debug) {
     Serial.begin(9600);
@@ -57,8 +61,8 @@ void setup()
   gy87.setSamples(HMC5883L_SAMPLES_8);
 
   if (EEPROM.length() > 0) {
-    offX = EEPROM.read(0);
-    offY = EEPROM.read(1);
+    offX = EEPROM.read(0) | (EEPROM.read(1) << 8);
+    offY = EEPROM.read(2) | (EEPROM.read(3) << 8);
   }
   if (debug) {
     Serial.print("Compass set offset: X:");
@@ -74,10 +78,6 @@ void setup()
 
   // Nastavenie citlivosti, odstranenie zasumenia.
   gy87.setThreshold(3);
-
-  Wire.begin(addressI2C);
-  Wire.onRequest(requestEvent);
-  Wire.onReceive(receiveEvent);
 
   if (debug) Serial.println("Start measuring...");
 }
@@ -124,9 +124,15 @@ void receiveEvent(int howMany) {
   c = Wire.read();
   switch (c) {
     case 99: // calibrate compass
+    gy87.setOffset(0, 0);
+      callibrateCompassOn = true;
+      break;
+    case 100:
       if (callibrateCompassOn) {
-        EEPROM.write(0, offX);
-        EEPROM.write(1, offY);
+        EEPROM.update(0, offX);
+        EEPROM.update(1, offX >> 8);
+        EEPROM.update(2, offY);
+        EEPROM.update(3, offY >> 8);
         gy87.setOffset(offX, offY);
         if (printCalibrate) {
           Serial.print("LOG/Offset compass X:");
@@ -136,11 +142,8 @@ void receiveEvent(int howMany) {
         }
         callibrateCompassOn = false;
       }
-      else {
-        callibrateCompassOn = true;
-      }
       break;
-    case 100: // calibrate gyroscope
+    case 101: // calibrate gyroscope
       callibrateGyOn = true;
       break;
   }
@@ -152,7 +155,7 @@ void requestEvent() {
       Wire.write(rollToSend, 2);
       break;
     case 2:
-      Wire.write(rollToSend, 2);
+      Wire.write(pitchToSend, 2);
       break;
     case 3:
       Wire.write(yawToSend, 2);
@@ -169,6 +172,7 @@ void requestEvent() {
 
 void loop()
 {
+  noInterrupts();
   timer = millis();
   //-------------------------------------------------------
   //vypocet vsetkych uhlov zariadenia
@@ -194,24 +198,24 @@ void loop()
     compassVal = correctAngle(compassVal);
     yaw = yaw * alfaCompass + compassVal * (1 - alfaCompass);
     yaw = correctAngle(yaw);
-    signed int  yawNormToSend = yaw * 100;
-    yawToSend[0] = (yawNormToSend & 0xFF);
-    yawToSend[1] = (yawNormToSend >> 8) & 0xFF;
+    int16_t  yawNormToSend = (int16_t)(yaw * 10000);
+    yawToSend[0] = yawNormToSend;
+    yawToSend[1] = yawNormToSend >> 8;
   }
   else {
-    signed int  yawNormToSend = -10;
-    yawToSend[0] = (yawNormToSend & 0xFF);
-    yawToSend[1] = (yawNormToSend >> 8) & 0xFF;
+    int16_t  yawNormToSend = -65000;
+    yawToSend[0] = yawNormToSend;
+    yawToSend[1] = yawNormToSend >> 8;
   }
   //-------------------------------------------------------
   //priprav data na odoslanie
-  signed int rollNormToSend = roll * 100;
-  rollToSend[0] = (rollNormToSend & 0xFF);
-  rollToSend[1] = (rollNormToSend >> 8) & 0xFF;
+  int16_t rollNormToSend = (int16_t)(roll * 10000);
+  rollToSend[0] = rollNormToSend;
+  rollToSend[1] = rollNormToSend >> 8;
 
-  signed int pitchNormToSend = pitch * 100;
-  pitchToSend[0] = (pitchNormToSend & 0xFF);
-  pitchToSend[1] = (pitchNormToSend >> 8) & 0xFF;
+  int16_t pitchNormToSend = (int16_t)(pitch * 10000);
+  pitchToSend[0] = pitchNormToSend;
+  pitchToSend[1] = pitchNormToSend >> 8;
 
   //-------------------------------------------------------
   //kalibracia stredu kompasu
@@ -232,9 +236,10 @@ void loop()
     gy87.calibrateGyro();
     callibrateGyOn = false;
   }
+  interrupts();
   //-------------------------------------------------------
   //debugovanie cez seriovy port
-  if (debug && poc++ == pocMaxValue) {
+  if (debug && poc++ >= pocMaxValue) {
     if (printDegree) {
       Serial.print("roll:");
       Serial.print(roll * 180 / M_PI);
@@ -243,7 +248,7 @@ void loop()
       Serial.print("; yaw:");
       Serial.println(yaw * 180 / M_PI);
     }
-    if (printCalibrate) {
+    if (printCalibrate && callibrateCompassOn) {
       Serial.print("Offset compass X:");
       Serial.print(offX);
       Serial.print(", Y:");
@@ -252,6 +257,8 @@ void loop()
     poc = 0;
   }
   //-------------------------------------------------------
-  delay((timeStep * 1000) - (millis() - timer)); //dobehnutie casu, ktory ostal
+  int16_t ostatokCasu = (timeStep * 1000) - (millis() - timer);
+  if (ostatokCasu > 0)
+    delay(ostatokCasu); //dobehnutie casu, ktory ostal
 }
 

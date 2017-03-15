@@ -218,6 +218,11 @@ void I2C2_WriteRegisterValue(uint8_t slaveAddr, uint8_t regAddr, uint8_t val) {
 	I2C2_BytesWrite(slaveAddr, tmp, 1, regAddr);
 }
 
+void I2C2_WriteRegister(uint8_t slaveAddr, uint8_t regAddr) {
+	uint8_t tmp[1];
+	I2C2_BytesWrite(slaveAddr, tmp, 0, regAddr);
+}
+
 void I2C2_clearReadRegister(){
 	readReg = 0;
 }

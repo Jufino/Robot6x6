@@ -8,88 +8,86 @@ using System.Drawing;
 using System.Threading;
 using System.IO;
 
-    public class socketWebcam
+public class socketWebcam
+{
+
+    protected Socket socket_client;
+    const long TIMEOUT_SOCKET = 100000;
+
+    public Socket socketCon
     {
-//-------------------------------------------------------------
-        protected Socket socket_client;
-        public Socket socketCon
-        {
-            get { return this.socket_client; }
-        }
-//-------------------------------------------------------------
-        public bool Open(String IP, String Port)
-        {
-            try
-            {
-                socket_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                int alPort = System.Convert.ToInt16(Port, 10);
-                System.Net.IPAddress remoteIPAddress = System.Net.IPAddress.Parse(IP);
-                System.Net.IPEndPoint remoteEndPoint = new System.Net.IPEndPoint(remoteIPAddress, alPort);
-                socket_client.ReceiveBufferSize = 100000;
-                socket_client.Connect(remoteEndPoint);
-                return true;
+        get { return this.socket_client; }
+    }
 
-            }
-            catch
-            {
-                return false;
-            }
+    public bool Open(String IP, String Port)
+    {
+        try
+        {
+            socket_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            int alPort = System.Convert.ToInt16(Port, 10);
+            System.Net.IPAddress remoteIPAddress = System.Net.IPAddress.Parse(IP);
+            System.Net.IPEndPoint remoteEndPoint = new System.Net.IPEndPoint(remoteIPAddress, alPort);
+            socket_client.ReceiveTimeout = 1000;
+            socket_client.SendTimeout = 1000;
+            socket_client.Connect(remoteEndPoint);
+            return true;
 
         }
-        public bool Close()
+        catch
         {
-            try
-            {
-                socket_client.Close();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
-        public string ReceiveASCII(long length)
+
+    }
+
+    public bool Close()
+    {
+        try
         {
-            byte[] buffer = ReceiveBytes(length);
-            return System.Text.Encoding.ASCII.GetString(buffer, 0, buffer.Length);
+            socket_client.Close();
+            return true;
         }
-        public byte[] ReceiveBytes(long length)
+        catch
         {
-            byte[] buffer = new byte[length];
-            //while (socket_client.Available == 0) ;
-            try
-            {
-                long size = 0;
-                while (length > size)
-                    size += socket_client.Receive(buffer, (int)size, (int)(length - size), SocketFlags.None);
-            }
-            catch { }
-            return buffer;
+            return false;
         }
-        public void SendString(string Data)
+    }
+
+    public string ReceiveASCII(int length)
+    {
+        byte[] buffer = ReceiveBytes(length);
+        return System.Text.Encoding.ASCII.GetString(buffer, 0, buffer.Length);
+    }
+
+    public byte[] ReceiveBytes(int length)
+    {
+        long timeout = 0;
+        byte[] buffer = new byte[length];
+        //while (socket_client.Available == 0) ;
+        try
         {
-            byte[] byData = System.Text.Encoding.ASCII.GetBytes(Data+"\0");
-            SendByte(byData);
+            int size = 0;
+            while (length > size && timeout++ < TIMEOUT_SOCKET)
+                size += socket_client.Receive(buffer, size, (length - size), SocketFlags.None);
         }
-        public void SendByte(byte[] Data)
+        catch { }
+        return buffer;
+    }
+
+    public void SendString(string Data)
+    {
+        byte[] byData = System.Text.Encoding.ASCII.GetBytes(Data + "\0");
+        SendByte(byData);
+    }
+
+    public void SendByte(byte[] Data)
+    {
+        try
         {
-           /* Thread send = new Thread(delegate()
-            {
-                lock (zamok)
-                {
-            */
-            try
-            {
-                socket_client.Send(Data, SocketFlags.None);
-            }
-            catch{}
-             /*   }
-            });
-            send.Start();
-            send.Join();
-              */
+            socket_client.Send(Data, SocketFlags.None);
         }
-//-------------------------------------------------------------
+        catch { }
+    }
 
     public enum ImageFormat
     {
@@ -137,34 +135,32 @@ using System.IO;
     }
 
     public Bitmap recv_picture()
+    {
+        int sizeFromSystem = -1;
+        int obrSize = -1;
+        try
         {
-            long sizeFromSystem = -1;
-            long obrSize = -1;
-            try
+            sizeFromSystem = Convert.ToInt32(ReceiveASCII(20));
+            if (sizeFromSystem > 0)
             {
-                sizeFromSystem = Convert.ToInt32(ReceiveASCII(20));
-                if (sizeFromSystem > 0)
+                byte[] obr = ReceiveBytes(sizeFromSystem);
+                obrSize = obr.Length;
+                ImageFormat formatObr = GetImageFormat(obr);
+                if (formatObr != ImageFormat.unknown)
                 {
-                    byte[] obr = ReceiveBytes(sizeFromSystem);
-                    obrSize = obr.LongLength;
-                    ImageFormat formatObr = GetImageFormat(obr);
-                    if (formatObr != ImageFormat.unknown)
-                    {
-                        /*ImageConverter ic = new ImageConverter();
-                        Image img = (Image)ic.ConvertFrom(obr);
-                        return new Bitmap(img, _width, _height);*/
-                        MemoryStream ms = new MemoryStream(obr);
-                        return (new Bitmap(ms));
-                    }
-                    else
-                    {
-                        Console.WriteLine("Neznámy formát obrázka.\n");
-                    }
+                    MemoryStream ms = new MemoryStream(obr);
+                    return (new Bitmap(ms));
+                }
+                else
+                {
+                    Console.WriteLine("Neznámy formát obrázka.\n");
                 }
             }
-            catch {
-                Console.WriteLine("Problem s konverziou obrazka.\nVelkost so systemu:"+sizeFromSystem+"\nVelkost obrazka:"+obrSize+"\n");
-            }
-            return null;
         }
+        catch
+        {
+            Console.WriteLine("Problem s konverziou obrazka.\nVelkost so systemu:" + sizeFromSystem + "\nVelkost obrazka:" + obrSize + "\n");
+        }
+        return null;
+    }
 }
