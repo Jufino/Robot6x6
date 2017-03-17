@@ -15,8 +15,14 @@ bool priorityVisible[numberOfPriorities];
 
 XN_USB_DEV_HANDLE dev;
 VideoCapture cameraKinect;
+char pointCloudMapChooseKinect = 0;
 char imageChooseKinect = 0;
 char depthChooseKinect = 0;
+char mapImageChoose = 0;
+Mat mapImage1;
+Mat mapImage2;
+Mat pointCloudMap1Kinect;
+Mat pointCloudMap2Kinect;
 Mat depth1Kinect;
 Mat depth2Kinect;
 Mat img1Kinect;
@@ -157,9 +163,19 @@ void initRobot(void) {
   semInit(sem_id, CAMERA_DEPTH_KINECT2, 1);
   semInit(sem_id, CAMERA_IMAGE_KINECT1, 1);
   semInit(sem_id, CAMERA_IMAGE_KINECT2, 1);
+  semInit(sem_id, CAMERA_POINTCLOUDMAP_KINECT1, 1);
+  semInit(sem_id, CAMERA_POINTCLOUDMAP_KINECT2, 1);
   semInit(sem_id, CAMERA_VARIABLE_KINECTIMAGE, 1);
   semInit(sem_id, CAMERA_VARIABLE_KINECTDEPTH, 1);
+  semInit(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP, 1);
+  semInit(sem_id, MAP_VARIABLE, 1);
+  semInit(sem_id, MAP_IMAGE1, 1);
+  semInit(sem_id, MAP_IMAGE2, 1);
   semInit(sem_id, I2C, 1);
+
+  Mat map(MAP_HEIGHT, MAP_WIDTH,  CV_8UC1, Scalar(0));
+  mapImage1 = map.clone();
+  mapImageChoose = 1;
 
   initMotorPowerSupply();
 
@@ -257,6 +273,9 @@ void initRobot(void) {
     }
   }
 
+  pthread_t threadModules;
+  pthread_create(&threadModules, NULL, &syncModules, NULL);
+
   if (SENSORS_WIFI) {
     pthread_t waitForSensorConnectionThread;
     pthread_create(&waitForSensorConnectionThread, NULL, &waitForSensorConnection, NULL);
@@ -268,8 +287,6 @@ void initRobot(void) {
   }
   if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
 
-  pthread_t threadModules;
-  pthread_create(&threadModules, NULL, &syncModules, NULL);
   signal(SIGINT, sigctrl);
 }
 
@@ -585,9 +602,28 @@ bool initKinect(unsigned char imageMode) {
   return true;
 }
 
+Mat getMapImage(void) {
+  Mat mapImageMat;
+  char mapImageChooseMain;
+  semWait(sem_id, MAP_VARIABLE);
+  mapImageChooseMain = mapImageChoose;
+  semPost(sem_id, MAP_VARIABLE);
+  if (mapImageChooseMain == 1) {
+    semWait(sem_id, MAP_IMAGE1);
+    mapImageMat = mapImage1.clone();
+    semPost(sem_id, MAP_IMAGE1);
+  }
+  else if (mapImageChooseMain == 2) {
+    semWait(sem_id, MAP_IMAGE2);
+    mapImageMat = mapImage2.clone();
+    semPost(sem_id, MAP_IMAGE2);
+  }
+  return mapImageMat;
+}
+
 Mat getImageKinect(void) {
   Mat imgMatKinect;
-  double imageChooseMainKinect;
+  char imageChooseMainKinect;
   semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
   imageChooseMainKinect = imageChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
@@ -606,7 +642,7 @@ Mat getImageKinect(void) {
 
 Mat getDepthKinect(void) {
   Mat depthMatKinect;
-  double depthChooseMainKinect;
+  char depthChooseMainKinect;
   semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
   depthChooseMainKinect = depthChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
@@ -623,9 +659,28 @@ Mat getDepthKinect(void) {
   return depthMatKinect;
 }
 
+Mat getPointCloudMapKinect(void) {
+  Mat pointCloudMapMatKinect;
+  char pointCloudMapChooseMainKinect;
+  semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+  pointCloudMapChooseMainKinect = pointCloudMapChooseKinect;
+  semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+  if (pointCloudMapChooseMainKinect == 1) {
+    semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+    pointCloudMapMatKinect = pointCloudMap1Kinect.clone();
+    semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+  }
+  else if (pointCloudMapChooseMainKinect == 2) {
+    semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+    pointCloudMapMatKinect = pointCloudMap2Kinect.clone();
+    semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+  }
+  return pointCloudMapMatKinect;
+}
+
 Mat getImageLeft(void) {
   Mat imgMatL;
-  double imageChooseMainL;
+  char imageChooseMainL;
   semWait(sem_id, CAMERA_VARIABLE_L);
   imageChooseMainL = imageChooseL;
   semPost(sem_id, CAMERA_VARIABLE_L);
@@ -648,7 +703,7 @@ Mat getImageLeft(void) {
 
 Mat getImageRight(void) {
   Mat imgMatR;
-  double imageChooseMainR;
+  char imageChooseMainR;
   semWait(sem_id, CAMERA_VARIABLE_R);
   imageChooseMainR = imageChooseR;
   semPost(sem_id, CAMERA_VARIABLE_R);
@@ -663,6 +718,69 @@ Mat getImageRight(void) {
     semPost(sem_id, CAMERA_IMAGE_R2);
   }
   return imgMatR;
+}
+
+void rotateImage(const Mat &input, Mat &output, double alpha, double beta, double gamma, double dx, double dy, double dz, double f)
+{
+  alpha = (alpha - 90.) * CV_PI / 180.;
+  beta = (beta - 90.) * CV_PI / 180.;
+  gamma = (gamma - 90.) * CV_PI / 180.;
+  // get width and height for ease of use in matrices
+  double w = (double)input.cols;
+  double h = (double)input.rows;
+  // Projection 2D -> 3D matrix
+  Mat A1 = (Mat_<double>(4, 3) <<
+            1, 0, -w / 2,
+            0, 1, -h / 2,
+            0, 0,    0,
+            0, 0,    1);
+  // Rotation matrices around the X, Y, and Z axis
+  Mat RX = (Mat_<double>(4, 4) <<
+            1,          0,           0, 0,
+            0, cos(alpha), -sin(alpha), 0,
+            0, sin(alpha),  cos(alpha), 0,
+            0,          0,           0, 1);
+  Mat RY = (Mat_<double>(4, 4) <<
+            cos(beta), 0, -sin(beta), 0,
+            0, 1,          0, 0,
+            sin(beta), 0,  cos(beta), 0,
+            0, 0,          0, 1);
+  Mat RZ = (Mat_<double>(4, 4) <<
+            cos(gamma), -sin(gamma), 0, 0,
+            sin(gamma),  cos(gamma), 0, 0,
+            0,          0,           1, 0,
+            0,          0,           0, 1);
+  // Composed rotation matrix with (RX, RY, RZ)
+  Mat R = RX * RY * RZ;
+  // Translation matrix
+  Mat T = (Mat_<double>(4, 4) <<
+           1, 0, 0, dx,
+           0, 1, 0, dy,
+           0, 0, 1, dz,
+           0, 0, 0, 1);
+  // 3D -> 2D matrix
+  Mat A2 = (Mat_<double>(3, 4) <<
+            f, 0, w / 2, 0,
+            0, f, h / 2, 0,
+            0, 0,   1, 0);
+  // Final transformation matrix
+  Mat trans = A2 * (T * (R * A1));
+  // Apply matrix transformation
+  warpPerspective(input, output, trans, input.size(), INTER_LANCZOS4);
+}
+
+Mat getAnglePossitionRobotImage(void) {
+  int cordWidth = 400;
+  int cordHeight = 400;
+  Mat cord(cordHeight, cordWidth,  CV_8UC3, Scalar(0, 0, 0));
+  Mat out(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
+  line(cord, Point(cordWidth / 2, cordHeight / 2), Point(cordWidth / 2, cordHeight / 2 - cordHeight / 4), Scalar(0, 0, 255), 3);
+  line(cord, Point(cordWidth / 2, cordHeight / 2), Point(cordWidth / 2 + cordWidth / 4, cordHeight / 2), Scalar(255, 0, 0), 3);
+  line(cord, Point(cordWidth / 2, cordHeight / 2), Point(cordWidth / 2 - (cordWidth / 4)*cos(45), cordHeight / 2 + (cordHeight / 4)*cos(45)), Scalar(0, 255, 0), 3);
+ // rotateImage(cord, cord, 90, 135, 90, 0, 0, 200, 200);
+
+  cord.copyTo(out(cv::Rect(MAP_WIDTH / 2 - cord.cols / 2, MAP_HEIGHT / 2 - cord.rows / 2, cord.cols, cord.rows)));
+  return out;
 }
 
 RobotAcculators getRobotAcculators(void) {
@@ -683,6 +801,14 @@ RobotSensors getRobotSensors(void) {
   RobotSensors temp;
   semWait(sem_id, ROBOTSENSORS);
   memcpy(&temp, &robotSensors, sizeof(RobotSensors));
+  semPost(sem_id, ROBOTSENSORS);
+  return temp;
+}
+
+RobotPosition_struct getRobotPossition(void) {
+  RobotPosition_struct temp;
+  semWait(sem_id, ROBOTSENSORS);
+  memcpy(&temp, &robotSensors.robotPosition, sizeof(RobotPosition_struct));
   semPost(sem_id, ROBOTSENSORS);
   return temp;
 }
@@ -840,8 +966,8 @@ Axis_struct getPossitionAxis(void) {
 Angle3d_struct getPossitionAngle3d(void) {
   Angle3d_struct angle3d;
   semWait(sem_id, I2C);
-  angle3d.roll = ((double)readRegister16(STM32_ADDRESS, 103)) / 10000;
-  angle3d.pitch = ((double)readRegister16(STM32_ADDRESS, 104)) / 10000;
+  angle3d.roll = ((double)readRegister16s(STM32_ADDRESS, 103)) / 10000;
+  angle3d.pitch = ((double)readRegister16s(STM32_ADDRESS, 104)) / 10000;
   angle3d.yaw = ((double)readRegister16(STM32_ADDRESS, 105)) / 10000;
   semPost(sem_id, I2C);
   return angle3d;
@@ -931,6 +1057,15 @@ void *syncCameraNetworkConnection(void *arg) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Depth img kinect sync.");
       sendMatImage(getDepthKinect(), 80);
     }
+    else if (strcmp(recvdata, "map\n") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Map sync.");
+      sendMatImage(getMapImage(), 80);
+    }
+    else if (strcmp(recvdata, "angle\n") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Angle sync.");
+      sendMatImage(getAnglePossitionRobotImage(), 80);
+    }
+
   }
   LOGInfo(SENSOR_CONN_TAG, 1, "End:Camera sync by network.");
   return NULL;
@@ -981,13 +1116,14 @@ void *syncKinectFrames(void *arg) {
     else
     {
       semWait(sem_id, CAMERA_DEPTH_KINECT1);
-      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP   ) ) {
         depthMap.convertTo( depth1Kinect, CV_8UC1, scaleFactor );
         semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
         depthChooseKinect = 1;
         semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
       }
       semPost(sem_id, CAMERA_DEPTH_KINECT1);
+
       semWait(sem_id, CAMERA_IMAGE_KINECT1);
       if (cameraKinect.retrieve( img1Kinect, CAP_OPENNI_BGR_IMAGE )) {
         semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
@@ -995,6 +1131,14 @@ void *syncKinectFrames(void *arg) {
         semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
       }
       semPost(sem_id, CAMERA_IMAGE_KINECT1);
+
+      semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+      if (cameraKinect.retrieve( pointCloudMap1Kinect, CAP_OPENNI_POINT_CLOUD_MAP )) {
+        semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+        pointCloudMapChooseKinect = 1;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+      }
+      semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
     }
 
     cvWaitKey(10);
@@ -1005,7 +1149,7 @@ void *syncKinectFrames(void *arg) {
     else
     {
       semWait(sem_id, CAMERA_DEPTH_KINECT2);
-      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP    ) ) {
         depthMap.convertTo( depth2Kinect, CV_8UC1, scaleFactor );
         semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
         depthChooseKinect = 2;
@@ -1020,6 +1164,14 @@ void *syncKinectFrames(void *arg) {
         semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
       }
       semPost(sem_id, CAMERA_IMAGE_KINECT2);
+
+      semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+      if (cameraKinect.retrieve( pointCloudMap2Kinect, CAP_OPENNI_POINT_CLOUD_MAP )) {
+        semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+        pointCloudMapChooseKinect = 2;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+      }
+      semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
     }
   }
   LOGInfo(SENSOR_CONN_TAG, 1, "End:Kinect sync frames.");
@@ -1084,6 +1236,42 @@ void *syncButtons(void *arg) {
   robotSensors.buttons.buttonUp = (buttons & 0x04) && 0x04;
   semPost(sem_id, ROBOTSENSORS);
   LOGInfo(NUCLEO_TAG, 1, "End:Buttons sync.");
+  return NULL;
+}
+
+void *syncGenerateMap(void *arg) {
+  LOGInfo(MAP_TAG, 1, "Start:Map sync.");
+  Mat map(MAP_HEIGHT, MAP_WIDTH,  CV_8UC1, Scalar(0));
+  RobotPosition_struct robotPosition = getRobotPossition();
+
+  //generovanie mapy
+  if (robotPosition.anglePossition.roll > 0) {
+    map.setTo(0); //assign 123
+  }
+  else {
+    map.setTo(255); //assign 123
+  }
+
+  semWait(sem_id, MAP_VARIABLE);
+  char mapChooseLast = mapImageChoose;
+  semPost(sem_id, MAP_VARIABLE);
+  if (mapChooseLast == 1) {
+    semWait(sem_id, MAP_IMAGE2);
+    mapImage2 = map.clone();
+    semWait(sem_id, MAP_VARIABLE);
+    mapImageChoose = 2;
+    semPost(sem_id, MAP_VARIABLE);
+    semPost(sem_id, MAP_IMAGE2);
+  }
+  else {
+    semWait(sem_id, MAP_IMAGE1);
+    mapImage1 = map.clone();
+    semWait(sem_id, MAP_VARIABLE);
+    mapImageChoose = 1;
+    semPost(sem_id, MAP_VARIABLE);
+    semPost(sem_id, MAP_IMAGE1);
+  }
+  LOGInfo(MAP_TAG, 1, "End:Map sync.");
   return NULL;
 }
 
@@ -1173,7 +1361,7 @@ void *syncKinectSensors(void *arg) {
   return NULL;
 }
 
-#define numberOfModules 8
+#define numberOfModules 9
 void *syncModules(void *arg) {
   unsigned long timeRunThread[numberOfModules];
   for (int i = 0; i < numberOfModules; i++) {
@@ -1242,6 +1430,14 @@ void *syncModules(void *arg) {
 
     if (ENABLE_KINECTSENSORS && (timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME)) {
       syncKinectSensors(NULL);
+      timeRunThread[threadIndex] = 0;
+    }
+    threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
+
+    if (ENABLE_MAP_GENERATE && (timeRunThread[threadIndex] > SYNC_MAP_GENERATE_TIME)) {
+      syncGenerateMap(NULL);
       timeRunThread[threadIndex] = 0;
     }
 

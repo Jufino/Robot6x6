@@ -49,15 +49,15 @@ int main(void) {
     robotAcculators.leds.LedUp = COLOR_GREEN;
     robotAcculators.leds.LedMiddle = COLOR_ORANGE;
     robotAcculators.leds.LedDown = COLOR_GREEN;
-    robotAcculators.kinect.roll=20;
+    robotAcculators.kinect.roll=10;
     robotAcculators.ledKinect = LEDKINECT_BLINK_RED_ORANGE;
     setRobotAcculators(robotAcculators);
 
-    //printf("x: %f, y: %f, z: %f,roll: %f, pitch: %f, yaw: %f\n",robotSensors.robotPosition.axisPossition.x,robotSensors.robotPosition.axisPossition.y,robotSensors.robotPosition.axisPossition.z,robotSensors.robotPosition.anglePossition.roll,robotSensors.robotPosition.anglePossition.pitch,robotSensors.robotPosition.anglePossition.yaw);
+    printf("x: %f, y: %f, z: %f,roll: %f, pitch: %f, yaw: %f\n",robotSensors.robotPosition.axisPossition.x,robotSensors.robotPosition.axisPossition.y,robotSensors.robotPosition.axisPossition.z,robotSensors.robotPosition.anglePossition.roll,robotSensors.robotPosition.anglePossition.pitch,robotSensors.robotPosition.anglePossition.yaw);
 
     //printf("bUp:%d;bMiddle:%d;bDown:%d\n", robotSensors.buttons.buttonUp, robotSensors.buttons.buttonMiddle, robotSensors.buttons.buttonDown);
 
-    printf("acc angle:%f,motorStatus:%d\n",robotSensors.kinect.accAngle.roll,robotSensors.kinect.motorStatus);
+//    printf("acc angle:%f,motorStatus:%d\n",robotSensors.kinect.accAngle.roll,robotSensors.kinect.motorStatus);
 
     sleep(1);
   }
