@@ -3,9 +3,8 @@
 
 #include "stm32l1xx.h"
 //------------------------------------------------------------------
-#define I2C_READ_TIMEOUT 10000
-#define DMA_TIMEOUT 200
-#define I2C_TIMEOUT 2000
+#define DMA_TIMEOUT 2000
+#define I2C_TIMEOUT 50000
 //------------------------------------------------------------------
 
 void I2C2_Init(void);
@@ -13,6 +12,8 @@ void I2C2_Init(void);
 void I2C2_clearReadRegister();
 
 void I2C2_BytesWrite(uint8_t slaveAddr, uint8_t pBuffer[], uint8_t length,uint8_t writeAddr);
+
+void I2C2_WriteRegister(uint8_t slaveAddr, uint8_t regAddr);
 
 void I2C2_WriteRegisterValue(uint8_t slaveAddr,uint8_t regAddr,uint8_t val);
 

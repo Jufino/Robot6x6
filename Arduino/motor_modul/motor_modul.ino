@@ -279,6 +279,7 @@ void loop() {
   }
   /*--------------------------------------------------*/
   /*spracovanie casu, aby sme robili kvazy presne periody pre regulatory*/
+  noInterrupts();
   unsigned long actual_time = micros();
   int delta_time;
   if (actual_time > last_time)
@@ -292,9 +293,11 @@ void loop() {
   /*integrovanie prudu*/
   sumCurrent += analogRead(A3);
   timesCurrentMeasure++;
+  interrupts();
   /*--------------------------------------------------*/
   /*v kazdej periode pridame hodnotu prudu cez dolnopriepustny filter, aby sme dostranili zasumenie*/
   if (periodDone) {
+    noInterrupts();
     if (useLPF) {
       double raw_data = ((double)(sumCurrent / timesCurrentMeasure)) * (5 / 1.023);
       averageMeasureCurrent = (double)averageMeasureCurrent - (LPF_Beta * ((double)averageMeasureCurrent - (double)raw_data));
@@ -309,10 +312,12 @@ void loop() {
     sumCurrent = 0;
     timesCurrentMeasure = 0;
     periodDone = false;
+    interrupts();
   }
   /*--------------------------------------------------*/
   /*regulator rychlosti*/
   if (time_integral[0] >= periodSpeedRegulator) {
+    noInterrupts();
     /*--------------------------------------------------*/
     /*ziskana rychlost derivovanim polohy*/
     double speedWheel = numberTick - numberTickLast;
@@ -352,6 +357,7 @@ void loop() {
         else if (u > 0) u = 0;
       }
       pozadCurrent = u;
+
     }
     /*--------------------------------------------------*/
     /*sluzi iba pri merani*/
@@ -368,10 +374,12 @@ void loop() {
 
     /*--------------------------------------------------*/
     time_integral[0] = 0;
+    interrupts();
   }
   /*--------------------------------------------------*/
   /*regulator prudu*/
   if (time_integral[1] >= periodCurrentRegulator) {
+    noInterrupts();
     if (onCurrentReg) {
       /*--------------------------------------------------*/
       /*PI regulator prúdu*/
@@ -409,14 +417,17 @@ void loop() {
 
     /*--------------------------------------------------*/
     time_integral[1] = 0;
+    interrupts();
   }
   /*--------------------------------------------------*/
   /*meranie napatia*/
   if (time_integral[2] >= periodVoltageMeasure) {
+    noInterrupts();
     measureVoltage = analogRead(A2);
     voltageToSend[0] = (measureVoltage & 0xFF);
     voltageToSend[1] = (measureVoltage >> 8) & 0xFF;
     time_integral[2] = 0;
+    interrupts();
   }
   /*--------------------------------------------------*/
 }

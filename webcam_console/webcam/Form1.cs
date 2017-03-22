@@ -42,7 +42,7 @@ namespace webcam
                 {
                     pictureBox2.Image = new Bitmap(img);
                 }
-                System.Threading.Thread.Sleep(50);
+                System.Threading.Thread.Sleep(33);
             }
             socketWebcam.Close();
         }

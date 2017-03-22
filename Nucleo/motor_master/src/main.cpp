@@ -1,6 +1,7 @@
 #include <math.h>
 #include <Motor/Motor.h>
-#include <GY87/GY87.h>
+
+#define alfa 0.98
 
 #define numberOfMotors 6
 Motor *motor1 = new Motor(MOTOR1);
@@ -34,6 +35,7 @@ extern "C" {
 #include <Ultrasonic/Ultrasonic.h>
 #include <Servo/Servo.h>
 #include <Buttons/Buttons.h>
+#include <IMU/IMU.h>
 #include <I2CMasterLib/I2CMasterLib.h>
 #include <I2CSlaveLib/I2CSlaveLib.h>
 #include "stm32l1xx.h"
@@ -45,10 +47,9 @@ enum Direction {
 
 #define I2C1_MAX_SEND_BUFFER 4
 volatile uint8_t motorTestValue = 0;
-volatile int16_t x_diff = 0;
 volatile long x = 0;
-volatile int16_t y_diff = 0;
 volatile long y = 0;
+volatile long z = 0;
 
 volatile double yaw = 0;
 volatile double roll = 0;
@@ -61,7 +62,7 @@ void InitializeTimer(void) {
 	TIM_TimeBaseInitTypeDef timerInitStructure; //opakovat kazdych 0.025 s = 40 hz
 	timerInitStructure.TIM_Prescaler = 49999;	//1Mhz/50000 = 20 hz
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 100;
+	timerInitStructure.TIM_Period = 5;
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInit(TIM2, &timerInitStructure);
 	TIM_Cmd(TIM2, ENABLE);
@@ -156,7 +157,7 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 		I2C1->SR1;
 		I2C1->SR2;
 		I2C1_Transmitter = (I2C_SR2_TRA & I2C1->SR2) == I2C_SR2_TRA;
-		if(I2C1_Transmitter == 1){
+		if (I2C1_Transmitter == 1) {
 			if (I2C1_BufferIndex < I2C1_BufferSize) {	//EV3-1
 				I2C1->DR = I2C1_Buffer[I2C1_BufferIndex++];
 			} else {
@@ -220,37 +221,52 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			break;
 		case 100:
 			I2C1_BufferIndex = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = x >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = x >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = x >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = x & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 101:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = y >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = y >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = y >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = y & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 102:
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = z >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = z >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = z >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = z & 0xFF;
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
 		case 103:
 			I2C1_BufferIndex = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			value = (int16_t) (roll * 10000);
+			I2C1_Buffer[I2C1_BufferIndex++] = value >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
 		case 104:
 			I2C1_BufferIndex = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			value = (int16_t) (pitch * 10000);
+			I2C1_Buffer[I2C1_BufferIndex++] = value >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
 		case 105:
 			I2C1_BufferIndex = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
-			I2C1_Buffer[I2C1_BufferIndex++] = 0;
+			value = (uint16_t) (yaw * 10000);
+			I2C1_Buffer[I2C1_BufferIndex++] = value >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
@@ -270,8 +286,9 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 		case 107:
 			I2C1_BufferIndex = 0;
 			value = getUltRaw(0);
-			I2C1_Buffer[I2C1_BufferIndex++] = value>>8 ;
-			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;;
+			I2C1_Buffer[I2C1_BufferIndex++] = value >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = value & 0xFF;
+			;
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
@@ -292,14 +309,14 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 
 	//ev3
 	while ((I2C_SR1_TXE & I2C1->SR1) == I2C_SR1_TXE) {
-			if (I2C1_BufferIndex < I2C1_BufferSize) {
-				I2C1->DR = I2C1_Buffer[I2C1_BufferIndex++];
-			} else {
-				I2C1->SR1 |= I2C_SR1_AF;
-			}
-			if (I2C1_BufferIndex >= I2C1_NumberBytesToSend) {
-				I2C1->SR1 |= I2C_SR1_AF;
-			}
+		if (I2C1_BufferIndex < I2C1_BufferSize) {
+			I2C1->DR = I2C1_Buffer[I2C1_BufferIndex++];
+		} else {
+			I2C1->SR1 |= I2C_SR1_AF;
+		}
+		if (I2C1_BufferIndex >= I2C1_NumberBytesToSend) {
+			I2C1->SR1 |= I2C_SR1_AF;
+		}
 	}
 
 	if (I2C1_Transmitter == 0) {
@@ -352,6 +369,7 @@ int main(void) {
 
 	I2C1_Init();
 	I2C2_Init();
+
 	motorTestValue = 0;
 	for (int i = 0; i < numberOfMotors; i++) {
 		if (getMotor(i + 1)->isTestOk()) {
@@ -360,18 +378,15 @@ int main(void) {
 	}
 
 	InitializeTimer();
-//
-//	gy87_1 = new GY87(0xD1, 0x1E<<1, 0x77);
-//	bool test = gy87_1->HMC5883LTestConnection();
+	yaw = getYaw();
+
 	while (1) {
+		roll = getRoll();
+		pitch = getPitch();
 		ultTriger(0);
 		for (int i = 1; i <= numberOfMotors / 2; i++) {
 			getMotor(i)->DMADeltaTicksInvoke();
-			for (int x = 0; x < 1000; x++)
-				;
 			getMotor(i + 3)->DMADeltaTicksInvoke();
-			for (int x = 0; x < 1000; x++)
-				;
 		}
 		if (timerDone > 0) {
 			double speeds[6];
@@ -388,7 +403,10 @@ int main(void) {
 			double vT = (vL + vR) / 2;
 
 			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
-			yaw += omegaT;
+			double yawIMU = getYaw();
+
+			yaw = yaw + omegaT;
+			yaw = yaw*alfa + yawIMU * (1-alfa);
 			if (yaw > 2 * M_PI)
 				yaw -= 2 * M_PI;
 			else if (yaw < 0)
@@ -396,22 +414,10 @@ int main(void) {
 			x += (long) (vT * cos(yaw));
 			y += (long) (vT * sin(yaw));
 
-			x_diff += (int16_t) (x - x_last);
-			x_last = x;
-			y_diff += (int16_t) (y - y_last);
-			y_last = y;
-
-			//ochrana proti chybam na i2c
-			//if (pocI2CEventTime > 1) {
-
-			//	pocI2CEventTime = 0;
-			//} else {
-			//	pocI2CEventTime++;
-			//}
 			timerDone = 0;
 		}
-		for (int i = 0; i < 1000; i++)
-			;
+		for (int i = 0; i < 1000; i++);
+
 	}
 }
 
