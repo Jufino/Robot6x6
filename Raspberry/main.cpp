@@ -53,7 +53,7 @@ int main(void) {
     robotAcculators.ledKinect = LEDKINECT_BLINK_RED_ORANGE;
     setRobotAcculators(robotAcculators);
 
-    printf("x: %f, y: %f, z: %f,roll: %f, pitch: %f, yaw: %f\n",robotSensors.robotPosition.axisPossition.x,robotSensors.robotPosition.axisPossition.y,robotSensors.robotPosition.axisPossition.z,robotSensors.robotPosition.anglePossition.roll,robotSensors.robotPosition.anglePossition.pitch,robotSensors.robotPosition.anglePossition.yaw);
+    printf("x: %f, y: %f, z: %f,roll: %f, pitch: %f, yaw: %f\n",robotSensors.robotPosition.axisPossition.x,robotSensors.robotPosition.axisPossition.y,robotSensors.robotPosition.axisPossition.z,robotSensors.robotPosition.anglePossition.roll*(180/3.14),robotSensors.robotPosition.anglePossition.pitch*(180/3.14),robotSensors.robotPosition.anglePossition.yaw*(180/3.14));
 
     //printf("bUp:%d;bMiddle:%d;bDown:%d\n", robotSensors.buttons.buttonUp, robotSensors.buttons.buttonMiddle, robotSensors.buttons.buttonDown);
 

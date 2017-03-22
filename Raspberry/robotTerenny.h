@@ -53,6 +53,7 @@ extern "C" {
 #define SYNC_LEDS_TIME              SYNC_MIN_TIME*300
 #define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*100
 #define SYNC_MAP_GENERATE_TIME      SYNC_MIN_TIME*100
+#define SYNC_OPERATOR_DETECT_TIME      SYNC_MIN_TIME*100
 
 #define ENABLE_I2C 1        //ok
 #define ENABLE_MOTORS 0    //ok
@@ -61,6 +62,12 @@ extern "C" {
 #define ENABLE_BUTTONS 0    //ok
 #define ENABLE_POSSITION 1  //ok
 #define ENABLE_MAP_GENERATE 1
+#define ENABLE_OPERATOR_DETECT 1
+
+#define ENABLE_MAP_OBLIVION 1
+
+#define SPEED_OF_MAP_OBLIVION 2
+#define SPEED_OF_MAP_CREATION 10
 
 #define MAP_WIDTH 640
 #define MAP_HEIGHT 480
@@ -111,6 +118,7 @@ typedef enum {
   MAP_VARIABLE,
   MAP_IMAGE1,
   MAP_IMAGE2,
+  OPERATOR_IMAGES,
   I2C
 } semafor_name_t; //nazabudnut pri pridani inicializovat v initRobot
 
@@ -123,7 +131,8 @@ typedef enum {
   MOTOR_TAG,
   NUCLEO_TAG,
   ROBOT_TAG,
-  MAP_TAG
+  MAP_TAG,
+  OPERATOR_TAG
 } log_tag_t;
 
 //ostatne
@@ -310,7 +319,5 @@ void sigpipe(int param);
 double dist(double a, double b);
 double rad2Deg(double angle);
 double deg2Rad(double angle);
-static void colorizeDisparity( const Mat& gray, Mat& rgb, double maxDisp, float S, float V);
-static float getMaxDisparity( VideoCapture& capture );
 
 #endif
