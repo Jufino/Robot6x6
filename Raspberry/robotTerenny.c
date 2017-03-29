@@ -15,26 +15,40 @@ bool priorityVisible[numberOfPriorities];
 
 XN_USB_DEV_HANDLE dev;
 VideoCapture cameraKinect;
-char pointCloudMapChooseKinect = 0;
-char imageChooseKinect = 0;
-char depthChooseKinect = 0;
+
 char mapImageChoose = 0;
 Mat mapImage1;
 Mat mapImage2;
 int mapOffsetX = 0;
 int mapOffsetY = 0;
+
+char pointCloudMapChooseKinect = 0;
 Mat pointCloudMap1Kinect;
 Mat pointCloudMap2Kinect;
+char depthChooseKinect = 0;
 Mat depth1Kinect;
 Mat depth2Kinect;
+char imageChooseKinect = 0;
 Mat img1Kinect;
 Mat img2Kinect;
 
-Mat depthOperatorMaskImage;
-Mat rgbOperatorImage;
-Mat hsvOperatorImage;
-Mat greenOperatorMaskImage;
-Mat orangeOperatorMaskImage;
+char depthOperatorMaskChoose = 0;
+Mat depthOperatorMaskImage1;
+Mat depthOperatorMaskImage2;
+char rgbOperatorChoose = 0;
+Mat rgbOperatorImage1;
+Mat rgbOperatorImage2;
+char hsvOperatorChoose = 0;
+Mat hsvOperatorImage1;
+Mat hsvOperatorImage2;
+char greenOperatorMaskChoose = 0;
+Mat greenOperatorMaskImage1;
+Mat greenOperatorMaskImage2;
+char orangeOperatorMaskChoose = 0;
+Mat orangeOperatorMaskImage1;
+Mat orangeOperatorMaskImage2;
+
+Point3f operatorPossition =  Point3f(-1, -1, -1);;
 
 const float scaleFactor = 0.05f;
 
@@ -214,7 +228,7 @@ void initRobot(void) {
   priorityVisible[1] = false;
   priorityVisible[2] = false;
 
-  sem_id = semCreate(getpid(), 22);
+  sem_id = semCreate(getpid(), 37);
   semInit(sem_id, CAMERA_VARIABLE_L, 1);
   semInit(sem_id, CAMERA_IMAGE_L1, 1);
   semInit(sem_id, CAMERA_IMAGE_L2, 1);
@@ -236,7 +250,22 @@ void initRobot(void) {
   semInit(sem_id, MAP_IMAGE1, 1);
   semInit(sem_id, MAP_IMAGE2, 1);
   semInit(sem_id, I2C, 1);
-  semInit(sem_id, OPERATOR_IMAGES, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK1, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK2, 1);
+  semInit(sem_id, RGB_OPERATOR1, 1);
+  semInit(sem_id, RGB_OPERATOR2, 1);
+  semInit(sem_id, HSV_OPERATOR1, 1);
+  semInit(sem_id, HSV_OPERATOR2, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK1, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK2, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK1, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK2, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, RGB_OPERATOR_VARIABLE, 1);
+  semInit(sem_id, HSV_OPERATOR_VARIABLE, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, OPERATOR_POSSITION, 1);
 
   mapImage1 = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
   mapImageChoose = 1;
@@ -707,6 +736,100 @@ Mat getImageKinect(void) {
   return imgMatKinect;
 }
 
+Mat getRGBOperator(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, RGB_OPERATOR_VARIABLE);
+  imageChooseMain = rgbOperatorChoose;
+  semPost(sem_id, RGB_OPERATOR_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, RGB_OPERATOR1);
+    imgMat = rgbOperatorImage1.clone();
+    semPost(sem_id, RGB_OPERATOR1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, RGB_OPERATOR2);
+    imgMat = rgbOperatorImage2.clone();
+    semPost(sem_id, RGB_OPERATOR2);
+  }
+  return imgMat;
+}
+Mat getDepthOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = depthOperatorMaskChoose;
+  semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK1);
+    imgMat = depthOperatorMaskImage1.clone();
+    semPost(sem_id, DEPTH_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK2);
+    imgMat = depthOperatorMaskImage2.clone();
+    semPost(sem_id, DEPTH_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getOrangeOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = orangeOperatorMaskChoose;
+  semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK1);
+    imgMat = orangeOperatorMaskImage1.clone();
+    semPost(sem_id, ORANGE_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK2);
+    imgMat = orangeOperatorMaskImage2.clone();
+    semPost(sem_id, ORANGE_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getGreenOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = greenOperatorMaskChoose;
+  semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, GREEN_OPERATOR_MASK1);
+    imgMat = greenOperatorMaskImage1.clone();
+    semPost(sem_id, GREEN_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, GREEN_OPERATOR_MASK2);
+    imgMat = greenOperatorMaskImage2.clone();
+    semPost(sem_id, GREEN_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getHSVOperator(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, HSV_OPERATOR_VARIABLE);
+  imageChooseMain = hsvOperatorChoose;
+  semPost(sem_id, HSV_OPERATOR_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, HSV_OPERATOR1);
+    imgMat = hsvOperatorImage1.clone();
+    semPost(sem_id, HSV_OPERATOR1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, HSV_OPERATOR2);
+    imgMat = hsvOperatorImage2.clone();
+    semPost(sem_id, HSV_OPERATOR2);
+  }
+  return imgMat;
+}
+
 Mat getDepthKinect(void) {
   Mat depthMatKinect;
   char depthChooseMainKinect;
@@ -1069,38 +1192,39 @@ void *syncCameraNetworkConnection(void *arg) {
       int centerY = MAP_HEIGHT / 2;
       circle(map, Point(centerX, centerY), 40, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
       circle(map, Point(centerX, centerY), 28, Scalar( 0, 255, 255 ), 1, 8); // robot zone
+      semWait(sem_id, OPERATOR_POSSITION);
+      double minPointX = operatorPossition.x * 100;
+      double minPointZ = operatorPossition.z * 100;
+      double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
+      double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
+
+      int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+      int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+      if (operatorPossition.x != -1 && operatorPossition.y != -1)
+        circle(map, Point(x2, z2), 5, Scalar( 0, 0, 255 ), -1, 8);
+      semPost(sem_id, OPERATOR_POSSITION);
       line(map, Point(centerX, centerY), Point(centerX + 28 * cos(robotPosition.anglePossition.yaw), centerY + 28 * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
       sendMatImage(map, 80);
     }
     else if (strcmp(recvdata, "rgbO\n") == 0) {
       LOGInfo(CAMERA_CONN_TAG, 1, "RGB operator sync.");
-      semWait(sem_id, OPERATOR_IMAGES);
-      sendMatImage(rgbOperatorImage, 80);
-      semPost(sem_id, OPERATOR_IMAGES);
+      sendMatImage(getRGBOperator(), 80);
     }
     else if (strcmp(recvdata, "hsvO\n") == 0) {
       LOGInfo(CAMERA_CONN_TAG, 1, "HSV operator sync.");
-      semWait(sem_id, OPERATOR_IMAGES);
-      sendMatImage(hsvOperatorImage, 80);
-      semPost(sem_id, OPERATOR_IMAGES);
+      sendMatImage(getHSVOperator(), 80);
     }
     else if (strcmp(recvdata, "greenO\n") == 0) {
       LOGInfo(CAMERA_CONN_TAG, 1, "Green mask sync.");
-      semWait(sem_id, OPERATOR_IMAGES);
-      sendMatImage(greenOperatorMaskImage, 80);
-      semPost(sem_id, OPERATOR_IMAGES);
+      sendMatImage(getGreenOperatorMask(), 80);
     }
     else if (strcmp(recvdata, "orangeO\n") == 0) {
       LOGInfo(CAMERA_CONN_TAG, 1, "Orange mask sync.");
-      semWait(sem_id, OPERATOR_IMAGES);
-      sendMatImage(orangeOperatorMaskImage, 80);
-      semPost(sem_id, OPERATOR_IMAGES);
+      sendMatImage(getOrangeOperatorMask(), 80);
     }
     else if (strcmp(recvdata, "depthO\n") == 0) {
       LOGInfo(CAMERA_CONN_TAG, 1, "Depth mask sync.");
-      semWait(sem_id, OPERATOR_IMAGES);
-      sendMatImage(depthOperatorMaskImage, 80);
-      semPost(sem_id, OPERATOR_IMAGES);
+      sendMatImage(getDepthOperatorMask(), 80);
     }
 
 
@@ -1415,69 +1539,57 @@ int const max_kernel_size = 21;
 
 void *syncOperatorDetect(void *arg) {
   LOGInfo(OPERATOR_TAG, 1, "Start:Operator sync.");
-  semWait(sem_id, OPERATOR_IMAGES);
-  rgbOperatorImage = getImageKinect();
+
+  Mat rgbOperatorImage = getImageKinect();
   Mat depthOperatorMap = getDepthKinect();
+  Mat hsvOperatorImage;
+  Mat orangeOperatorMaskImage;
+  Mat greenOperatorMaskImage;
+  Mat depthOperatorMaskImage = Mat(depthOperatorMap.size(), CV_8UC1, Scalar(0));
   if (!rgbOperatorImage.empty() && !depthOperatorMap.empty()) {
     cvtColor(rgbOperatorImage, hsvOperatorImage, COLOR_BGR2HSV); //konverzia na hsv model
     inRange(hsvOperatorImage, Scalar(iLowH_green, iLowS_green, iLowV_green), Scalar(iHighH_green, iHighS_green, iHighV_green), greenOperatorMaskImage); //vytvorenie masky zelenej farby
     inRange(hsvOperatorImage, Scalar(iLowH_orange, iLowS_orange, iLowV_orange), Scalar(iHighH_orange, iHighS_orange, iHighV_orange), orangeOperatorMaskImage); //vytvorenie maasky oranzovej farby
+    /*
+    int dilation_size = 3;
+        Mat element = getStructuringElement( MORPH_CROSS,
+                                             Size( 2 * dilation_size + 1, 2 * dilation_size + 1 ),
+                                             Point( dilation_size, dilation_size ) );
+        /// Apply the dilation operation
+        dilate( greenOperatorMaskImage, greenOperatorMaskImage, element );
+        dilate( orangeOperatorMaskImage, orangeOperatorMaskImage, element );
+    */
 
-    depthOperatorMaskImage = Mat(depthOperatorMap.size(), CV_8UC1, Scalar(0));
-    int dist = 2;
-    int size = 2;
+    int dist = 5;
+    int size = 4;
+    int checkSize = 4;
 
-    for (int y = size; y < depthOperatorMap.rows - size; y += 2)
+    for (int y = size; y < depthOperatorMap.rows - size; y += size)
     {
-      for (int x = size; x < depthOperatorMap.cols - size; x += 2)
+      for (int x = size; x < depthOperatorMap.cols - size; x += size)
       {
         bool find = false;
-        for (int p = -size; p <= size && !find; p++) {
+        for (int p = -checkSize; p <= checkSize && !find; p++) {
           if (abs(depthOperatorMap.at<uchar>(Point(x + p, y)) - depthOperatorMap.at<uchar>(Point(x, y))) > dist) {
             find = true;
           }
         }
-        for (int q = -size; q <= size && !find; q++) {
+        for (int q = -checkSize; q <= checkSize && !find; q++) {
           if (abs(depthOperatorMap.at<uchar>(Point(x, y + q)) - depthOperatorMap.at<uchar>(Point(x, y))) > dist) {
             find = true;
           }
         }
         if (find) {
-          for (int p = -size; p <= size; p++) {
-            depthOperatorMaskImage.at<uchar>(Point(x + p, y)) = 255;
-          }
-          for (int q = -size; q <= size; q++) {
-            depthOperatorMaskImage.at<uchar>(Point(x, y + q)) = 255;
-          }
+          circle(depthOperatorMaskImage, Point(x, y), size + 1, Scalar(255), 1, 8);
           x += size;
         }
       }
     }
 
-    line(depthOperatorMaskImage,
-         Point(10, 10),
-         Point(10, depthOperatorMap.rows - 10),
-         Scalar(255), 5);
-
-    line(depthOperatorMaskImage,
-         Point(10, 10),
-         Point(depthOperatorMap.cols - 10, 10),
-         Scalar(255), 5);
-
-    line(depthOperatorMaskImage,
-         Point(10, depthOperatorMap.rows - 10),
-         Point(depthOperatorMap.cols - 10, depthOperatorMap.rows - 10),
-         Scalar(255), 5);
-
-    line(depthOperatorMaskImage,
-         Point(depthOperatorMap.cols - 10, 10),
-         Point(depthOperatorMap.cols - 10, depthOperatorMap.rows - 10),
-         Scalar(255), 5);
-
-    
     int choose_people = -1;
     int choose_orange = -1;
     int choose_green = -1;
+    int choose_depth = -1;
     long maxArea = -1;
     Point point1(-1, -1);
     Point point2(-1, -1);
@@ -1491,38 +1603,60 @@ void *syncOperatorDetect(void *arg) {
 
     Rect r_orange[contours_orange.size()];
     Rect r_green[contours_green.size()];
+    Rect r_depth[contours_depth.size()];
     long areasOrange[contours_orange.size()];
     long areasGreen[contours_green.size()];
-    
-    for (int i = 0; i < contours_orange.size(); i++){ 
+    long areasDepth[contours_depth.size()];
+
+    for (int i = 0; i < contours_orange.size(); i++) {
       areasOrange[i] = 0;
       r_orange[i] = boundingRect(contours_orange[i]);
     }
-    for (int i = 0; i < contours_green.size(); i++){
+    for (int i = 0; i < contours_green.size(); i++) {
       areasGreen[i] = 0;
       r_green[i] = boundingRect(contours_green[i]);
     }
-
-    for (unsigned int index_orange = 0; index_orange < contours_depth.size(); index_orange++) {
-      long area = contourArea(Mat(contours_depth[index_orange]));
-      if (area < 150000 && area > 500) {
-        drawContours(depthOperatorMaskImage, contours_depth, index_orange, Scalar(255), CV_FILLED);
-      }
+    for (int i = 0; i < contours_depth.size(); i++) {
+      areasDepth[i] = 0;
+      r_depth[i] = boundingRect(contours_depth[i]);
     }
 
     for (unsigned int index_orange = 0; index_orange < contours_orange.size(); index_orange++) {
       for (unsigned int index_green = 0; index_green < contours_green.size(); index_green++) {
 
-        if ((r_green[index_green].x + r_green[index_green].width / 2) - (r_orange[index_orange].x + r_orange[index_orange].width / 2) < 100) {
+        int centerGreenX = r_green[index_green].x + r_green[index_green].width / 2;
+        int centerOrangeX = r_orange[index_orange].x + r_orange[index_orange].width / 2;
+
+        int centerGreenY = r_green[index_green].y + r_green[index_green].height / 2;
+        int centerOrangeY = r_orange[index_orange].y + r_orange[index_orange].height / 2;
+
+        if (abs(centerGreenX - centerOrangeX)  < 50 && abs(centerGreenY - centerOrangeY)  < 50 && abs(centerGreenY - centerOrangeY)  > 2) {
+
+          int centerHSVX = (centerGreenX + centerOrangeX) / 2;
+          int centerHSVY = (centerGreenY + centerOrangeY) / 2;
 
           if (areasGreen[index_green] == 0) areasGreen[index_green] = contourArea(Mat(contours_green[index_green]));
           if (areasOrange[index_orange] == 0) areasOrange[index_orange] = contourArea(Mat(contours_orange[index_orange]));
 
-          if (areasGreen[index_green] > 300 && areasOrange[index_orange] > 300 && maxArea < (areasGreen[index_green] + areasOrange[index_orange]))
-          {
-            maxArea = (areasGreen[index_green] + areasOrange[index_orange]);
-            choose_green = index_green;
-            choose_orange = index_orange;
+          if (areasGreen[index_green] > 500 && areasOrange[index_orange] > 500) {
+            for (unsigned int index_depth = 0; index_depth < contours_depth.size(); index_depth++) {
+              if (areasDepth[index_depth] == 0) areasDepth[index_depth] = contourArea(Mat(contours_depth[index_depth]));
+              if (areasDepth[index_depth] > 1000 && areasDepth[index_depth] < 320 * 480) {
+                int centerDepthX =  + r_depth[index_depth].width / 2;
+                int centerDepthY = r_depth[index_depth].y + r_depth[index_depth].height / 2;
+                if (abs(r_depth[index_depth].x - (r_green[index_green].x + r_orange[index_orange].x) / 2) < 60 &&
+                    abs(r_depth[index_depth].x + r_depth[index_depth].width - (r_green[index_green].x + r_green[index_green].width + r_orange[index_orange].x + r_orange[index_orange].width) / 2) < 60 &&
+                    abs(r_depth[index_depth].y - (r_green[index_green].y + r_orange[index_orange].y) / 2) < 60 &&
+                    abs(r_depth[index_depth].y + r_depth[index_depth].height - (r_green[index_green].y + r_green[index_green].height + r_orange[index_orange].y + r_orange[index_orange].height) / 2) < 60 &&
+                    maxArea < (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]))
+                {
+                  maxArea = (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]);
+                  choose_green = index_green;
+                  choose_orange = index_orange;
+                  choose_depth = index_depth;
+                }
+              }
+            }
           }
         }
       }
@@ -1561,7 +1695,7 @@ void *syncOperatorDetect(void *arg) {
       point1 = Point(minX, minY);
       point2 = Point(maxX, maxY);
 
-
+      drawContours(depthOperatorMaskImage, contours_depth, choose_depth, Scalar(255), CV_FILLED);
       drawContours(orangeOperatorMaskImage, contours_orange, choose_orange, Scalar(255), CV_FILLED);
       drawContours(greenOperatorMaskImage, contours_green, choose_green, Scalar(255), CV_FILLED);
       rectangle(rgbOperatorImage, point1, point2, CV_RGB(0, 255, 0), 3, 8, 0);
@@ -1571,9 +1705,113 @@ void *syncOperatorDetect(void *arg) {
       char text[20];
       sprintf(text, "%d,%d,P%d", center.x, center.y, choose_people);
       putText(rgbOperatorImage, text, Point(10, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+      semWait(sem_id, OPERATOR_POSSITION);
+      Mat pointCloudBuffer = getPointCloudMapKinect();
+      operatorPossition = pointCloudBuffer.at<Point3f>(center.y, center.x);
+      semPost(sem_id, OPERATOR_POSSITION);
+    }
+    else {
+      semWait(sem_id, OPERATOR_POSSITION);
+      operatorPossition = Point3f(-1, -1, -1);
+      semPost(sem_id, OPERATOR_POSSITION);
     }
   }
-  semPost(sem_id, OPERATOR_IMAGES);
+  else {
+    semWait(sem_id, OPERATOR_POSSITION);
+    operatorPossition = Point3f(-1, -1, -1);
+    semPost(sem_id, OPERATOR_POSSITION);
+  }
+
+//copy mat
+  if (rgbOperatorChoose == 1) {
+    semWait(sem_id, RGB_OPERATOR2);
+    rgbOperatorImage2 = rgbOperatorImage;
+    semWait(sem_id, RGB_OPERATOR_VARIABLE);
+    rgbOperatorChoose = 2;
+    semPost(sem_id, RGB_OPERATOR_VARIABLE);
+    semPost(sem_id, RGB_OPERATOR2);
+
+  }
+  else {
+    semWait(sem_id, RGB_OPERATOR1);
+    rgbOperatorImage1 = rgbOperatorImage;
+    semWait(sem_id, RGB_OPERATOR_VARIABLE);
+    rgbOperatorChoose = 1;
+    semPost(sem_id, RGB_OPERATOR_VARIABLE);
+    semPost(sem_id, RGB_OPERATOR1);
+  }
+
+  if (hsvOperatorChoose == 1) {
+    semWait(sem_id, HSV_OPERATOR2);
+    hsvOperatorImage2 = hsvOperatorImage;
+    semWait(sem_id, HSV_OPERATOR_VARIABLE);
+    hsvOperatorChoose = 2;
+    semPost(sem_id, HSV_OPERATOR_VARIABLE);
+    semPost(sem_id, HSV_OPERATOR2);
+
+  }
+  else {
+    semWait(sem_id, HSV_OPERATOR1);
+    hsvOperatorImage1 = hsvOperatorImage;
+    semWait(sem_id, HSV_OPERATOR_VARIABLE);
+    hsvOperatorChoose = 1;
+    semPost(sem_id, HSV_OPERATOR_VARIABLE);
+    semPost(sem_id, HSV_OPERATOR1);
+  }
+
+  if (depthOperatorMaskChoose == 1) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK2);
+    depthOperatorMaskImage2 = depthOperatorMaskImage;
+    semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    depthOperatorMaskChoose = 2;
+    semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, DEPTH_OPERATOR_MASK2);
+
+  }
+  else {
+    semWait(sem_id, DEPTH_OPERATOR_MASK1);
+    depthOperatorMaskImage1 = depthOperatorMaskImage;
+    semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    depthOperatorMaskChoose = 1;
+    semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, DEPTH_OPERATOR_MASK1);
+  }
+
+  if (greenOperatorMaskChoose == 1) {
+    semWait(sem_id, GREEN_OPERATOR_MASK2);
+    greenOperatorMaskImage2 = greenOperatorMaskImage;
+    semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    greenOperatorMaskChoose = 2;
+    semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, GREEN_OPERATOR_MASK2);
+
+  }
+  else {
+    semWait(sem_id, GREEN_OPERATOR_MASK1);
+    greenOperatorMaskImage1 = greenOperatorMaskImage;
+    semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    greenOperatorMaskChoose = 1;
+    semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, GREEN_OPERATOR_MASK1);
+  }
+
+  if (orangeOperatorMaskChoose == 1) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK2);
+    orangeOperatorMaskImage2 = orangeOperatorMaskImage;
+    semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    orangeOperatorMaskChoose = 2;
+    semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, ORANGE_OPERATOR_MASK2);
+  }
+  else {
+    semWait(sem_id, ORANGE_OPERATOR_MASK1);
+    orangeOperatorMaskImage1 = orangeOperatorMaskImage;
+    semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    orangeOperatorMaskChoose = 1;
+    semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, ORANGE_OPERATOR_MASK1);
+  }
+
   LOGInfo(OPERATOR_TAG, 1, "End:Operator sync.");
 }
 
