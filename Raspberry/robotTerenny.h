@@ -81,7 +81,7 @@ extern "C" {
 
 #define NUMBER_OF_MODULES (ENABLE_I2C+ENABLE_MOTORS+ENABLE_ULTRASONIC+ENABLE_LEDS+ENABLE_BUTTONS+ENABLE_POSSITION+ENABLE_KINECTCAMERA+ENABLE_KINECTSENSORS+ENABLE_KINECTLED+ENABLE_VOLTAGE)
 
-#define OPERATOR_WITH_DEPTH 0
+#define OPERATOR_WITH_DEPTH 1
 #define OPERATOR_STATUS_KINECT_LED 1
 #define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 5
 #define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 80
@@ -128,15 +128,9 @@ typedef enum {
   CAMERA_VARIABLE_R,
   CAMERA_IMAGE_R1,
   CAMERA_IMAGE_R2,
-  CAMERA_VARIABLE_KINECTDEPTH,
-  CAMERA_DEPTH_KINECT1,
-  CAMERA_DEPTH_KINECT2,
-  CAMERA_VARIABLE_KINECTIMAGE,
-  CAMERA_IMAGE_KINECT1,
-  CAMERA_IMAGE_KINECT2,
-  CAMERA_VARIABLE_KINECTPOINTCLOUDMAP,
-  CAMERA_POINTCLOUDMAP_KINECT1,
-  CAMERA_POINTCLOUDMAP_KINECT2,
+  MAT_KINECT1,
+  MAT_KINECT2,
+  MAT_KINECT_VARIABLE,
   ROBOTSENSORS,
   ROBOTACCULATORS,
   ROBOTACCULATORS_LAST,
@@ -311,15 +305,20 @@ unsigned char readRegister8(unsigned char addr, unsigned char reg);
 
 //kinect and operator images
 bool initKinect(unsigned char imageMode);
+int pauseGrabKinect();
+void continueGrabKinect();
+Mat getRGBKinect(int index=-1);
+Mat getDepthScaledKinect(int index=-1);
+Mat getDepthKinect(int index=-1);
+Mat getDepthValidKinect(int index=-1);
+Mat getPointCloudMapKinect(int index=-1);
+
 Mat getMapImage(void);
-Mat getImageKinect(void);
 Mat getRGBOperator(void);
 Mat getDepthOperatorMask(void);
 Mat getOrangeOperatorMask(void);
 Mat getGreenOperatorMask(void);
 Mat getHSVOperator(void);
-Mat getDepthKinect(void);
-Mat getPointCloudMapKinect(void);
 Mat getImageLeft(void);
 Mat getImageRight(void);
 
