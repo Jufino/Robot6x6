@@ -19,8 +19,8 @@ VideoCapture cameraKinect;
 char mapImageChoose = 0;
 Mat mapImage1;
 Mat mapImage2;
-int mapOffsetX = 0;
-int mapOffsetY = 0;
+long mapOffsetX = 0;
+long mapOffsetY = 0;
 
 char pointCloudMapChooseKinect = 0;
 Mat pointCloudMap1Kinect;
@@ -66,21 +66,18 @@ RobotAcculators robotAcculators;
 RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
 
-int iLowH_green = 25;
+int iLowH_green = 20;
 int iHighH_green = 45;
-int iLowS_green = 0;
+int iLowS_green = 50;
 int iHighS_green  = 255;
 int iLowV_green  = 100;
 int iHighV_green  = 255;
 int iLowH_orange = 0;
-int iHighH_orange = 20;
+int iHighH_orange = 25;
 int iLowS_orange = 100;
 int iHighS_orange  = 255;
 int iLowV_orange  = 100;
 int iHighV_orange  = 255;
-int thresholdMin = 0;
-int thresholdMax = 255;
-int cannyKernel = 3;
 
 typedef union {
   int val; /* Value for SETVAL */
@@ -199,9 +196,6 @@ void *readKey(void*) {
     printf("10. zmena orange high saturation (%d)\n", iHighS_orange);
     printf("11. zmena orange low value(%d)\n", iLowV_orange);
     printf("12. zmena orange high value(%d)\n", iHighV_orange);
-    printf("13. zmena thresholdMin(%d)\n", thresholdMin);
-    printf("14. zmena thresholdMax(%d)\n", thresholdMax);
-    printf("15. zmena canny kernel(%d)\n", cannyKernel);
     scanf("%d", &option);
     switch (option) {
     case 1: scanf("%d", &iLowH_green); break;
@@ -216,9 +210,6 @@ void *readKey(void*) {
     case 10: scanf("%d", &iHighS_orange); break;
     case 11: scanf("%d", &iLowV_orange); break;
     case 12: scanf("%d", &iHighV_orange); break;
-    case 13: scanf("%d", &thresholdMin); break;
-    case 14: scanf("%d", &thresholdMax); break;
-    case 15: scanf("%d", &cannyKernel); break;
     }
   }
 }
@@ -1201,7 +1192,7 @@ void *syncCameraNetworkConnection(void *arg) {
       int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
       int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
       if (operatorPossition.x != -1 && operatorPossition.y != -1)
-        circle(map, Point(x2, z2), 5, Scalar( 0, 0, 255 ), -1, 8);
+        circle(map, Point(x2, z2), 5, Scalar( 0, 255, 255 ), -1, 8);
       semPost(sem_id, OPERATOR_POSSITION);
       line(map, Point(centerX, centerY), Point(centerX + 28 * cos(robotPosition.anglePossition.yaw), centerY + 28 * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
       sendMatImage(map, 80);
@@ -1416,13 +1407,16 @@ void *syncGenerateMap(void *arg) {
   if (map.empty())
     map = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
 
-  int deltaX = robotPosition.axisPossition.x / 10 - mapOffsetX;
-  int deltaY = robotPosition.axisPossition.y / 10 - mapOffsetY;
+  long robotX = robotPosition.axisPossition.x / (MAP_SCALE / 10);
+  long robotY = robotPosition.axisPossition.y / (MAP_SCALE / 10);
 
-  translateImg(map, -deltaX, -deltaY); // posun mapy aby sme nestratili predchadzajuce udaje, vzdy si pametame len okolie robota
-
-  mapOffsetX = robotPosition.axisPossition.x / 10;
-  mapOffsetY = robotPosition.axisPossition.y / 10;
+  int deltaX = robotX - mapOffsetX;
+  int deltaY = robotY - mapOffsetY;
+  if (deltaX < MAX_DELTA_TRANSLATE && deltaY < MAX_DELTA_TRANSLATE) {
+    translateImg(map, -deltaX, -deltaY); // posun mapy aby sme nestratili predchadzajuce udaje, vzdy si pametame len okolie robota
+    mapOffsetX = robotX;
+    mapOffsetY = robotY;
+  }
 
   for (int x = 0; x < map.cols; x++) {
     for (int y = 0; y < map.rows; y++) {
@@ -1462,7 +1456,7 @@ void *syncGenerateMap(void *arg) {
         float kinectpointY = p.y + 0.21;  //pozicia hore/dole na kinecte
         float kinectPointZ = p.z;         //hlbka
 
-        if (kinectpointY < 0.5 && kinectPointX != 0 && kinectpointY != 0 && kinectPointZ != 0) {
+        if (kinectpointY >= MIN_BARRIER_HEIGHT && kinectpointY <= MAX_BARRIER_HEIGHT && kinectPointX != 0 && kinectpointY != 0 && kinectPointZ != 0) {
           int pointZ = kinectPointZ * 100;
           if (pointZ < minPointZ) minPointZ = pointZ;
 
@@ -1639,22 +1633,32 @@ void *syncOperatorDetect(void *arg) {
           if (areasOrange[index_orange] == 0) areasOrange[index_orange] = contourArea(Mat(contours_orange[index_orange]));
 
           if (areasGreen[index_green] > 500 && areasOrange[index_orange] > 500) {
-            for (unsigned int index_depth = 0; index_depth < contours_depth.size(); index_depth++) {
-              if (areasDepth[index_depth] == 0) areasDepth[index_depth] = contourArea(Mat(contours_depth[index_depth]));
-              if (areasDepth[index_depth] > 1000 && areasDepth[index_depth] < 320 * 480) {
-                int centerDepthX =  + r_depth[index_depth].width / 2;
-                int centerDepthY = r_depth[index_depth].y + r_depth[index_depth].height / 2;
-                if (abs(r_depth[index_depth].x - (r_green[index_green].x + r_orange[index_orange].x) / 2) < 60 &&
-                    abs(r_depth[index_depth].x + r_depth[index_depth].width - (r_green[index_green].x + r_green[index_green].width + r_orange[index_orange].x + r_orange[index_orange].width) / 2) < 60 &&
-                    abs(r_depth[index_depth].y - (r_green[index_green].y + r_orange[index_orange].y) / 2) < 60 &&
-                    abs(r_depth[index_depth].y + r_depth[index_depth].height - (r_green[index_green].y + r_green[index_green].height + r_orange[index_orange].y + r_orange[index_orange].height) / 2) < 60 &&
-                    maxArea < (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]))
-                {
-                  maxArea = (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]);
-                  choose_green = index_green;
-                  choose_orange = index_orange;
-                  choose_depth = index_depth;
+            if (OPERATOR_WITH_DEPTH) {
+              for (unsigned int index_depth = 0; index_depth < contours_depth.size(); index_depth++) {
+                if (areasDepth[index_depth] == 0) areasDepth[index_depth] = contourArea(Mat(contours_depth[index_depth]));
+                if (areasDepth[index_depth] > 1000 && areasDepth[index_depth] < 320 * 480) {
+                  int centerDepthX =  + r_depth[index_depth].width / 2;
+                  int centerDepthY = r_depth[index_depth].y + r_depth[index_depth].height / 2;
+                  if (abs(r_depth[index_depth].x - (r_green[index_green].x + r_orange[index_orange].x) / 2) < 60 &&
+                      abs(r_depth[index_depth].x + r_depth[index_depth].width - (r_green[index_green].x + r_green[index_green].width + r_orange[index_orange].x + r_orange[index_orange].width) / 2) < 60 &&
+                      abs(r_depth[index_depth].y - (r_green[index_green].y + r_orange[index_orange].y) / 2) < 60 &&
+                      abs(r_depth[index_depth].y + r_depth[index_depth].height - (r_green[index_green].y + r_green[index_green].height + r_orange[index_orange].y + r_orange[index_orange].height) / 2) < 60 &&
+                      maxArea < (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]))
+                  {
+                    maxArea = (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]);
+                    choose_green = index_green;
+                    choose_orange = index_orange;
+                    choose_depth = index_depth;
+                  }
                 }
+              }
+            }
+            else {
+              if (maxArea < (areasGreen[index_green] + areasOrange[index_orange]))
+              {
+                maxArea = (areasGreen[index_green] + areasOrange[index_orange]);
+                choose_green = index_green;
+                choose_orange = index_orange;
               }
             }
           }
@@ -1694,14 +1698,16 @@ void *syncOperatorDetect(void *arg) {
 
       point1 = Point(minX, minY);
       point2 = Point(maxX, maxY);
-
-      drawContours(depthOperatorMaskImage, contours_depth, choose_depth, Scalar(255), CV_FILLED);
-      drawContours(orangeOperatorMaskImage, contours_orange, choose_orange, Scalar(255), CV_FILLED);
-      drawContours(greenOperatorMaskImage, contours_green, choose_green, Scalar(255), CV_FILLED);
+      if (choose_depth != -1)
+        drawContours(depthOperatorMaskImage, contours_depth, choose_depth, Scalar(255), CV_FILLED);
+      if (choose_orange != -1)
+        drawContours(orangeOperatorMaskImage, contours_orange, choose_orange, Scalar(255), CV_FILLED);
+      if (choose_green != -1)
+        drawContours(greenOperatorMaskImage, contours_green, choose_green, Scalar(255), CV_FILLED);
       rectangle(rgbOperatorImage, point1, point2, CV_RGB(0, 255, 0), 3, 8, 0);
       Point center = Point(point2.x - (point2.x - point1.x) / 2, point2.y - (point2.y - point1.y) / 2);
 
-      circle(rgbOperatorImage, center, 5, Scalar( 0, 0, 255 ), -1, 8);
+      circle(rgbOperatorImage, center, 5, Scalar( 0, 255, 255 ), -1, 8);
       char text[20];
       sprintf(text, "%d,%d,P%d", center.x, center.y, choose_people);
       putText(rgbOperatorImage, text, Point(10, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
