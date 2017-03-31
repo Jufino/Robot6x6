@@ -296,7 +296,7 @@ class GY87
   	Vector readRawCompass(void);
 	Vector readNormalizeCompass(void);
 
-	void  setOffset(int xo, int yo);
+	void  setOffset(int xo, int yo,int zo);
 
 	void  setRangeCompass(hmc5883l_range_t range);
 	hmc5883l_range_t getRangeCompass(void);
@@ -318,7 +318,7 @@ class GY87
 	Activites a;   // Activities
   float mgPerDigit;
 	Vector v;
-	int xOffset, yOffset;
+	int xOffset, yOffset,zOffset;
 	
 	float dpsPerDigit, rangePerDigit;
 	float actualThreshold;

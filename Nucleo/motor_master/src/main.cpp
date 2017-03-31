@@ -1,7 +1,7 @@
 #include <math.h>
 #include <Motor/Motor.h>
 
-#define alfa 0.98
+#define alfa 0.5
 
 #define numberOfMotors 6
 Motor *motor1 = new Motor(MOTOR1);
@@ -384,11 +384,14 @@ int main(void) {
 		roll = getRoll();
 		pitch = getPitch();
 		ultTriger(0);
-		for (int i = 1; i <= numberOfMotors / 2; i++) {
-			getMotor(i)->DMADeltaTicksInvoke();
-			getMotor(i + 3)->DMADeltaTicksInvoke();
-		}
 		if (timerDone > 0) {
+
+			double yawIMU = getYaw();
+
+			for (int i = 1; i <= numberOfMotors / 2; i++) {
+				getMotor(i)->DMADeltaTicksInvoke();
+				getMotor(i + 3)->DMADeltaTicksInvoke();
+			}
 			double speeds[6];
 			for (int i = 1; i <= numberOfMotors; i++) {
 				speeds[i - 1] = (getMotor(i)->getDistance()
@@ -403,10 +406,9 @@ int main(void) {
 			double vT = (vL + vR) / 2;
 
 			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
-			double yawIMU = getYaw();
 
 			yaw = yaw + omegaT;
-			yaw = yaw*alfa + yawIMU * (1-alfa);
+			yaw = yaw * alfa + yawIMU * (1 - alfa);
 			if (yaw > 2 * M_PI)
 				yaw -= 2 * M_PI;
 			else if (yaw < 0)
@@ -416,7 +418,6 @@ int main(void) {
 
 			timerDone = 0;
 		}
-		for (int i = 0; i < 1000; i++);
 
 	}
 }

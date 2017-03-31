@@ -6,12 +6,12 @@
 GY87 gy87;
 
 #define alfaAccelAndGyro 0.95 //pomer zberu dat medzi accelerometrom a gyroscopom
-#define alfaCompass 0.80      //dolnopriepustny filter
+#define alfaCompass 0.70      //dolnopriepustny filter
 
-#define debug 1
-#define I2CDebug 1
+#define debug 0
+#define I2CDebug 0
 #define printDegree 1
-#define printCalibrate 1
+#define printCalibrate 0
 #define pocMaxValue 10
 bool callibrateCompassOn = false;
 bool callibrateGyOn = false;
@@ -19,8 +19,11 @@ int minX = 0;
 int maxX = 0;
 int minY = 0;
 int maxY = 0;
+int minZ = 0;
+int maxZ = 0;
 int offX = 0;
 int offY = 0;
+int offZ = 0;
 
 float roll = 0;
 float pitch = 0;
@@ -59,18 +62,32 @@ void setup()
   gy87.setMeasurementMode(HMC5883L_CONTINOUS);
   gy87.setDataRate(HMC5883L_DATARATE_30HZ);
   gy87.setSamples(HMC5883L_SAMPLES_8);
+/*
+  offX = -12;
+  offY = -215;
+  offZ = -226;
+  EEPROM.update(0, offX);
+  EEPROM.update(1, offX >> 8);
+  EEPROM.update(2, offY);
+  EEPROM.update(3, offY >> 8);
+  EEPROM.update(4, offZ);
+  EEPROM.update(5, offZ >> 8);
+  */
 
   if (EEPROM.length() > 0) {
     offX = EEPROM.read(0) | (EEPROM.read(1) << 8);
     offY = EEPROM.read(2) | (EEPROM.read(3) << 8);
+    offY = EEPROM.read(4) | (EEPROM.read(5) << 8);
   }
   if (debug) {
     Serial.print("Compass set offset: X:");
     Serial.print(offX);
     Serial.print(", Y:");
-    Serial.println(offY);
+    Serial.print(offY);
+    Serial.print(", Z:");
+    Serial.println(offZ);
   }
-  gy87.setOffset(offX, offY);
+  gy87.setOffset(offX, offY, offZ);
 
   if (debug) Serial.println("Gyroscope calibrate.");
   // Kalibracia gyroskopu, musi byt v klude
@@ -124,7 +141,7 @@ void receiveEvent(int howMany) {
   c = Wire.read();
   switch (c) {
     case 99: // calibrate compass
-    gy87.setOffset(0, 0);
+      gy87.setOffset(0, 0, 0);
       callibrateCompassOn = true;
       break;
     case 100:
@@ -133,12 +150,16 @@ void receiveEvent(int howMany) {
         EEPROM.update(1, offX >> 8);
         EEPROM.update(2, offY);
         EEPROM.update(3, offY >> 8);
-        gy87.setOffset(offX, offY);
+        EEPROM.update(4, offZ);
+        EEPROM.update(5, offZ >> 8);
+        gy87.setOffset(offX, offY, offZ);
         if (printCalibrate) {
           Serial.print("LOG/Offset compass X:");
           Serial.print(offX);
           Serial.print(", Y:");
-          Serial.println(offY);
+          Serial.print(offY);
+          Serial.print(", Z:");
+          Serial.println(offZ);
         }
         callibrateCompassOn = false;
       }
@@ -183,7 +204,7 @@ void loop()
   //        if (debug) Serial.println("Read accelerometer...");
   Vector acc = gy87.readScaledAccel();
   float pitchAcc = atan2f(acc.YAxis, acc.ZAxis);
-  float rollAcc = atan2f(acc.XAxis, acc.ZAxis);
+  float rollAcc = atan2f(-acc.XAxis, acc.ZAxis);
 
   roll += gy.XAxis * timeStep * (PI / 180);
   pitch += gy.YAxis * timeStep * (PI / 180);
@@ -192,12 +213,11 @@ void loop()
   pitch = pitch * alfaAccelAndGyro + pitchAcc * (1 - alfaAccelAndGyro);
   roll = roll * alfaAccelAndGyro + rollAcc * (1 - alfaAccelAndGyro);
 
-  float compassVal = tiltCompensate(mag, roll, pitch);
+  float compassVal = tiltCompensate(mag, rollAcc, pitchAcc);
   if (compassVal != -10) {
     compassVal += (4.0 + (26.0 / 60.0)) / (180 / M_PI);
-    compassVal = correctAngle(compassVal);
     yaw = yaw * alfaCompass + compassVal * (1 - alfaCompass);
-    yaw = correctAngle(yaw);
+    yaw = correctAngle(compassVal);
     int16_t  yawNormToSend = (int16_t)(yaw * 10000);
     yawToSend[0] = yawNormToSend;
     yawToSend[1] = yawNormToSend >> 8;
@@ -226,9 +246,12 @@ void loop()
     if (magRaw.XAxis > maxX) maxX = magRaw.XAxis;
     if (magRaw.YAxis < minY) minY = magRaw.YAxis;
     if (magRaw.YAxis > maxY) maxY = magRaw.YAxis;
+    if (magRaw.ZAxis < minZ) minZ = magRaw.ZAxis;
+    if (magRaw.ZAxis > maxZ) maxZ = magRaw.ZAxis;
 
     offX = (maxX + minX) / 2;
     offY = (maxY + minY) / 2;
+    offZ = (maxZ + minZ) / 2;
   }
   //-------------------------------------------------------
   //kalibracia zasumenia gyroskopu
@@ -252,7 +275,9 @@ void loop()
       Serial.print("Offset compass X:");
       Serial.print(offX);
       Serial.print(", Y:");
-      Serial.println(offY);
+      Serial.print(offY);
+      Serial.print(", Z:");
+      Serial.println(offZ);
     }
     poc = 0;
   }

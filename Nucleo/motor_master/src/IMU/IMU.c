@@ -7,7 +7,7 @@ float getPitch(void){
 	return ((float)((int16_t)I2C2_ReadRegister16(imuAddr, 2)))/10000;
 }
 float getYaw(void){
-	return ((float)((int16_t)I2C2_ReadRegister16(imuAddr, 3)))/10000;
+	return ((float)((uint16_t)I2C2_ReadRegister16(imuAddr, 3)))/10000;
 }
 void calibrateCompassStart(void){
 	I2C2_WriteRegister(imuAddr,99);

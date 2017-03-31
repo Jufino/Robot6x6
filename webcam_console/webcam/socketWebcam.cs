@@ -12,7 +12,7 @@ public class socketWebcam
 {
 
     protected Socket socket_client;
-    const long TIMEOUT_SOCKET = 100000;
+    const long TIMEOUT_SOCKET = 1000;
 
     public Socket socketCon
     {
@@ -68,7 +68,10 @@ public class socketWebcam
         {
             int size = 0;
             while (length > size && timeout++ < TIMEOUT_SOCKET)
+            {
                 size += socket_client.Receive(buffer, size, (length - size), SocketFlags.None);
+                System.Threading.Thread.Sleep(1);
+            }
         }
         catch { }
         return buffer;

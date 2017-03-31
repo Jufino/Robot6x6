@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define SOFTWARE_I2C 1 // ci chceme softwerove i2c alebo hardverove
 #if SOFTWARE_I2C >= 1
-  #define SCL_PIN 1 
+  #define SCL_PIN 2 
   #define SCL_PORT PORTC 
-  #define SDA_PIN 0
+  #define SDA_PIN 1
   #define SDA_PORT PORTC 
   #define I2C_FASTMODE 1  // Limit to 25kHz
   #define I2C_TIMEOUT 10  // 10ms timeout
@@ -691,16 +691,17 @@ Vector GY87::readNormalizeCompass(void)
 {
     v.XAxis = ((float)readRegister16(hmclAddress,HMC5883L_REG_OUT_X_M) - xOffset) * mgPerDigit;
     v.YAxis = ((float)readRegister16(hmclAddress,HMC5883L_REG_OUT_Y_M) - yOffset) * mgPerDigit;
-    v.ZAxis = (float)readRegister16(hmclAddress,HMC5883L_REG_OUT_Z_M) * mgPerDigit;
+    v.ZAxis = ((float)readRegister16(hmclAddress,HMC5883L_REG_OUT_Z_M) - zOffset) * mgPerDigit;
 
     return v;
 }
 
-void GY87::setOffset(int xo, int yo)
+void GY87::setOffset(int xo, int yo, int zo)
 {
     xOffset = xo;
-    yOffset = yo;
-}
+    yOffset = yo;           
+    zOffset = zo;
+    }
 
 void GY87::setRangeCompass(hmc5883l_range_t range)
 {
