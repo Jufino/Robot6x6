@@ -15,12 +15,41 @@ bool priorityVisible[numberOfPriorities];
 
 XN_USB_DEV_HANDLE dev;
 VideoCapture cameraKinect;
-char imageChooseKinect = 0;
+
+char mapImageChoose = 0;
+Mat mapImage1;
+Mat mapImage2;
+int mapOffsetX = 0;
+int mapOffsetY = 0;
+
+char pointCloudMapChooseKinect = 0;
+Mat pointCloudMap1Kinect;
+Mat pointCloudMap2Kinect;
 char depthChooseKinect = 0;
 Mat depth1Kinect;
 Mat depth2Kinect;
+char imageChooseKinect = 0;
 Mat img1Kinect;
 Mat img2Kinect;
+
+char depthOperatorMaskChoose = 0;
+Mat depthOperatorMaskImage1;
+Mat depthOperatorMaskImage2;
+char rgbOperatorChoose = 0;
+Mat rgbOperatorImage1;
+Mat rgbOperatorImage2;
+char hsvOperatorChoose = 0;
+Mat hsvOperatorImage1;
+Mat hsvOperatorImage2;
+char greenOperatorMaskChoose = 0;
+Mat greenOperatorMaskImage1;
+Mat greenOperatorMaskImage2;
+char orangeOperatorMaskChoose = 0;
+Mat orangeOperatorMaskImage1;
+Mat orangeOperatorMaskImage2;
+
+Point3f operatorPossition =  Point3f(-1, -1, -1);;
+
 const float scaleFactor = 0.05f;
 
 CvCapture* cameraL;
@@ -36,6 +65,22 @@ IplImage *img2R;
 RobotAcculators robotAcculators;
 RobotAcculators lastRobotAcculators;
 RobotSensors robotSensors;
+
+int iLowH_green = 25;
+int iHighH_green = 45;
+int iLowS_green = 0;
+int iHighS_green  = 255;
+int iLowV_green  = 100;
+int iHighV_green  = 255;
+int iLowH_orange = 0;
+int iHighH_orange = 20;
+int iLowS_orange = 100;
+int iHighS_orange  = 255;
+int iLowV_orange  = 100;
+int iHighV_orange  = 255;
+int thresholdMin = 0;
+int thresholdMax = 255;
+int cannyKernel = 3;
 
 typedef union {
   int val; /* Value for SETVAL */
@@ -139,12 +184,51 @@ void semRem(int sem_id) {
   semctl(sem_id, 0, IPC_RMID, NULL);
 }
 
+void *readKey(void*) {
+  int option;
+  while (onAllThreads) {
+    printf("1. zmena green low hue (%d)\n", iLowH_green);
+    printf("2. zmena green high hue (%d)\n", iHighH_green);
+    printf("3. zmena green low saturation (%d)\n", iLowS_green);
+    printf("4. zmena green high saturation (%d)\n", iHighS_green);
+    printf("5. zmena green low value(%d)\n", iLowV_green);
+    printf("6. zmena green high value(%d)\n", iHighV_green);
+    printf("7. zmena orange low hue (%d)\n", iLowH_orange);
+    printf("8. zmena orange high hue (%d)\n", iHighH_orange);
+    printf("9. zmena orange low saturation (%d)\n", iLowS_orange);
+    printf("10. zmena orange high saturation (%d)\n", iHighS_orange);
+    printf("11. zmena orange low value(%d)\n", iLowV_orange);
+    printf("12. zmena orange high value(%d)\n", iHighV_orange);
+    printf("13. zmena thresholdMin(%d)\n", thresholdMin);
+    printf("14. zmena thresholdMax(%d)\n", thresholdMax);
+    printf("15. zmena canny kernel(%d)\n", cannyKernel);
+    scanf("%d", &option);
+    switch (option) {
+    case 1: scanf("%d", &iLowH_green); break;
+    case 2: scanf("%d", &iHighH_green); break;
+    case 3: scanf("%d", &iLowS_green); break;
+    case 4: scanf("%d", &iHighS_green); break;
+    case 5: scanf("%d", &iLowV_green); break;
+    case 6: scanf("%d", &iHighV_green); break;
+    case 7: scanf("%d", &iLowH_orange); break;
+    case 8: scanf("%d", &iHighH_orange); break;
+    case 9: scanf("%d", &iLowS_orange); break;
+    case 10: scanf("%d", &iHighS_orange); break;
+    case 11: scanf("%d", &iLowV_orange); break;
+    case 12: scanf("%d", &iHighV_orange); break;
+    case 13: scanf("%d", &thresholdMin); break;
+    case 14: scanf("%d", &thresholdMax); break;
+    case 15: scanf("%d", &cannyKernel); break;
+    }
+  }
+}
+
 void initRobot(void) {
   priorityVisible[0] = true;
   priorityVisible[1] = false;
   priorityVisible[2] = false;
 
-  sem_id = semCreate(getpid(), 16);
+  sem_id = semCreate(getpid(), 37);
   semInit(sem_id, CAMERA_VARIABLE_L, 1);
   semInit(sem_id, CAMERA_IMAGE_L1, 1);
   semInit(sem_id, CAMERA_IMAGE_L2, 1);
@@ -157,9 +241,34 @@ void initRobot(void) {
   semInit(sem_id, CAMERA_DEPTH_KINECT2, 1);
   semInit(sem_id, CAMERA_IMAGE_KINECT1, 1);
   semInit(sem_id, CAMERA_IMAGE_KINECT2, 1);
+  semInit(sem_id, CAMERA_POINTCLOUDMAP_KINECT1, 1);
+  semInit(sem_id, CAMERA_POINTCLOUDMAP_KINECT2, 1);
   semInit(sem_id, CAMERA_VARIABLE_KINECTIMAGE, 1);
   semInit(sem_id, CAMERA_VARIABLE_KINECTDEPTH, 1);
+  semInit(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP, 1);
+  semInit(sem_id, MAP_VARIABLE, 1);
+  semInit(sem_id, MAP_IMAGE1, 1);
+  semInit(sem_id, MAP_IMAGE2, 1);
   semInit(sem_id, I2C, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK1, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK2, 1);
+  semInit(sem_id, RGB_OPERATOR1, 1);
+  semInit(sem_id, RGB_OPERATOR2, 1);
+  semInit(sem_id, HSV_OPERATOR1, 1);
+  semInit(sem_id, HSV_OPERATOR2, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK1, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK2, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK1, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK2, 1);
+  semInit(sem_id, DEPTH_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, RGB_OPERATOR_VARIABLE, 1);
+  semInit(sem_id, HSV_OPERATOR_VARIABLE, 1);
+  semInit(sem_id, ORANGE_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, GREEN_OPERATOR_MASK_VARIABLE, 1);
+  semInit(sem_id, OPERATOR_POSSITION, 1);
+
+  mapImage1 = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
+  mapImageChoose = 1;
 
   initMotorPowerSupply();
 
@@ -257,6 +366,9 @@ void initRobot(void) {
     }
   }
 
+  pthread_t threadModules;
+  pthread_create(&threadModules, NULL, &syncModules, NULL);
+
   if (SENSORS_WIFI) {
     pthread_t waitForSensorConnectionThread;
     pthread_create(&waitForSensorConnectionThread, NULL, &waitForSensorConnection, NULL);
@@ -268,9 +380,10 @@ void initRobot(void) {
   }
   if (SENSORS_WIFI == 1 || CAMERA_WIFI == 1)   signal(SIGPIPE, sigpipe);
 
-  pthread_t threadModules;
-  pthread_create(&threadModules, NULL, &syncModules, NULL);
   signal(SIGINT, sigctrl);
+
+  pthread_t threadReadKey;
+  pthread_create(&threadReadKey, NULL, &readKey, NULL);
 }
 
 void closeRobot(void) {
@@ -585,9 +698,28 @@ bool initKinect(unsigned char imageMode) {
   return true;
 }
 
+Mat getMapImage(void) {
+  Mat mapImageMat;
+  char mapImageChooseMain;
+  semWait(sem_id, MAP_VARIABLE);
+  mapImageChooseMain = mapImageChoose;
+  semPost(sem_id, MAP_VARIABLE);
+  if (mapImageChooseMain == 1) {
+    semWait(sem_id, MAP_IMAGE1);
+    mapImageMat = mapImage1.clone();
+    semPost(sem_id, MAP_IMAGE1);
+  }
+  else if (mapImageChooseMain == 2) {
+    semWait(sem_id, MAP_IMAGE2);
+    mapImageMat = mapImage2.clone();
+    semPost(sem_id, MAP_IMAGE2);
+  }
+  return mapImageMat;
+}
+
 Mat getImageKinect(void) {
   Mat imgMatKinect;
-  double imageChooseMainKinect;
+  char imageChooseMainKinect;
   semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
   imageChooseMainKinect = imageChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
@@ -604,9 +736,103 @@ Mat getImageKinect(void) {
   return imgMatKinect;
 }
 
+Mat getRGBOperator(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, RGB_OPERATOR_VARIABLE);
+  imageChooseMain = rgbOperatorChoose;
+  semPost(sem_id, RGB_OPERATOR_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, RGB_OPERATOR1);
+    imgMat = rgbOperatorImage1.clone();
+    semPost(sem_id, RGB_OPERATOR1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, RGB_OPERATOR2);
+    imgMat = rgbOperatorImage2.clone();
+    semPost(sem_id, RGB_OPERATOR2);
+  }
+  return imgMat;
+}
+Mat getDepthOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = depthOperatorMaskChoose;
+  semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK1);
+    imgMat = depthOperatorMaskImage1.clone();
+    semPost(sem_id, DEPTH_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK2);
+    imgMat = depthOperatorMaskImage2.clone();
+    semPost(sem_id, DEPTH_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getOrangeOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = orangeOperatorMaskChoose;
+  semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK1);
+    imgMat = orangeOperatorMaskImage1.clone();
+    semPost(sem_id, ORANGE_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK2);
+    imgMat = orangeOperatorMaskImage2.clone();
+    semPost(sem_id, ORANGE_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getGreenOperatorMask(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+  imageChooseMain = greenOperatorMaskChoose;
+  semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, GREEN_OPERATOR_MASK1);
+    imgMat = greenOperatorMaskImage1.clone();
+    semPost(sem_id, GREEN_OPERATOR_MASK1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, GREEN_OPERATOR_MASK2);
+    imgMat = greenOperatorMaskImage2.clone();
+    semPost(sem_id, GREEN_OPERATOR_MASK2);
+  }
+  return imgMat;
+}
+
+Mat getHSVOperator(void) {
+  Mat imgMat;
+  char imageChooseMain;
+  semWait(sem_id, HSV_OPERATOR_VARIABLE);
+  imageChooseMain = hsvOperatorChoose;
+  semPost(sem_id, HSV_OPERATOR_VARIABLE);
+  if (imageChooseMain == 1) {
+    semWait(sem_id, HSV_OPERATOR1);
+    imgMat = hsvOperatorImage1.clone();
+    semPost(sem_id, HSV_OPERATOR1);
+  }
+  else if (imageChooseMain == 2) {
+    semWait(sem_id, HSV_OPERATOR2);
+    imgMat = hsvOperatorImage2.clone();
+    semPost(sem_id, HSV_OPERATOR2);
+  }
+  return imgMat;
+}
+
 Mat getDepthKinect(void) {
   Mat depthMatKinect;
-  double depthChooseMainKinect;
+  char depthChooseMainKinect;
   semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
   depthChooseMainKinect = depthChooseKinect;
   semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
@@ -623,9 +849,28 @@ Mat getDepthKinect(void) {
   return depthMatKinect;
 }
 
+Mat getPointCloudMapKinect(void) {
+  Mat pointCloudMapMatKinect;
+  char pointCloudMapChooseMainKinect;
+  semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+  pointCloudMapChooseMainKinect = pointCloudMapChooseKinect;
+  semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+  if (pointCloudMapChooseMainKinect == 1) {
+    semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+    pointCloudMapMatKinect = pointCloudMap1Kinect.clone();
+    semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+  }
+  else if (pointCloudMapChooseMainKinect == 2) {
+    semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+    pointCloudMapMatKinect = pointCloudMap2Kinect.clone();
+    semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+  }
+  return pointCloudMapMatKinect;
+}
+
 Mat getImageLeft(void) {
   Mat imgMatL;
-  double imageChooseMainL;
+  char imageChooseMainL;
   semWait(sem_id, CAMERA_VARIABLE_L);
   imageChooseMainL = imageChooseL;
   semPost(sem_id, CAMERA_VARIABLE_L);
@@ -648,7 +893,7 @@ Mat getImageLeft(void) {
 
 Mat getImageRight(void) {
   Mat imgMatR;
-  double imageChooseMainR;
+  char imageChooseMainR;
   semWait(sem_id, CAMERA_VARIABLE_R);
   imageChooseMainR = imageChooseR;
   semPost(sem_id, CAMERA_VARIABLE_R);
@@ -683,6 +928,14 @@ RobotSensors getRobotSensors(void) {
   RobotSensors temp;
   semWait(sem_id, ROBOTSENSORS);
   memcpy(&temp, &robotSensors, sizeof(RobotSensors));
+  semPost(sem_id, ROBOTSENSORS);
+  return temp;
+}
+
+RobotPosition_struct getRobotPossition(void) {
+  RobotPosition_struct temp;
+  semWait(sem_id, ROBOTSENSORS);
+  memcpy(&temp, &robotSensors.robotPosition, sizeof(RobotPosition_struct));
   semPost(sem_id, ROBOTSENSORS);
   return temp;
 }
@@ -840,8 +1093,8 @@ Axis_struct getPossitionAxis(void) {
 Angle3d_struct getPossitionAngle3d(void) {
   Angle3d_struct angle3d;
   semWait(sem_id, I2C);
-  angle3d.roll = ((double)readRegister16(STM32_ADDRESS, 103)) / 10000;
-  angle3d.pitch = ((double)readRegister16(STM32_ADDRESS, 104)) / 10000;
+  angle3d.roll = ((double)readRegister16s(STM32_ADDRESS, 103)) / 10000;
+  angle3d.pitch = ((double)readRegister16s(STM32_ADDRESS, 104)) / 10000;
   angle3d.yaw = ((double)readRegister16(STM32_ADDRESS, 105)) / 10000;
   semPost(sem_id, I2C);
   return angle3d;
@@ -891,8 +1144,8 @@ void *syncImageRight(void *arg) {
 }
 
 void *syncCameraNetworkConnection(void *arg) {
-  int bytes = 10;
-  char recvdata[10];
+  int bytes = 50;
+  char recvdata[50];
   LOGInfo(SENSOR_CONN_TAG, 1, "Start:Camera sync by network.");
   while (bytes != 0 && onAllThreads && onWifiCameraStill) {
     bytes = recv(cameraClientsock, recvdata, 10, 0);
@@ -916,21 +1169,65 @@ void *syncCameraNetworkConnection(void *arg) {
     }
     LOGInfo(CAMERA_CONN_TAG, 2, buffer);
     if (strcmp(recvdata, "imgL\n") == 0) {
-      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img left sync.");
+      LOGInfo(CAMERA_CONN_TAG, 1, "RGB img left sync.");
       sendMatImage(getImageLeft(), 80);
     }
     else if (strcmp(recvdata, "imgR\n") == 0) {
-      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img right sync.");
+      LOGInfo(CAMERA_CONN_TAG, 1, "RGB img right sync.");
       sendMatImage(getImageRight(), 80);
     }
     else if (strcmp(recvdata, "imgK\n") == 0) {
-      LOGInfo(SENSOR_CONN_TAG, 1, "RGB img kinect sync.");
+      LOGInfo(CAMERA_CONN_TAG, 1, "RGB img kinect sync.");
       sendMatImage(getImageKinect(), 80);
     }
     else if (strcmp(recvdata, "depK\n") == 0) {
-      LOGInfo(SENSOR_CONN_TAG, 1, "Depth img kinect sync.");
+      LOGInfo(CAMERA_CONN_TAG, 1, "Depth img kinect sync.");
       sendMatImage(getDepthKinect(), 80);
     }
+    else if (strcmp(recvdata, "map\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "Map sync.");
+      Mat map = getMapImage().clone();
+      RobotPosition_struct robotPosition = getRobotPossition();
+      int centerX = MAP_WIDTH / 2;
+      int centerY = MAP_HEIGHT / 2;
+      circle(map, Point(centerX, centerY), 40, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
+      circle(map, Point(centerX, centerY), 28, Scalar( 0, 255, 255 ), 1, 8); // robot zone
+      semWait(sem_id, OPERATOR_POSSITION);
+      double minPointX = operatorPossition.x * 100;
+      double minPointZ = operatorPossition.z * 100;
+      double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
+      double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
+
+      int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+      int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+      if (operatorPossition.x != -1 && operatorPossition.y != -1)
+        circle(map, Point(x2, z2), 5, Scalar( 0, 0, 255 ), -1, 8);
+      semPost(sem_id, OPERATOR_POSSITION);
+      line(map, Point(centerX, centerY), Point(centerX + 28 * cos(robotPosition.anglePossition.yaw), centerY + 28 * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
+      sendMatImage(map, 80);
+    }
+    else if (strcmp(recvdata, "rgbO\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "RGB operator sync.");
+      sendMatImage(getRGBOperator(), 80);
+    }
+    else if (strcmp(recvdata, "hsvO\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "HSV operator sync.");
+      sendMatImage(getHSVOperator(), 80);
+    }
+    else if (strcmp(recvdata, "greenO\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "Green mask sync.");
+      sendMatImage(getGreenOperatorMask(), 80);
+    }
+    else if (strcmp(recvdata, "orangeO\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "Orange mask sync.");
+      sendMatImage(getOrangeOperatorMask(), 80);
+    }
+    else if (strcmp(recvdata, "depthO\n") == 0) {
+      LOGInfo(CAMERA_CONN_TAG, 1, "Depth mask sync.");
+      sendMatImage(getDepthOperatorMask(), 80);
+    }
+
+
   }
   LOGInfo(SENSOR_CONN_TAG, 1, "End:Camera sync by network.");
   return NULL;
@@ -981,13 +1278,14 @@ void *syncKinectFrames(void *arg) {
     else
     {
       semWait(sem_id, CAMERA_DEPTH_KINECT1);
-      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP   ) ) {
         depthMap.convertTo( depth1Kinect, CV_8UC1, scaleFactor );
         semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
         depthChooseKinect = 1;
         semPost(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
       }
       semPost(sem_id, CAMERA_DEPTH_KINECT1);
+
       semWait(sem_id, CAMERA_IMAGE_KINECT1);
       if (cameraKinect.retrieve( img1Kinect, CAP_OPENNI_BGR_IMAGE )) {
         semWait(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
@@ -995,6 +1293,14 @@ void *syncKinectFrames(void *arg) {
         semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
       }
       semPost(sem_id, CAMERA_IMAGE_KINECT1);
+
+      semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
+      if (cameraKinect.retrieve( pointCloudMap1Kinect, CAP_OPENNI_POINT_CLOUD_MAP )) {
+        semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+        pointCloudMapChooseKinect = 1;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+      }
+      semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT1);
     }
 
     cvWaitKey(10);
@@ -1005,7 +1311,7 @@ void *syncKinectFrames(void *arg) {
     else
     {
       semWait(sem_id, CAMERA_DEPTH_KINECT2);
-      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP ) ) {
+      if (cameraKinect.retrieve( depthMap, CAP_OPENNI_DEPTH_MAP    ) ) {
         depthMap.convertTo( depth2Kinect, CV_8UC1, scaleFactor );
         semWait(sem_id, CAMERA_VARIABLE_KINECTDEPTH);
         depthChooseKinect = 2;
@@ -1020,6 +1326,14 @@ void *syncKinectFrames(void *arg) {
         semPost(sem_id, CAMERA_VARIABLE_KINECTIMAGE);
       }
       semPost(sem_id, CAMERA_IMAGE_KINECT2);
+
+      semWait(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
+      if (cameraKinect.retrieve( pointCloudMap2Kinect, CAP_OPENNI_POINT_CLOUD_MAP )) {
+        semWait(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+        pointCloudMapChooseKinect = 2;
+        semPost(sem_id, CAMERA_VARIABLE_KINECTPOINTCLOUDMAP);
+      }
+      semPost(sem_id, CAMERA_POINTCLOUDMAP_KINECT2);
     }
   }
   LOGInfo(SENSOR_CONN_TAG, 1, "End:Kinect sync frames.");
@@ -1085,6 +1399,420 @@ void *syncButtons(void *arg) {
   semPost(sem_id, ROBOTSENSORS);
   LOGInfo(NUCLEO_TAG, 1, "End:Buttons sync.");
   return NULL;
+}
+
+Mat translateImg(Mat &img, int offsetx, int offsety) {
+  Mat trans_mat = (Mat_<double>(2, 3) << 1, 0, offsetx, 0, 1, offsety);
+  warpAffine(img, img, trans_mat, img.size());
+  return trans_mat;
+}
+
+void *syncGenerateMap(void *arg) {
+  LOGInfo(MAP_TAG, 1, "Start:Map generate sync.");
+  RobotPosition_struct robotPosition = getRobotPossition();
+  Mat pointCloudBuffer = getPointCloudMapKinect();
+
+  Mat map = getMapImage();
+  if (map.empty())
+    map = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
+
+  int deltaX = robotPosition.axisPossition.x / 10 - mapOffsetX;
+  int deltaY = robotPosition.axisPossition.y / 10 - mapOffsetY;
+
+  translateImg(map, -deltaX, -deltaY); // posun mapy aby sme nestratili predchadzajuce udaje, vzdy si pametame len okolie robota
+
+  mapOffsetX = robotPosition.axisPossition.x / 10;
+  mapOffsetY = robotPosition.axisPossition.y / 10;
+
+  for (int x = 0; x < map.cols; x++) {
+    for (int y = 0; y < map.rows; y++) {
+      Vec3b color = map.at<Vec3b>(Point(x, y));
+
+      int varMapOblivion[3];
+      varMapOblivion[0] = (int)color[0] - SPEED_OF_MAP_OBLIVION;
+      varMapOblivion[1] = (int)color[1] - SPEED_OF_MAP_OBLIVION;
+      varMapOblivion[2] = (int)color[2] - SPEED_OF_MAP_OBLIVION;
+
+      if (varMapOblivion[0] <= 0)
+        color[0] = 0;
+      else
+        color[0] = varMapOblivion[0];
+
+      if (varMapOblivion[1] <= 0)
+        color[1] = 0;
+      else
+        color[1] = varMapOblivion[1];
+
+      if (varMapOblivion[2] <= 0)
+        color[2] = 0;
+      else
+        color[2] = varMapOblivion[2];
+
+      map.at<Vec3b>(Point(x, y)) = color;
+    }
+  }
+
+  for (int x = 0; x < pointCloudBuffer.cols; x++) {
+    int minPointX = 30000;
+    int minPointZ = 30000;
+    for (int y = 0; y < pointCloudBuffer.rows; y++) {
+      if ( !pointCloudBuffer.empty() )   {
+        Point3f p = pointCloudBuffer.at<Point3f>(y, x);
+        float kinectPointX = p.x;         //pozicia vlavo/vpravo na kinecte
+        float kinectpointY = p.y + 0.21;  //pozicia hore/dole na kinecte
+        float kinectPointZ = p.z;         //hlbka
+
+        if (kinectpointY < 0.5 && kinectPointX != 0 && kinectpointY != 0 && kinectPointZ != 0) {
+          int pointZ = kinectPointZ * 100;
+          if (pointZ < minPointZ) minPointZ = pointZ;
+
+          int pointX = kinectPointX * 100;
+          minPointX = pointX;
+        }
+      }
+    }
+    if (minPointX != 30000 && minPointZ != 30000) {
+      double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
+      double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
+
+      int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+      int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+
+      if (x2 > 0 && x2 < MAP_WIDTH && z2 > 0 && z2 < MAP_HEIGHT) {
+
+        Vec3b color = map.at<Vec3b>(Point(x2, z2));
+
+        int varMapCreation[3];
+        varMapCreation[0] = (int)color[0] + SPEED_OF_MAP_CREATION;
+        varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION;
+        varMapCreation[2] = (int)color[2] + SPEED_OF_MAP_CREATION;
+
+        if (varMapCreation[0] >= 255)
+          color[0] = 255;
+        else
+          color[0] = varMapCreation[0];
+
+        if (varMapCreation[1] >= 255)
+          color[1] = 255;
+        else
+          color[1] = varMapCreation[1];
+
+        if (varMapCreation[2] >= 255)
+          color[2] = 255;
+        else
+          color[2] = varMapCreation[2];
+
+        map.at<Vec3b>(Point(x2, z2)) = color;
+      }
+    }
+  }
+
+  semWait(sem_id, MAP_VARIABLE);
+  char mapChooseLast = mapImageChoose;
+  semPost(sem_id, MAP_VARIABLE);
+  if (mapChooseLast == 1) {
+    semWait(sem_id, MAP_IMAGE2);
+    mapImage2 = map.clone();
+    semWait(sem_id, MAP_VARIABLE);
+    mapImageChoose = 2;
+    semPost(sem_id, MAP_VARIABLE);
+    semPost(sem_id, MAP_IMAGE2);
+  }
+  else {
+    semWait(sem_id, MAP_IMAGE1);
+    mapImage1 = map.clone();
+    semWait(sem_id, MAP_VARIABLE);
+    mapImageChoose = 1;
+    semPost(sem_id, MAP_VARIABLE);
+    semPost(sem_id, MAP_IMAGE1);
+  }
+  LOGInfo(MAP_TAG, 1, "End:Map generate sync.");
+  return NULL;
+}
+
+int morph_elem = 0;
+int morph_size = 8;
+int morph_operator = 0;
+int const max_operator = 4;
+int const max_elem = 2;
+int const max_kernel_size = 21;
+
+void *syncOperatorDetect(void *arg) {
+  LOGInfo(OPERATOR_TAG, 1, "Start:Operator sync.");
+
+  Mat rgbOperatorImage = getImageKinect();
+  Mat depthOperatorMap = getDepthKinect();
+  Mat hsvOperatorImage;
+  Mat orangeOperatorMaskImage;
+  Mat greenOperatorMaskImage;
+  Mat depthOperatorMaskImage = Mat(depthOperatorMap.size(), CV_8UC1, Scalar(0));
+  if (!rgbOperatorImage.empty() && !depthOperatorMap.empty()) {
+    cvtColor(rgbOperatorImage, hsvOperatorImage, COLOR_BGR2HSV); //konverzia na hsv model
+    inRange(hsvOperatorImage, Scalar(iLowH_green, iLowS_green, iLowV_green), Scalar(iHighH_green, iHighS_green, iHighV_green), greenOperatorMaskImage); //vytvorenie masky zelenej farby
+    inRange(hsvOperatorImage, Scalar(iLowH_orange, iLowS_orange, iLowV_orange), Scalar(iHighH_orange, iHighS_orange, iHighV_orange), orangeOperatorMaskImage); //vytvorenie maasky oranzovej farby
+    /*
+    int dilation_size = 3;
+        Mat element = getStructuringElement( MORPH_CROSS,
+                                             Size( 2 * dilation_size + 1, 2 * dilation_size + 1 ),
+                                             Point( dilation_size, dilation_size ) );
+        /// Apply the dilation operation
+        dilate( greenOperatorMaskImage, greenOperatorMaskImage, element );
+        dilate( orangeOperatorMaskImage, orangeOperatorMaskImage, element );
+    */
+
+    int dist = 5;
+    int size = 4;
+    int checkSize = 4;
+
+    for (int y = size; y < depthOperatorMap.rows - size; y += size)
+    {
+      for (int x = size; x < depthOperatorMap.cols - size; x += size)
+      {
+        bool find = false;
+        for (int p = -checkSize; p <= checkSize && !find; p++) {
+          if (abs(depthOperatorMap.at<uchar>(Point(x + p, y)) - depthOperatorMap.at<uchar>(Point(x, y))) > dist) {
+            find = true;
+          }
+        }
+        for (int q = -checkSize; q <= checkSize && !find; q++) {
+          if (abs(depthOperatorMap.at<uchar>(Point(x, y + q)) - depthOperatorMap.at<uchar>(Point(x, y))) > dist) {
+            find = true;
+          }
+        }
+        if (find) {
+          circle(depthOperatorMaskImage, Point(x, y), size + 1, Scalar(255), 1, 8);
+          x += size;
+        }
+      }
+    }
+
+    int choose_people = -1;
+    int choose_orange = -1;
+    int choose_green = -1;
+    int choose_depth = -1;
+    long maxArea = -1;
+    Point point1(-1, -1);
+    Point point2(-1, -1);
+
+    vector< vector<Point> > contours_green;
+    vector< vector<Point> > contours_orange;
+    vector< vector<Point> > contours_depth;
+    findContours(greenOperatorMaskImage, contours_green, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+    findContours(orangeOperatorMaskImage, contours_orange, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+    findContours(depthOperatorMaskImage, contours_depth, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+
+    Rect r_orange[contours_orange.size()];
+    Rect r_green[contours_green.size()];
+    Rect r_depth[contours_depth.size()];
+    long areasOrange[contours_orange.size()];
+    long areasGreen[contours_green.size()];
+    long areasDepth[contours_depth.size()];
+
+    for (int i = 0; i < contours_orange.size(); i++) {
+      areasOrange[i] = 0;
+      r_orange[i] = boundingRect(contours_orange[i]);
+    }
+    for (int i = 0; i < contours_green.size(); i++) {
+      areasGreen[i] = 0;
+      r_green[i] = boundingRect(contours_green[i]);
+    }
+    for (int i = 0; i < contours_depth.size(); i++) {
+      areasDepth[i] = 0;
+      r_depth[i] = boundingRect(contours_depth[i]);
+    }
+
+    for (unsigned int index_orange = 0; index_orange < contours_orange.size(); index_orange++) {
+      for (unsigned int index_green = 0; index_green < contours_green.size(); index_green++) {
+
+        int centerGreenX = r_green[index_green].x + r_green[index_green].width / 2;
+        int centerOrangeX = r_orange[index_orange].x + r_orange[index_orange].width / 2;
+
+        int centerGreenY = r_green[index_green].y + r_green[index_green].height / 2;
+        int centerOrangeY = r_orange[index_orange].y + r_orange[index_orange].height / 2;
+
+        if (abs(centerGreenX - centerOrangeX)  < 50 && abs(centerGreenY - centerOrangeY)  < 50 && abs(centerGreenY - centerOrangeY)  > 2) {
+
+          int centerHSVX = (centerGreenX + centerOrangeX) / 2;
+          int centerHSVY = (centerGreenY + centerOrangeY) / 2;
+
+          if (areasGreen[index_green] == 0) areasGreen[index_green] = contourArea(Mat(contours_green[index_green]));
+          if (areasOrange[index_orange] == 0) areasOrange[index_orange] = contourArea(Mat(contours_orange[index_orange]));
+
+          if (areasGreen[index_green] > 500 && areasOrange[index_orange] > 500) {
+            for (unsigned int index_depth = 0; index_depth < contours_depth.size(); index_depth++) {
+              if (areasDepth[index_depth] == 0) areasDepth[index_depth] = contourArea(Mat(contours_depth[index_depth]));
+              if (areasDepth[index_depth] > 1000 && areasDepth[index_depth] < 320 * 480) {
+                int centerDepthX =  + r_depth[index_depth].width / 2;
+                int centerDepthY = r_depth[index_depth].y + r_depth[index_depth].height / 2;
+                if (abs(r_depth[index_depth].x - (r_green[index_green].x + r_orange[index_orange].x) / 2) < 60 &&
+                    abs(r_depth[index_depth].x + r_depth[index_depth].width - (r_green[index_green].x + r_green[index_green].width + r_orange[index_orange].x + r_orange[index_orange].width) / 2) < 60 &&
+                    abs(r_depth[index_depth].y - (r_green[index_green].y + r_orange[index_orange].y) / 2) < 60 &&
+                    abs(r_depth[index_depth].y + r_depth[index_depth].height - (r_green[index_green].y + r_green[index_green].height + r_orange[index_orange].y + r_orange[index_orange].height) / 2) < 60 &&
+                    maxArea < (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]))
+                {
+                  maxArea = (areasGreen[index_green] + areasOrange[index_orange] + areasDepth[index_depth]);
+                  choose_green = index_green;
+                  choose_orange = index_orange;
+                  choose_depth = index_depth;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    if (maxArea != -1) {
+
+      if (r_orange[choose_orange].y < r_green[choose_green].y)
+        choose_people = 1;
+      else
+        choose_people = 2;
+
+      int minX;
+      int minY;
+      int maxX;
+      int maxY;
+      if (r_orange[choose_orange].x > r_green[choose_green].x)
+        minX = r_green[choose_green].x;
+      else
+        minX = r_orange[choose_orange].x;
+
+      if (r_orange[choose_orange].x + r_orange[choose_orange].width < r_green[choose_green].x + r_green[choose_green].width)
+        maxX = r_green[choose_green].x + r_green[choose_green].width;
+      else
+        maxX = r_orange[choose_orange].x + r_orange[choose_orange].width ;
+
+      if (r_orange[choose_orange].y > r_green[choose_green].y)
+        minY = r_green[choose_green].y;
+      else
+        minY = r_orange[choose_orange].y;
+
+      if (r_orange[choose_orange].y + r_orange[choose_orange].height < r_green[choose_green].y + r_green[choose_green].height)
+        maxY = r_green[choose_green].y + r_green[choose_green].height;
+      else
+        maxY = r_orange[choose_orange].y + r_orange[choose_orange].height;
+
+      point1 = Point(minX, minY);
+      point2 = Point(maxX, maxY);
+
+      drawContours(depthOperatorMaskImage, contours_depth, choose_depth, Scalar(255), CV_FILLED);
+      drawContours(orangeOperatorMaskImage, contours_orange, choose_orange, Scalar(255), CV_FILLED);
+      drawContours(greenOperatorMaskImage, contours_green, choose_green, Scalar(255), CV_FILLED);
+      rectangle(rgbOperatorImage, point1, point2, CV_RGB(0, 255, 0), 3, 8, 0);
+      Point center = Point(point2.x - (point2.x - point1.x) / 2, point2.y - (point2.y - point1.y) / 2);
+
+      circle(rgbOperatorImage, center, 5, Scalar( 0, 0, 255 ), -1, 8);
+      char text[20];
+      sprintf(text, "%d,%d,P%d", center.x, center.y, choose_people);
+      putText(rgbOperatorImage, text, Point(10, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+      semWait(sem_id, OPERATOR_POSSITION);
+      Mat pointCloudBuffer = getPointCloudMapKinect();
+      operatorPossition = pointCloudBuffer.at<Point3f>(center.y, center.x);
+      semPost(sem_id, OPERATOR_POSSITION);
+    }
+    else {
+      semWait(sem_id, OPERATOR_POSSITION);
+      operatorPossition = Point3f(-1, -1, -1);
+      semPost(sem_id, OPERATOR_POSSITION);
+    }
+  }
+  else {
+    semWait(sem_id, OPERATOR_POSSITION);
+    operatorPossition = Point3f(-1, -1, -1);
+    semPost(sem_id, OPERATOR_POSSITION);
+  }
+
+//copy mat
+  if (rgbOperatorChoose == 1) {
+    semWait(sem_id, RGB_OPERATOR2);
+    rgbOperatorImage2 = rgbOperatorImage;
+    semWait(sem_id, RGB_OPERATOR_VARIABLE);
+    rgbOperatorChoose = 2;
+    semPost(sem_id, RGB_OPERATOR_VARIABLE);
+    semPost(sem_id, RGB_OPERATOR2);
+
+  }
+  else {
+    semWait(sem_id, RGB_OPERATOR1);
+    rgbOperatorImage1 = rgbOperatorImage;
+    semWait(sem_id, RGB_OPERATOR_VARIABLE);
+    rgbOperatorChoose = 1;
+    semPost(sem_id, RGB_OPERATOR_VARIABLE);
+    semPost(sem_id, RGB_OPERATOR1);
+  }
+
+  if (hsvOperatorChoose == 1) {
+    semWait(sem_id, HSV_OPERATOR2);
+    hsvOperatorImage2 = hsvOperatorImage;
+    semWait(sem_id, HSV_OPERATOR_VARIABLE);
+    hsvOperatorChoose = 2;
+    semPost(sem_id, HSV_OPERATOR_VARIABLE);
+    semPost(sem_id, HSV_OPERATOR2);
+
+  }
+  else {
+    semWait(sem_id, HSV_OPERATOR1);
+    hsvOperatorImage1 = hsvOperatorImage;
+    semWait(sem_id, HSV_OPERATOR_VARIABLE);
+    hsvOperatorChoose = 1;
+    semPost(sem_id, HSV_OPERATOR_VARIABLE);
+    semPost(sem_id, HSV_OPERATOR1);
+  }
+
+  if (depthOperatorMaskChoose == 1) {
+    semWait(sem_id, DEPTH_OPERATOR_MASK2);
+    depthOperatorMaskImage2 = depthOperatorMaskImage;
+    semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    depthOperatorMaskChoose = 2;
+    semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, DEPTH_OPERATOR_MASK2);
+
+  }
+  else {
+    semWait(sem_id, DEPTH_OPERATOR_MASK1);
+    depthOperatorMaskImage1 = depthOperatorMaskImage;
+    semWait(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    depthOperatorMaskChoose = 1;
+    semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, DEPTH_OPERATOR_MASK1);
+  }
+
+  if (greenOperatorMaskChoose == 1) {
+    semWait(sem_id, GREEN_OPERATOR_MASK2);
+    greenOperatorMaskImage2 = greenOperatorMaskImage;
+    semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    greenOperatorMaskChoose = 2;
+    semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, GREEN_OPERATOR_MASK2);
+
+  }
+  else {
+    semWait(sem_id, GREEN_OPERATOR_MASK1);
+    greenOperatorMaskImage1 = greenOperatorMaskImage;
+    semWait(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    greenOperatorMaskChoose = 1;
+    semPost(sem_id, GREEN_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, GREEN_OPERATOR_MASK1);
+  }
+
+  if (orangeOperatorMaskChoose == 1) {
+    semWait(sem_id, ORANGE_OPERATOR_MASK2);
+    orangeOperatorMaskImage2 = orangeOperatorMaskImage;
+    semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    orangeOperatorMaskChoose = 2;
+    semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, ORANGE_OPERATOR_MASK2);
+  }
+  else {
+    semWait(sem_id, ORANGE_OPERATOR_MASK1);
+    orangeOperatorMaskImage1 = orangeOperatorMaskImage;
+    semWait(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    orangeOperatorMaskChoose = 1;
+    semPost(sem_id, ORANGE_OPERATOR_MASK_VARIABLE);
+    semPost(sem_id, ORANGE_OPERATOR_MASK1);
+  }
+
+  LOGInfo(OPERATOR_TAG, 1, "End:Operator sync.");
 }
 
 void *syncKinectMotor(void *arg) {
@@ -1173,7 +1901,7 @@ void *syncKinectSensors(void *arg) {
   return NULL;
 }
 
-#define numberOfModules 8
+#define numberOfModules 10
 void *syncModules(void *arg) {
   unsigned long timeRunThread[numberOfModules];
   for (int i = 0; i < numberOfModules; i++) {
@@ -1244,6 +1972,22 @@ void *syncModules(void *arg) {
       syncKinectSensors(NULL);
       timeRunThread[threadIndex] = 0;
     }
+    threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
+
+    if (ENABLE_MAP_GENERATE && (timeRunThread[threadIndex] > SYNC_MAP_GENERATE_TIME)) {
+      syncGenerateMap(NULL);
+      timeRunThread[threadIndex] = 0;
+    }
+    threadIndex++;
+
+    usleep(SYNC_MIN_TIME / numberOfModules);
+
+    if (ENABLE_OPERATOR_DETECT && (timeRunThread[threadIndex] > SYNC_OPERATOR_DETECT_TIME)) {
+      syncOperatorDetect(NULL);
+      timeRunThread[threadIndex] = 0;
+    }
 
     usleep(SYNC_MIN_TIME / numberOfModules);
 
@@ -1279,63 +2023,4 @@ double rad2Deg(double angle) {
 
 double deg2Rad(double angle) {
   return angle * (M_PI / 180);
-}
-
-static void colorizeDisparity( const Mat & gray, Mat & rgb, double maxDisp = -1.f, float S = 1.f, float V = 1.f ) {
-  CV_Assert( !gray.empty() );
-  CV_Assert( gray.type() == CV_8UC1 );
-
-  if ( maxDisp <= 0 )
-  {
-    maxDisp = 0;
-    minMaxLoc( gray, 0, &maxDisp );
-  }
-
-  rgb.create( gray.size(), CV_8UC3 );
-  rgb = Scalar::all(0);
-  if ( maxDisp < 1 )
-    return;
-
-  for ( int y = 0; y < gray.rows; y++ )
-  {
-    for ( int x = 0; x < gray.cols; x++ )
-    {
-      uchar d = gray.at<uchar>(y, x);
-      unsigned int H = ((uchar)maxDisp - d) * 240 / (uchar)maxDisp;
-
-      unsigned int hi = (H / 60) % 6;
-      float f = H / 60.f - H / 60;
-      float p = V * (1 - S);
-      float q = V * (1 - f * S);
-      float t = V * (1 - (1 - f) * S);
-
-      Point3f res;
-
-      if ( hi == 0 ) //R = V,  G = t,  B = p
-        res = Point3f( p, t, V );
-      if ( hi == 1 ) // R = q, G = V,  B = p
-        res = Point3f( p, V, q );
-      if ( hi == 2 ) // R = p, G = V,  B = t
-        res = Point3f( t, V, p );
-      if ( hi == 3 ) // R = p, G = q,  B = V
-        res = Point3f( V, q, p );
-      if ( hi == 4 ) // R = t, G = p,  B = V
-        res = Point3f( V, p, t );
-      if ( hi == 5 ) // R = V, G = p,  B = q
-        res = Point3f( q, p, V );
-
-      uchar b = (uchar)(std::max(0.f, std::min (res.x, 1.f)) * 255.f);
-      uchar g = (uchar)(std::max(0.f, std::min (res.y, 1.f)) * 255.f);
-      uchar r = (uchar)(std::max(0.f, std::min (res.z, 1.f)) * 255.f);
-
-      rgb.at<Point3_<uchar> >(y, x) = Point3_<uchar>(b, g, r);
-    }
-  }
-}
-
-static float getMaxDisparity( VideoCapture & capture ) {
-  const int minDistance = 400; // mm
-  float b = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_BASELINE ); // mm
-  float F = (float)capture.get( CAP_OPENNI_DEPTH_GENERATOR_FOCAL_LENGTH ); // pixels
-  return b * F / minDistance;
 }

@@ -47,18 +47,30 @@ extern "C" {
 #define SENSORS_PORT 1213
 
 #define SYNC_MIN_TIME 1000 // 1 ms
-#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*20
+#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*50
 #define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
-#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*20
-#define SYNC_LEDS_TIME              SYNC_MIN_TIME*20
-#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*20
+#define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*50
+#define SYNC_LEDS_TIME              SYNC_MIN_TIME*300
+#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*100
+#define SYNC_MAP_GENERATE_TIME      SYNC_MIN_TIME*100
+#define SYNC_OPERATOR_DETECT_TIME      SYNC_MIN_TIME*100
 
 #define ENABLE_I2C 1        //ok
-#define ENABLE_MOTORS 1    //ok
-#define ENABLE_ULTRASONIC 1 //ok
-#define ENABLE_LEDS 1      //ok
-#define ENABLE_BUTTONS 1    //ok
+#define ENABLE_MOTORS 0    //ok
+#define ENABLE_ULTRASONIC 0 //ok
+#define ENABLE_LEDS 0      //ok
+#define ENABLE_BUTTONS 0    //ok
 #define ENABLE_POSSITION 1  //ok
+#define ENABLE_MAP_GENERATE 1
+#define ENABLE_OPERATOR_DETECT 1
+
+#define ENABLE_MAP_OBLIVION 1
+
+#define SPEED_OF_MAP_OBLIVION 2
+#define SPEED_OF_MAP_CREATION 10
+
+#define MAP_WIDTH 640
+#define MAP_HEIGHT 480
 
 #define SYNC_KINECTMOTOR_TIME     SYNC_MIN_TIME*20
 #define SYNC_KINECTLED_TIME       SYNC_MIN_TIME*1000
@@ -98,10 +110,33 @@ typedef enum {
   CAMERA_VARIABLE_KINECTIMAGE,
   CAMERA_IMAGE_KINECT1,
   CAMERA_IMAGE_KINECT2,
+  CAMERA_VARIABLE_KINECTPOINTCLOUDMAP,
+  CAMERA_POINTCLOUDMAP_KINECT1,
+  CAMERA_POINTCLOUDMAP_KINECT2,
   ROBOTSENSORS,
   ROBOTACCULATORS,
-  I2C
-} semafor_name_t;
+  MAP_VARIABLE,
+  MAP_IMAGE1,
+  MAP_IMAGE2,
+  OPERATOR_IMAGES,
+  I2C,
+  DEPTH_OPERATOR_MASK1,
+  DEPTH_OPERATOR_MASK2,
+  DEPTH_OPERATOR_MASK_VARIABLE,
+  RGB_OPERATOR1,
+  RGB_OPERATOR2,
+  RGB_OPERATOR_VARIABLE,
+  HSV_OPERATOR1,
+  HSV_OPERATOR2,
+  HSV_OPERATOR_VARIABLE,
+  ORANGE_OPERATOR_MASK1,
+  ORANGE_OPERATOR_MASK2,
+  ORANGE_OPERATOR_MASK_VARIABLE,
+  GREEN_OPERATOR_MASK1,
+  GREEN_OPERATOR_MASK2,
+  GREEN_OPERATOR_MASK_VARIABLE,
+  OPERATOR_POSSITION
+} semafor_name_t; //nazabudnut pri pridani inicializovat v initRobot
 
 typedef enum {
   SEMAFOR_TAG,
@@ -111,7 +146,9 @@ typedef enum {
   CAMERA_CONN_TAG,
   MOTOR_TAG,
   NUCLEO_TAG,
-  ROBOT_TAG
+  ROBOT_TAG,
+  MAP_TAG,
+  OPERATOR_TAG
 } log_tag_t;
 
 //ostatne
@@ -298,7 +335,5 @@ void sigpipe(int param);
 double dist(double a, double b);
 double rad2Deg(double angle);
 double deg2Rad(double angle);
-static void colorizeDisparity( const Mat& gray, Mat& rgb, double maxDisp, float S, float V);
-static float getMaxDisparity( VideoCapture& capture );
 
 #endif
