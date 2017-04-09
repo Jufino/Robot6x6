@@ -139,7 +139,7 @@ public class SocketWebcam
 
     public String recv_data(String command)
     {
-        SendString(command + "\n");
+        SendString(command+"\n");
         String pocet = ReceiveASCII(20);
         int sizeFromSystem = Convert.ToInt32(pocet);
         return ReceiveASCII(sizeFromSystem);
@@ -151,7 +151,7 @@ public class SocketWebcam
         int obrSize = -1;
         try
         {
-            SendString(command + "\n");
+            SendString(command+"\n");
             sizeFromSystem = Convert.ToInt32(ReceiveASCII(20));
             if (sizeFromSystem > 0)
             {

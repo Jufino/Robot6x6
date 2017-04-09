@@ -17,7 +17,7 @@ namespace webcam
         }
 
         bool cameraGrab = true;
-        socketWebcam socketWebcam = new socketWebcam();
+        SocketWebcam socketWebcam = new SocketWebcam();
         private void button1_Click(object sender, EventArgs e)
         {
             socketWebcam.Open("192.168.10.1", "1212");
@@ -30,38 +30,32 @@ namespace webcam
         {
             while (cameraGrab)
             {
-                socketWebcam.SendString("depK\n");
-                Bitmap img = socketWebcam.recv_picture();
+                Bitmap img = socketWebcam.recv_picture("depK");
                 if (img != null)
                 {
                     pictureBox2.Image = new Bitmap(img, pictureBox2.Size);
                 }
-                socketWebcam.SendString("map\n");
-                img = socketWebcam.recv_picture();
+                img = socketWebcam.recv_picture("map");
                 if (img != null)
                 {
                     pictureBox3.Image = new Bitmap(img,pictureBox3.Size);
                 }
-                socketWebcam.SendString("rgbO\n");
-                img = socketWebcam.recv_picture();
+                img = socketWebcam.recv_picture("rgbO");
                 if (img != null)
                 {
                     pictureBox4.Image = new Bitmap(img, pictureBox4.Size);
                 }
-                socketWebcam.SendString("greenO\n");
-                img = socketWebcam.recv_picture();
+                img = socketWebcam.recv_picture("greenO");
                 if (img != null)
                 {
                     pictureBox6.Image = new Bitmap(img, pictureBox6.Size);
                 }
-                socketWebcam.SendString("orangeO\n");
-                img = socketWebcam.recv_picture();
+                img = socketWebcam.recv_picture("orangeO");
                 if (img != null)
                 {
                     pictureBox7.Image = new Bitmap(img, pictureBox7.Size);
                 }
-                socketWebcam.SendString("depthO\n");
-                img = socketWebcam.recv_picture();
+                img = socketWebcam.recv_picture("depthO");
                 if (img != null)
                 {
                     pictureBox8.Image = new Bitmap(img, pictureBox8.Size);

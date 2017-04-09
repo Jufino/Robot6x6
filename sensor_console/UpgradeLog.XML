@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type='text/xsl' href='_UpgradeReport_Files/UpgradeReport.xslt'?><UpgradeLog>
+<Properties><Property Name="Solution" Value="webcam">
+</Property><Property Name="Solution File" Value="C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam.sln">
+</Property><Property Name="User Options File" Value="C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\webcam.suo">
+</Property><Property Name="Date" Value="19. novembra 2014">
+</Property><Property Name="Time" Value="18:38">
+</Property></Properties><Event ErrorLevel="0" Project="" Source="webcam.sln" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam.sln">
+</Event><Event ErrorLevel="0" Project="" Source="webcam.suo" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam.suo">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\webcam.csproj" Description="Project file successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\webcam.csproj">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\webcam.csproj.user" Description="Project user file successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\webcam.csproj.user">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Form1.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Form1.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Form1.Designer.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Form1.Designer.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Program.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Program.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Properties\AssemblyInfo.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Properties\AssemblyInfo.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Properties\Resources.Designer.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Properties\Resources.Designer.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Properties\Settings.Designer.cs" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Properties\Settings.Designer.cs">
+</Event><Event ErrorLevel="2" Project="webcam" Source="webcam\socket.cs" Description="Failed to backup file as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\socket.cs">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Properties\Settings.settings" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Properties\Settings.settings">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Form1.resx" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Form1.resx">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\Properties\Resources.resx" Description="File successfully backed up as C:\Users\Jufo\Documents\Visual Studio 2008\Projects\webcam\Backup\webcam\Properties\Resources.resx">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\webcam.csproj" Description="Project converted successfully">
+</Event><Event ErrorLevel="3" Project="webcam" Source="webcam\webcam.csproj" Description="Converted">
+</Event><Event ErrorLevel="0" Project="" Source="webcam.sln" Description="Solution converted successfully">
+</Event><Event ErrorLevel="3" Project="" Source="webcam.sln" Description="Converted">
+</Event><Event ErrorLevel="0" Project="webcam" Source="webcam\webcam.csproj" Description="Scan complete: Upgrade not required for project files.">
+</Event></UpgradeLog>
