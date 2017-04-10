@@ -65,7 +65,7 @@ extern "C" {
 #define SYNC_OPERATOR_DETECT_TIME   0.3
 
 #define ENABLE_I2C 1        //ok
-#define ENABLE_MOTORS 0    //ok
+#define ENABLE_MOTORS 1    //ok
 #define ENABLE_ULTRASONIC 0 //ok
 #define ENABLE_LEDS 1     //ok
 #define ENABLE_BUTTONS 1    //ok

@@ -217,80 +217,6 @@ int kbhit(void)
   return 0;
 }
 
-void *readKey(void*) {
-  //int option;
-  while (onAllThreads) {
-    RobotAcculators robotAcculators = getRobotAcculators();
-
-    if (kbhit() != 0) {
-      char key = fgetc(stdin);
-
-      switch (key) {
-      case 'w':
-        robotAcculators.robotDirection = FORWARD;
-        robotAcculators.robotSpeed = 1000;
-        printf("FORWARD\n");
-        break;
-      case 's':
-        robotAcculators.robotDirection = BACKWARD;
-        robotAcculators.robotSpeed = 1000;
-        printf("BACKWARD\n");
-        break;
-      case 'a':
-        robotAcculators.robotDirection = ANTICLOCKWISE;
-        robotAcculators.robotSpeed = 1000;
-        printf("ANTICLOCKWISE\n");
-        break;
-      case 'd':
-        robotAcculators.robotDirection = CLOCKWISE;
-        robotAcculators.robotSpeed = 1000;
-        printf("CLOCKWISE\n");
-        break;
-      case 'x':
-        robotAcculators.robotDirection = STOP;
-        robotAcculators.robotSpeed = 0;
-        printf("STOP\n");
-        break;
-      }
-    }
-    setRobotAcculators(robotAcculators);
-    sleep(0.02);
-    //robotAcculators.robotDirection = FORWARD;
-    //robotAcculators.robotSpeed = 100;
-    //robotAcculators.ledKinect = LEDKINECT_RED;
-
-
-    /*
-    printf("1. zmena green low hue (%d)\n", iLowH_green);
-    printf("2. zmena green high hue (%d)\n", iHighH_green);
-    printf("3. zmena green low saturation (%d)\n", iLowS_green);
-    printf("4. zmena green high saturation (%d)\n", iHighS_green);
-    printf("5. zmena green low value(%d)\n", iLowV_green);
-    printf("6. zmena green high value(%d)\n", iHighV_green);
-    printf("7. zmena orange low hue (%d)\n", iLowH_orange);
-    printf("8. zmena orange high hue (%d)\n", iHighH_orange);
-    printf("9. zmena orange low saturation (%d)\n", iLowS_orange);
-    printf("10. zmena orange high saturation (%d)\n", iHighS_orange);
-    printf("11. zmena orange low value(%d)\n", iLowV_orange);
-    printf("12. zmena orange high value(%d)\n", iHighV_orange);
-    scanf("%d", &option);
-    switch (option) {
-    case 1: scanf("%d", &iLowH_green); break;
-    case 2: scanf("%d", &iHighH_green); break;
-    case 3: scanf("%d", &iLowS_green); break;
-    case 4: scanf("%d", &iHighS_green); break;
-    case 5: scanf("%d", &iLowV_green); break;
-    case 6: scanf("%d", &iHighV_green); break;
-    case 7: scanf("%d", &iLowH_orange); break;
-    case 8: scanf("%d", &iHighH_orange); break;
-    case 9: scanf("%d", &iLowS_orange); break;
-    case 10: scanf("%d", &iHighS_orange); break;
-    case 11: scanf("%d", &iLowV_orange); break;
-    case 12: scanf("%d", &iHighV_orange); break;
-    }*/
-  }
-  return NULL;
-}
 
 void initRobot(void) {
   priorityVisible[0] = true;
@@ -462,8 +388,6 @@ void initRobot(void) {
 
   signal(SIGINT, sigctrl);
 
-  pthread_t threadReadKey;
-  pthread_create(&threadReadKey, NULL, &readKey, NULL);
 }
 
 void closeRobot(void) {
@@ -1360,12 +1284,16 @@ void *syncCameraNetworkConnection(void *arg) {
   return NULL;
 }
 
+#define maxBufferRecv 50
 void *syncSensorNetworkConnection(void *arg) {
   LOGInfo(SENSOR_CONN_TAG, 1, "Start:Sensor sync by network.");
-  char recvdata[50];
-  int bytes = 50;
+  char recvdata[maxBufferRecv];
+  char command[maxBufferRecv / 2];
+  char value[maxBufferRecv / 2];
+  int bytes = 1;
   while (bytes != 0 && onAllThreads && onWifiSensorStill) {
-    bytes = recv(sensorsClientsock, recvdata, 20, 0);
+    int indexValue = -1;
+    bytes = recv(sensorsClientsock, recvdata, maxBufferRecv, 0);
     if (bytes == 0) {
       onWifiSensorStill = false;
       closeSensorConnection();
@@ -1376,74 +1304,133 @@ void *syncSensorNetworkConnection(void *arg) {
       break;
     }
 
-    /*    char buffer [50];
-        sprintf (buffer, "recv data : %s", recvdata);
-        for (int i = 0; i < 50; i++) {
-          if (buffer[i] == '\n') {
-            buffer[i] = '\0';
-            break;
-          }
-        }
-        LOGInfo(SENSOR_CONN_TAG, 2, buffer);*/
+    for (int i = 0; i < maxBufferRecv; i++) {
+      if ((recvdata[i] == '\n' || recvdata[i] == '\0')  && indexValue == -1) {
+        command[i] = '\0';
+        break;
+      }
+      else if (recvdata[i] != ';' && indexValue == -1) {
+        command[i] = recvdata[i];
+      }
+      else if (recvdata[i] == ';' && indexValue == -1) {
+        command[i] = '\0';
+        indexValue = i + 1;
+      }
+      else if ((recvdata[i] == '\n' || recvdata[i] == '\0') && indexValue != -1) {
+        value[i - indexValue] = '\0';
+        break;
+      }
+      else if (recvdata[i] != '\n' && indexValue != 0) {
+        value[i - indexValue] = recvdata[i];
+      }
+    }
 
-    if (strcmp(recvdata, "butt\n") == 0) {
+    LOGInfo(SENSOR_CONN_TAG, 2, command);
+    LOGInfo(SENSOR_CONN_TAG, 2, value);
+
+    if (strcmp(command, "butt") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Button sync.");
-      RobotSensors robotSensors = getRobotSensors();
       int valueButtons = 0;
+      semWait(sem_id, ROBOTSENSORS);
       if (robotSensors.buttons.buttonUp) valueButtons += 1;
       if (robotSensors.buttons.buttonMiddle) valueButtons += 2;
       if (robotSensors.buttons.buttonDown) valueButtons += 4;
+      semPost(sem_id, ROBOTSENSORS);
       sendIntByWifi(valueButtons);
     }
-    else if (strcmp(recvdata, "roll\n") == 0) {
+    else if (strcmp(command, "roll") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Roll sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.anglePossition.roll);
+      semWait(sem_id, ROBOTSENSORS);
+      double angle = robotSensors.robotPosition.anglePossition.roll;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(angle);
     }
-    else if (strcmp(recvdata, "pitch\n") == 0) {
+    else if (strcmp(command, "pitch") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Pitch sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.anglePossition.pitch);
+      semWait(sem_id, ROBOTSENSORS);
+      double angle = robotSensors.robotPosition.anglePossition.pitch;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(angle);
     }
-    else if (strcmp(recvdata, "yaw\n") == 0) {
+    else if (strcmp(command, "yaw") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Yaw sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.anglePossition.yaw);
+      semWait(sem_id, ROBOTSENSORS);
+      double angle = robotSensors.robotPosition.anglePossition.yaw;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(angle);
     }
-    else if (strcmp(recvdata, "x\n") == 0) {
+    else if (strcmp(command, "x") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "X sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.axisPossition.x);
+      semWait(sem_id, ROBOTSENSORS);
+      double pos = robotSensors.robotPosition.axisPossition.x;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(pos);
     }
-    else if (strcmp(recvdata, "y\n") == 0) {
+    else if (strcmp(command, "y") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Y sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.axisPossition.y);
+      semWait(sem_id, ROBOTSENSORS);
+      double pos = robotSensors.robotPosition.axisPossition.y;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(pos);
     }
-    else if (strcmp(recvdata, "z\n") == 0) {
+    else if (strcmp(command, "z") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Z sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.robotPosition.axisPossition.z);
+      semWait(sem_id, ROBOTSENSORS);
+      double pos = robotSensors.robotPosition.axisPossition.z;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(pos);
     }
-    else if (strcmp(recvdata, "voltPer\n") == 0) {
+    else if (strcmp(command, "voltPer") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Voltage percent sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.voltage.capacityPercent);
+
+      semWait(sem_id, ROBOTSENSORS);
+      double value = robotSensors.voltage.capacityPercent;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(value);
     }
-    else if (strcmp(recvdata, "voltage\n") == 0) {
+    else if (strcmp(command, "voltage") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Voltage sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.voltage.volts);
+      semWait(sem_id, ROBOTSENSORS);
+      double value = robotSensors.voltage.volts;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(value);
     }
-    else if (strcmp(recvdata, "ult\n") == 0) {
+    else if (strcmp(command, "ult") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Ultrasonic sync.");
-      RobotSensors robotSensors = getRobotSensors();
-      sendDoubleByWifi(robotSensors.ultrasonic);
+      semWait(sem_id, ROBOTSENSORS);
+      double value = robotSensors.ultrasonic;
+      semPost(sem_id, ROBOTSENSORS);
+      sendDoubleByWifi(value);
     }
-    else if (strcmp(recvdata, "leds\n") == 0) {
+    else if (strcmp(command, "dir") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Direction sync.");
+
+      semWait(sem_id, ROBOTACCULATORS);
+      if (strcmp(value, "F") == 0)
+        robotAcculators.robotDirection = FORWARD;
+      else if (strcmp(value, "B") == 0)
+        robotAcculators.robotDirection = BACKWARD;
+      else if (strcmp(value, "C") == 0)
+        robotAcculators.robotDirection = CLOCKWISE;
+      else if (strcmp(value, "A") == 0)
+        robotAcculators.robotDirection = ANTICLOCKWISE;
+      else
+        robotAcculators.robotDirection = STOP;
+      semPost(sem_id, ROBOTACCULATORS);
+
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+    else if (strcmp(command, "speed") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Speed sync.");
+      semWait(sem_id, ROBOTACCULATORS);
+      robotAcculators.robotSpeed = atoi(value);
+      semPost(sem_id, ROBOTACCULATORS);
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+    else if (strcmp(command, "leds") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Leds sync.");
-      RobotAcculators robotAcculators = getRobotAcculators();
       int valueLeds = 0;
+      semWait(sem_id, ROBOTACCULATORS);
       if (robotAcculators.leds.LedUp == COLOR_RED) valueLeds += (1 << 1);
       else if (robotAcculators.leds.LedUp == COLOR_GREEN) valueLeds += (1 << 2);
       else if (robotAcculators.leds.LedUp == COLOR_ORANGE) valueLeds += (1 << 2) + (1 << 1);
@@ -1455,18 +1442,20 @@ void *syncSensorNetworkConnection(void *arg) {
       if (robotAcculators.leds.LedDown == COLOR_RED) valueLeds += (1 << 5);
       else if (robotAcculators.leds.LedDown == COLOR_GREEN) valueLeds += (1 << 6);
       else if (robotAcculators.leds.LedDown == COLOR_ORANGE) valueLeds += (1 << 5) + (1 << 6);
+      semPost(sem_id, ROBOTACCULATORS);
       sendIntByWifi(valueLeds);
     }
-    else if (strcmp(recvdata, "ledK\n") == 0) {
+    else if (strcmp(command, "ledK") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Led kinect sync.");
-      RobotAcculators robotAcculators = getRobotAcculators();
       int valueLeds = 0;
+      semWait(sem_id, ROBOTACCULATORS);
       if (robotAcculators.ledKinect == LEDKINECT_RED) valueLeds = (1 << 1);
       else if (robotAcculators.ledKinect == LEDKINECT_GREEN) valueLeds = (1 << 2);
       else if (robotAcculators.ledKinect == LEDKINECT_ORANGE) valueLeds = (1 << 3);
       else if (robotAcculators.ledKinect == LEDKINECT_BLINK_RED_ORANGE) valueLeds += (1 << 4);
       else if (robotAcculators.ledKinect == LEDKINECT_BLINK_GREEN) valueLeds = (1 << 5);
       else if (robotAcculators.ledKinect == LEDKINECT_BLINK_ORANGE) valueLeds = (1 << 6);
+      semPost(sem_id, ROBOTACCULATORS);
       sendIntByWifi(valueLeds);
     }
     sleep(0.005);
@@ -1567,6 +1556,11 @@ void *syncLeds(bool checkChange) {
   semPost(sem_id, ROBOTACCULATORS);
   if (!checkChange) {
     setLeds(LedUp, LedMiddle, LedDown);
+    semWait(sem_id, ROBOTACCULATORS_LAST);
+    robotAcculatorsLast.leds.LedUp = LedUp;
+    robotAcculatorsLast.leds.LedMiddle = LedMiddle;
+    robotAcculatorsLast.leds.LedDown = LedDown;
+    semPost(sem_id, ROBOTACCULATORS_LAST);
   }
   else {
     semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -1576,6 +1570,11 @@ void *syncLeds(bool checkChange) {
     semPost(sem_id, ROBOTACCULATORS_LAST);
     if (LedUp != LedUpLast || LedMiddle != LedMiddleLast || LedDown != LedDownLast) {
       setLeds(LedUp, LedMiddle, LedDown);
+      semWait(sem_id, ROBOTACCULATORS_LAST);
+      robotAcculatorsLast.leds.LedUp = LedUp;
+      robotAcculatorsLast.leds.LedMiddle = LedMiddle;
+      robotAcculatorsLast.leds.LedDown = LedDown;
+      semPost(sem_id, ROBOTACCULATORS_LAST);
       LOGInfo(NUCLEO_TAG, 1, "Change leds sync.");
     }
   }
@@ -1591,6 +1590,10 @@ void *syncMotors(bool checkChange) {
   semPost(sem_id, ROBOTACCULATORS);
   if (!checkChange) {
     setMove(robotDirection, robotSpeed );
+    semWait(sem_id, ROBOTACCULATORS_LAST);
+    robotAcculatorsLast.robotDirection = robotDirection;
+    robotAcculatorsLast.robotSpeed = robotSpeed;
+    semPost(sem_id, ROBOTACCULATORS_LAST);
   }
   else {
     semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -1599,6 +1602,10 @@ void *syncMotors(bool checkChange) {
     semPost(sem_id, ROBOTACCULATORS_LAST);
     if (robotDirection != robotDirectionLast || robotSpeed != robotSpeedLast) {
       setMove(robotDirection, robotSpeed );
+      semWait(sem_id, ROBOTACCULATORS_LAST);
+      robotAcculatorsLast.robotDirection = robotDirection;
+      robotAcculatorsLast.robotSpeed = robotSpeed;
+      semPost(sem_id, ROBOTACCULATORS_LAST);
       LOGInfo(NUCLEO_TAG, 0, "Change motors sync.");
     }
   }
@@ -2122,6 +2129,9 @@ void *syncKinectMotor(bool checkChange) {
     if (rc != XN_STATUS_OK) {
       LOGError(KINECT_TAG, xnGetStatusString(rc) );
     }
+    semWait(sem_id, ROBOTACCULATORS_LAST);
+    robotAcculatorsLast.kinect.roll = angle;
+    semPost(sem_id, ROBOTACCULATORS_LAST);
   }
   else {
     semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -2139,6 +2149,11 @@ void *syncKinectMotor(bool checkChange) {
       if (rc != XN_STATUS_OK) {
         LOGError(KINECT_TAG, xnGetStatusString(rc) );
       }
+
+      semWait(sem_id, ROBOTACCULATORS_LAST);
+      robotAcculatorsLast.kinect.roll = angle;
+      semPost(sem_id, ROBOTACCULATORS_LAST);
+
       LOGInfo(KINECT_TAG, 0, "Change motor sync.");
     }
   }
@@ -2167,6 +2182,9 @@ void *syncKinectLed(bool checkChange) {
     if (rc != XN_STATUS_OK) {
       LOGError(KINECT_TAG, xnGetStatusString(rc) );
     }
+    semWait(sem_id, ROBOTACCULATORS_LAST);
+    robotAcculatorsLast.ledKinect = led;
+    semPost(sem_id, ROBOTACCULATORS_LAST);
   }
   else {
     semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -2184,6 +2202,9 @@ void *syncKinectLed(bool checkChange) {
       if (rc != XN_STATUS_OK) {
         LOGError(KINECT_TAG, xnGetStatusString(rc) );
       }
+      semWait(sem_id, ROBOTACCULATORS_LAST);
+      robotAcculatorsLast.ledKinect = led;
+      semPost(sem_id, ROBOTACCULATORS_LAST);
       LOGInfo(KINECT_TAG, 0, "Change led sync.");
     }
   }
@@ -2291,14 +2312,6 @@ void *syncModules(void *arg) {
     }
     threadIndex++;
     usleep(SYNC_MIN_TIME / NUMBER_OF_MODULES);
-#endif
-
-#if (ENABLE_MOTORS+ENABLE_KINECTMOTOR+ENABLE_LEDS+ENABLE_KINECTLED) > 0
-    semWait(sem_id, ROBOTACCULATORS);
-    semWait(sem_id, ROBOTACCULATORS_LAST);
-    memcpy(&robotAcculatorsLast, &robotAcculators, sizeof(RobotAcculators));
-    semPost(sem_id, ROBOTACCULATORS_LAST);
-    semPost(sem_id, ROBOTACCULATORS);
 #endif
 
 //sensors
