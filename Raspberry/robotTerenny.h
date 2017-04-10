@@ -28,6 +28,7 @@
 #include <sys/sem.h>
 #include <XnCppWrapper.h>
 #include <XnUSB.h>
+#include <limits.h>
 
 using namespace std;
 using namespace cv;
@@ -43,47 +44,61 @@ extern "C" {
 #define STM32_ADDRESS   (0x11)
 #define I2C_WRITE_TIMEOUT 10        //pocet kolkokrat ma opakovat zapis pri zlyhani
 
-#define SENSORS_WIFI 0
+#define SENSORS_WIFI 1
 #define SENSORS_PORT 1213
 
 #define SYNC_MIN_TIME 1000 // 1 ms
+//sensors
 #define SYNC_POSSITION_TIME         SYNC_MIN_TIME*50
-#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
 #define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*50
-#define SYNC_LEDS_TIME              SYNC_MIN_TIME*300
-#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*100
-#define SYNC_MAP_GENERATE_TIME      SYNC_MIN_TIME*100
-#define SYNC_OPERATOR_DETECT_TIME      SYNC_MIN_TIME*100
+#define SYNC_KINECTSENSORS_TIME     SYNC_MIN_TIME*50
+#define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*50
+#define SYNC_VOLTAGE_TIME           SYNC_MIN_TIME*1000
+//acculators
+#define SYNC_KINECTMOTOR_TIME       SYNC_MIN_TIME*100
+#define SYNC_LEDS_TIME              SYNC_MIN_TIME*2000
+#define SYNC_KINECTLED_TIME         SYNC_MIN_TIME*2000
+#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
+
+
+#define SYNC_MAP_GENERATE_TIME      0.3 //v sekundach
+#define SYNC_OPERATOR_DETECT_TIME   0.3
 
 #define ENABLE_I2C 1        //ok
 #define ENABLE_MOTORS 0    //ok
 #define ENABLE_ULTRASONIC 0 //ok
-#define ENABLE_LEDS 0      //ok
-#define ENABLE_BUTTONS 0    //ok
+#define ENABLE_LEDS 1     //ok
+#define ENABLE_BUTTONS 1    //ok
 #define ENABLE_POSSITION 1  //ok
 #define ENABLE_MAP_GENERATE 1
 #define ENABLE_MAP_OBLIVION 1
 #define ENABLE_OPERATOR_DETECT 1
-
-#define OPERATOR_WITH_DEPTH 1
-
-#define SPEED_OF_MAP_OBLIVION 5
-#define SPEED_OF_MAP_CREATION 10
-#define MIN_BARRIER_HEIGHT 0.03 //[m]
-#define MAX_BARRIER_HEIGHT 0.5 //[m]
-#define MAP_WIDTH 640
-#define MAP_HEIGHT 480
-#define MAP_SCALE 100 //default [m]*MAP_SCALE
-#define MAX_DELTA_TRANSLATE 100 //depents on MAP_SCALE
-
-#define SYNC_KINECTMOTOR_TIME     SYNC_MIN_TIME*20
-#define SYNC_KINECTLED_TIME       SYNC_MIN_TIME*1000
-#define SYNC_KINECTSENSORS_TIME   SYNC_MIN_TIME*20
-
 #define ENABLE_KINECTMOTOR 1
 #define ENABLE_KINECTLED 1
 #define ENABLE_KINECTSENSORS 1
 #define ENABLE_KINECTCAMERA 1
+#define ENABLE_VOLTAGE 1
+
+#define NUMBER_OF_MODULES (ENABLE_I2C+ENABLE_MOTORS+ENABLE_ULTRASONIC+ENABLE_LEDS+ENABLE_BUTTONS+ENABLE_POSSITION+ENABLE_KINECTCAMERA+ENABLE_KINECTSENSORS+ENABLE_KINECTLED+ENABLE_VOLTAGE)
+
+#define OPERATOR_WITH_DEPTH 0
+#define OPERATOR_STATUS_KINECT_LED 1
+#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 5
+#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 80
+#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 5
+#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 80
+#define OPERATOR_MIN_AREA_ORANGE 300
+#define OPERATOR_MIN_AREA_GREEN 300
+#define OPERATOR_MIN_AREA_DEPTH (OPERATOR_MIN_AREA_ORANGE+OPERATOR_MIN_AREA_GREEN)
+
+#define SPEED_OF_MAP_OBLIVION 5
+#define SPEED_OF_MAP_CREATION 10
+#define MIN_BARRIER_HEIGHT 0.03 //[m]
+#define MAX_BARRIER_HEIGHT 1.2 //[m]
+#define MAP_WIDTH 640
+#define MAP_HEIGHT 480
+#define MAP_SCALE 100 //default [m]*MAP_SCALE
+#define MAX_DELTA_TRANSLATE 100 //depents on MAP_SCALE
 
 #define CAMERA_WIFI  1
 #define CAMERA_PORT  1212
@@ -100,6 +115,11 @@ extern "C" {
 
 #define VID_MICROSOFT 0x45e
 #define PID_NUI_MOTOR 0x02b0
+
+#define VOLTAGE_MIN 19.5
+#define VOLTAGE_MAX 25.2
+#define K_VOLTAGE (100/(VOLTAGE_MAX-VOLTAGE_MIN))
+#define Q_VOLTAGE (-VOLTAGE_MIN*K_VOLTAGE) 
 
 typedef enum {
   CAMERA_VARIABLE_L,
@@ -119,6 +139,7 @@ typedef enum {
   CAMERA_POINTCLOUDMAP_KINECT2,
   ROBOTSENSORS,
   ROBOTACCULATORS,
+  ROBOTACCULATORS_LAST,
   MAP_VARIABLE,
   MAP_IMAGE1,
   MAP_IMAGE2,
@@ -201,7 +222,7 @@ typedef enum {
 } position3_t;
 //--------------------------------------------
 
-struct Axis_struct {
+struct Axis3d_struct {
   double x;
   double y;
   double z;
@@ -226,7 +247,7 @@ struct Leds_struct {
 };
 
 struct RobotPosition_struct {
-  Axis_struct axisPossition;
+  Axis3d_struct axisPossition;
   Angle3d_struct anglePossition;
 };
 
@@ -237,7 +258,7 @@ struct Voltage_struct {
 
 struct KinectSensor_struct {
   Angle3d_struct accAngle;
-  Axis_struct accAxis;
+  Axis3d_struct accAxis;
   motorStatusKinect_t motorStatus;
 };
 
@@ -245,6 +266,7 @@ struct RobotSensors {                 //struktura pre snimace aktualizovane s ca
   KinectSensor_struct   kinect;         //kinect
   Buttons_struct        buttons;             //tlacidla
   RobotPosition_struct  robotPosition; //prepocitana pozicia
+  Voltage_struct voltage;
   double ultrasonic;
 
 };
@@ -258,19 +280,23 @@ struct RobotAcculators {              //struktura pre riadiace veliciny s casom 
   bool            motorPowerSupply;
 };
 
+//loger function
 void charTag(log_tag_t tag, char *buffer);
 void LOGError(log_tag_t tag, const char text[]);
 void LOGInfo(log_tag_t tag, unsigned char priority, const char text[]);
 
+//semafor function
 int semInit(int sem_id, int sem_num, int val);
 int semCreate(key_t key, int poc);
 int semWait(int sem_id, semafor_name_t sem_num);
 int semPost(int sem_id, semafor_name_t sem_num);
 void semRem(int sem_id);
 
+//init and deinit function for full robot
 void initRobot(void);
 void closeRobot(void);
 
+//i2c communication
 bool initI2C(void);
 void closeI2C(void);
 char setDevice(unsigned char addr);
@@ -283,59 +309,74 @@ signed int readRegister16s(unsigned char addr, unsigned char reg);
 signed long readRegister32s(unsigned char addr, unsigned char reg);
 unsigned char readRegister8(unsigned char addr, unsigned char reg);
 
+//kinect and operator images
 bool initKinect(unsigned char imageMode);
-
+Mat getMapImage(void);
 Mat getImageKinect(void);
+Mat getRGBOperator(void);
+Mat getDepthOperatorMask(void);
+Mat getOrangeOperatorMask(void);
+Mat getGreenOperatorMask(void);
+Mat getHSVOperator(void);
 Mat getDepthKinect(void);
+Mat getPointCloudMapKinect(void);
 Mat getImageLeft(void);
-
 Mat getImageRight(void);
 
+//main struct with input and output data
 RobotAcculators getRobotAcculators(void);
 void setRobotAcculators(RobotAcculators temp);
 RobotSensors getRobotSensors(void);
+RobotPosition_struct getRobotPossition(void);
 
-void sendMatImage(Mat img, int quality);
-void closeCameraConnection(void);
-void closeSensorConnection(void);
-
+//setter and getter values by i2c and another communication
 void initMotorPowerSupply(void);
 void setMotorPowerSupply(bool state);
 void closeMotorPowerSupply(void);
-
 bool nucleoTestConnection(void);
 char motorsTestConnection(void);
-
 void setServo(int angle);
 void setMove(direction_t direction, unsigned int speed);
 void setLeds(color_t ledUpColor, color_t ledMiddleColor, color_t ledDownColor);
 unsigned int getUltrasonicRaw(void);
 double getUltrasonic(void);
 unsigned char getButtons(void);
-Axis_struct getPossitionAxis(void);
+Axis3d_struct getPossitionAxis(void);
 Angle3d_struct getPossitionAngle3d(void);
 
-void *waitForCameraConnection(void *arg);
-void *waitForSensorConnection(void *arg);
+void sendDoubleByWifi(double value);
+void sendIntByWifi(int value);
 
+//synchronization information function
 void *syncImageLeft(void *arg);
 void *syncImageRight(void *arg);
 void *syncCameraNetworkConnection(void *arg);
 void *syncSensorNetworkConnection(void *arg);
 void *syncKinectFrames(void *arg);
 void *syncUltrasonic(void *arg);
-void *syncLeds(void *arg);
-void *syncMotors(void *arg);
+void *syncLeds(bool checkChange);
+void *syncMotors(bool checkChange);
 void *syncPossition(void *arg);
 void *syncButtons(void *arg);
-void *syncKinectMotor(void *arg);
-void *syncKinectLed(void *arg);
+void *syncGenerateMap(void *arg);
+void *syncOperatorDetect(void *arg);
+void *syncKinectMotor(bool checkChange);
+void *syncKinectLed(bool checkChange);
 void *syncKinectSensors(void *arg);
 void *syncModules(void *arg);
 
+//waiting function
+void *readKey(void*);
+void *waitForCameraConnection(void *arg);
+void *waitForSensorConnection(void *arg);
+void closeCameraConnection(void);
+void closeSensorConnection(void);
+
+//other function
+void sendMatImageByWifi(Mat img, int quality);
+Mat translateImg(Mat &img, int offsetx, int offsety);
 void sigctrl(int param);
 void sigpipe(int param);
-
 double dist(double a, double b);
 double rad2Deg(double angle);
 double deg2Rad(double angle);
