@@ -71,7 +71,7 @@ public class zaplavovy extends javax.swing.JFrame {
         jLabel4 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("Skúška záplavového algoritmu");
+        setTitle("Záplavový algoritmus");
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -392,14 +392,21 @@ public class zaplavovy extends javax.swing.JFrame {
             aktualneOhodnotenie = 1;
             zaplavovyAlgoritmus();
             List<Bod> bodyCesty = najdiCestu();
-            while (prejdiBody.size() > 0) {
-                prejdiBody.remove(0);
-            }
-            while (modelBody.getRowCount() > 0) {
-                modelBody.removeRow(0);
-            }
-            for (int i = 0; i < bodyCesty.size(); i++) {
-                modelBody.addRow(new String[]{String.valueOf(bodyCesty.get(i).getX()), String.valueOf(bodyCesty.get(i).getY())});
+            if (bodyCesty != null) {
+                while (prejdiBody.size() > 0) {
+                    prejdiBody.remove(0);
+                }
+                while (modelBody.getRowCount() > 0) {
+                    modelBody.removeRow(0);
+                }
+                for (int i = 0; i < bodyCesty.size(); i++) {
+                    modelBody.addRow(new String[]{String.valueOf(bodyCesty.get(i).getX()), String.valueOf(bodyCesty.get(i).getY())});
+                    if (!getValueOnMap(bodyCesty.get(i)).contains(startString) && !getValueOnMap(bodyCesty.get(i)).contains(finishString)) {
+                        setChangeDirectionOnMap(bodyCesty.get(i));
+                    }
+                }
+            } else {
+                throw new Exception("Nie je možné sa dostať do cieľa.");
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, e);
@@ -460,6 +467,12 @@ public class zaplavovy extends javax.swing.JFrame {
                 }
             }
         }
+        if (startBod == null) {
+            throw new Exception("Prosím definujte štart.");
+        }
+        if (finishBod == null) {
+            throw new Exception("Prosím definujte cieľ.");
+        }
     }
 
     void vymazMapu() {
@@ -491,51 +504,47 @@ public class zaplavovy extends javax.swing.JFrame {
         int y = bod.getBod().getY();
         int nasledujuceOhodnotenie = bod.getOhodnotenie() + 1;
         int t = Integer.parseInt(vzdialenostOdCiela.getText());
-        isAtFinish = (Math.pow(bod.getBod().getX() - finishBod.getX(), 2) + Math.pow(bod.getBod().getY() - finishBod.getY(), 2)) <= t;
-        if (!isAtFinish) {
-            for (int i = 0; i < 8; i++) {
-                switch (i) {
-                    case 0:
-                        bodNaPrejdenie = new BodSOhodnotenim(x - 1, y, nasledujuceOhodnotenie);
-                        break;
-                    case 1:
-                        bodNaPrejdenie = new BodSOhodnotenim(x, y - 1, nasledujuceOhodnotenie);
-                        break;
-                    case 2:
-                        bodNaPrejdenie = new BodSOhodnotenim(x + 1, y, nasledujuceOhodnotenie);
-                        break;
-                    case 3:
-                        bodNaPrejdenie = new BodSOhodnotenim(x, y + 1, nasledujuceOhodnotenie);
-                        break;
-                    case 4:
-                        bodNaPrejdenie = new BodSOhodnotenim(x - 1, y - 1, nasledujuceOhodnotenie);
-                        break;
-                    case 5:
-                        bodNaPrejdenie = new BodSOhodnotenim(x + 1, y + 1, nasledujuceOhodnotenie);
-                        break;
-                    case 6:
-                        bodNaPrejdenie = new BodSOhodnotenim(x + 1, y - 1, nasledujuceOhodnotenie);
-                        break;
-                    case 7:
-                        bodNaPrejdenie = new BodSOhodnotenim(x - 1, y + 1, nasledujuceOhodnotenie);
-                        break;
-                    default:
-                        JOptionPane.showMessageDialog(null, "Chybne definovana susednost");
-                }
-                if (isBodMoznaCesta(bodNaPrejdenie.getBod())) {
-                    if (rozsirovanie) {
-                        setExtendedBarrierOnMap(bodNaPrejdenie.getBod());
-                    } else {
-                        //isAtFinish = bodNaPrejdenie.getBod().getX() == finishBod.getX() && bodNaPrejdenie.getBod().getY() == finishBod.getY();
-
-                        isAtFinish = (Math.pow(bodNaPrejdenie.getBod().getX() - finishBod.getX(), 2) + Math.pow(bodNaPrejdenie.getBod().getY() - finishBod.getY(), 2)) <= t;
-
-                        if (!isAtFinish) {
+        for (int i = 0; i < 8; i++) {
+            switch (i) {
+                case 0:
+                    bodNaPrejdenie = new BodSOhodnotenim(x - 1, y, nasledujuceOhodnotenie);
+                    break;
+                case 1:
+                    bodNaPrejdenie = new BodSOhodnotenim(x, y - 1, nasledujuceOhodnotenie);
+                    break;
+                case 2:
+                    bodNaPrejdenie = new BodSOhodnotenim(x + 1, y, nasledujuceOhodnotenie);
+                    break;
+                case 3:
+                    bodNaPrejdenie = new BodSOhodnotenim(x, y + 1, nasledujuceOhodnotenie);
+                    break;
+                case 4:
+                    bodNaPrejdenie = new BodSOhodnotenim(x - 1, y - 1, nasledujuceOhodnotenie);
+                    break;
+                case 5:
+                    bodNaPrejdenie = new BodSOhodnotenim(x + 1, y + 1, nasledujuceOhodnotenie);
+                    break;
+                case 6:
+                    bodNaPrejdenie = new BodSOhodnotenim(x + 1, y - 1, nasledujuceOhodnotenie);
+                    break;
+                case 7:
+                    bodNaPrejdenie = new BodSOhodnotenim(x - 1, y + 1, nasledujuceOhodnotenie);
+                    break;
+                default:
+                    JOptionPane.showMessageDialog(null, "Chybne definovana susednost");
+            }
+            if (isBodMoznaCesta(bodNaPrejdenie.getBod())) {
+                if (rozsirovanie) {
+                    setExtendedBarrierOnMap(bodNaPrejdenie.getBod());
+                } else {
+                    isAtFinish = Math.sqrt(Math.pow(bodNaPrejdenie.getBod().getX() - finishBod.getX(), 2) + Math.pow(bodNaPrejdenie.getBod().getY() - finishBod.getY(), 2)) == t;
+                    if (!isAtFinish) {
+                        if (!bodNaPrejdenie.getBod().equals(finishBod) && !bodNaPrejdenie.getBod().equals(startBod)) {
                             setValueOnMap(bodNaPrejdenie);
-                            prejdiBody.add(bodNaPrejdenie);
-                        } else {
-                            koncovyBod = bodNaPrejdenie.getBod();
                         }
+                        prejdiBody.add(bodNaPrejdenie);
+                    } else {
+                        koncovyBod = bodNaPrejdenie.getBod();
                     }
                 }
             }
@@ -557,6 +566,14 @@ public class zaplavovy extends javax.swing.JFrame {
 
     void setExtendedBarrierOnMap(Bod bod) {
         model.setValueAt(extendBarrierString, bod.getY(), bod.getX());
+    }
+
+    void setChangeDirectionOnMap(Bod bod) {
+        model.setValueAt(cornerString, bod.getY(), bod.getX());
+    }
+
+    void setWayOnMap(Bod bod) {
+        model.setValueAt(wayString, bod.getY(), bod.getX());
     }
 
     boolean isNumber(String string) {
@@ -765,31 +782,33 @@ public class zaplavovy extends javax.swing.JFrame {
             moznyPosun = false;
             for (int smer = 1; smer <= 8; smer++) {
                 Bod offsetBodu = posunBoduPodlaPriority(smer, poziciaCieluVociStartu);
-                int x = oznacenyBod.getBod().getX() + offsetBodu.getX();
-                int y = oznacenyBod.getBod().getY() + offsetBodu.getY();
-                if (isHodnotyZaplavovy(new Bod(x, y)) && Integer.parseInt(model.getValueAt(y, x).toString()) == oznacenyBod.getOhodnotenie()) {
+                Bod moznyNasledujuciBod = new Bod(oznacenyBod.getBod().getX() + offsetBodu.getX(), oznacenyBod.getBod().getY() + offsetBodu.getY());
+                if (isHodnotyZaplavovy(moznyNasledujuciBod) && Integer.parseInt(getValueOnMap(moznyNasledujuciBod)) == oznacenyBod.getOhodnotenie()) {
                     if (smer != lastSmer && lastSmer != -1) {
                         if (!predchadzajuci.getBod().equals(koncovyBod)) {
-                            model.setValueAt(cornerString, predchadzajuci.getBod().getY(), predchadzajuci.getBod().getX());
                             bodyCestyList.add(predchadzajuci.getBod().clone());
                         }
                     }
                     lastSmer = smer;
                     predchadzajuci = oznacenyBod;
-                    oznacenyBod.setBod(new Bod(x, y));
-                    oznacenyBod.setOhodnotenie(Integer.parseInt(model.getValueAt(y, x).toString()) - 1);
-                    model.setValueAt(wayString, oznacenyBod.getBod().getY(), oznacenyBod.getBod().getX());
+                    oznacenyBod.setBod(moznyNasledujuciBod);
+                    oznacenyBod.setOhodnotenie(Integer.parseInt(getValueOnMap(moznyNasledujuciBod)) - 1);
+                    setWayOnMap(oznacenyBod.getBod());
                     moznyPosun = true;
                     break;
                 }
             }
         }
-        bodyCestyZoradeneList.add(startBod);
-        for (int i = bodyCestyList.size() - 1; i >= 0; i--) {
-            bodyCestyZoradeneList.add(bodyCestyList.get(i));
+        if (moznyPosun) {
+            bodyCestyZoradeneList.add(startBod);
+            for (int i = bodyCestyList.size() - 1; i >= 0; i--) {
+                bodyCestyZoradeneList.add(bodyCestyList.get(i));
+            }
+            bodyCestyZoradeneList.add(koncovyBod);
+            return bodyCestyZoradeneList;
+        } else {
+            return null;
         }
-        bodyCestyZoradeneList.add(koncovyBod);
-        return bodyCestyZoradeneList;
     }
 
     void zaplavovyAlgoritmus() {
