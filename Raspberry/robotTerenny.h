@@ -70,6 +70,7 @@ extern "C" {
 #define ENABLE_LEDS 1     //ok
 #define ENABLE_BUTTONS 1    //ok
 #define ENABLE_POSSITION 1  //ok
+#define ENABLE_JORNEY_GENERATE 1
 #define ENABLE_MAP_GENERATE 1
 #define ENABLE_MAP_OBLIVION 1
 #define ENABLE_OPERATOR_DETECT 1
@@ -81,24 +82,25 @@ extern "C" {
 
 #define NUMBER_OF_MODULES (ENABLE_I2C+ENABLE_MOTORS+ENABLE_ULTRASONIC+ENABLE_LEDS+ENABLE_BUTTONS+ENABLE_POSSITION+ENABLE_KINECTCAMERA+ENABLE_KINECTSENSORS+ENABLE_KINECTLED+ENABLE_VOLTAGE)
 
-#define OPERATOR_WITH_DEPTH 1
 #define OPERATOR_STATUS_KINECT_LED 1
-#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 5
-#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 80
-#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 5
-#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 80
+#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 0
+#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_X 20
+#define OPERATOR_MINCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 0
+#define OPERATOR_MAXCENTER_DISTANCE_ORANGE_AND_GREEN_MASK_Y 100
 #define OPERATOR_MIN_AREA_ORANGE 300
 #define OPERATOR_MIN_AREA_GREEN 300
-#define OPERATOR_MIN_AREA_DEPTH (OPERATOR_MIN_AREA_ORANGE+OPERATOR_MIN_AREA_GREEN)
+#define OPERATOR_MIN_AREA_DEPTH 300
 
 #define SPEED_OF_MAP_OBLIVION 5
 #define SPEED_OF_MAP_CREATION 10
 #define MIN_BARRIER_HEIGHT 0.03 //[m]
 #define MAX_BARRIER_HEIGHT 1.2 //[m]
-#define MAP_WIDTH 640
-#define MAP_HEIGHT 480
-#define MAP_SCALE 100 //default [m]*MAP_SCALE
-#define MAX_DELTA_TRANSLATE 100 //depents on MAP_SCALE
+#define MAP_WIDTH 200
+#define MAP_HEIGHT 200
+#define MAP_SCALE 0.05 //default [mm]
+#define MAX_DELTA_TRANSLATE 100 //[mm]
+#define MAP_DISTANCE_FROM_OPERATOR 500
+
 
 #define CAMERA_WIFI  1
 #define CAMERA_PORT  1212
@@ -119,7 +121,16 @@ extern "C" {
 #define VOLTAGE_MIN 19.5
 #define VOLTAGE_MAX 25.2
 #define K_VOLTAGE (100/(VOLTAGE_MAX-VOLTAGE_MIN))
-#define Q_VOLTAGE (-VOLTAGE_MIN*K_VOLTAGE) 
+#define Q_VOLTAGE (-VOLTAGE_MIN*K_VOLTAGE)
+
+const Point sipkaHore = Point(0, -1);
+const Point sipkaDole = Point(0, +1);
+const Point sipkaVlavo = Point(-1, 0);
+const Point sipkaVpravo = Point(+1, 0);
+const Point sipkaVpravoHore = Point(+1, -1);
+const Point sipkaVpravoDole = Point(+1, +1);
+const Point sipkaVlavoHore = Point(-1, -1);
+const Point sipkaVlavoDole =  Point(-1, +1);
 
 typedef enum {
   CAMERA_VARIABLE_L,
@@ -307,11 +318,11 @@ unsigned char readRegister8(unsigned char addr, unsigned char reg);
 bool initKinect(unsigned char imageMode);
 int pauseGrabKinect();
 void continueGrabKinect();
-Mat getRGBKinect(int index=-1);
-Mat getDepthScaledKinect(int index=-1);
-Mat getDepthKinect(int index=-1);
-Mat getDepthValidKinect(int index=-1);
-Mat getPointCloudMapKinect(int index=-1);
+Mat getRGBKinect(int index = -1);
+Mat getDepthScaledKinect(int index = -1);
+Mat getDepthKinect(int index = -1);
+Mat getDepthValidKinect(int index = -1);
+Mat getPointCloudMapKinect(int index = -1);
 
 Mat getMapImage(void);
 Mat getRGBOperator(void);
@@ -363,6 +374,7 @@ void *syncKinectMotor(bool checkChange);
 void *syncKinectLed(bool checkChange);
 void *syncKinectSensors(void *arg);
 void *syncModules(void *arg);
+void *syncGenerateJorney(void *arg);
 
 //waiting function
 void *readKey(void*);
