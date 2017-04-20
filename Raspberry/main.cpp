@@ -23,8 +23,10 @@ int main(void) {
     RobotAcculators robotAcculators = getRobotAcculators();
     //RobotSensors robotSensors = getRobotSensors();
     robotAcculators.kinect.roll = 20;
-    robotAcculators.ledKinect = LEDKINECT_RED;
+    //robotAcculators.leds.LedMiddle = COLOR_ORANGE;
+    //robotAcculators.ledKinect = LEDKINECT_RED;
     setRobotAcculators(robotAcculators);
+    //printf("%f;%f\n",robotSensors.voltage.volts ,robotSensors.voltage.capacityPercent);*/
     /*   robotAcculators.robotDirection = FORWARD;
        if (robotSensors.buttons.buttonUp)
          robotAcculators.robotSpeed = 300;
