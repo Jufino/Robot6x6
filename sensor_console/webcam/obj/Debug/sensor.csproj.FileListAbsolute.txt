@@ -5,3 +5,4 @@ C:\Users\Juraj\Documents\GitHub\Robot6x6\sensor_console\webcam\obj\Debug\webcam.
 C:\Users\Juraj\Documents\GitHub\Robot6x6\sensor_console\webcam\obj\Debug\sensor.csproj.GenerateResource.Cache
 C:\Users\Juraj\Documents\GitHub\Robot6x6\sensor_console\webcam\obj\Debug\webcam.exe
 C:\Users\Juraj\Documents\GitHub\Robot6x6\sensor_console\webcam\obj\Debug\webcam.pdb
+C:\Users\Juraj\Documents\GitHub\Robot6x6\sensor_console\webcam\obj\Debug\sensor.csprojResolveAssemblyReference.cache

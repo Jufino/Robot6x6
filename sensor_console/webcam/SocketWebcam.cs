@@ -139,10 +139,16 @@ public class SocketWebcam
 
     public String recv_data(String command)
     {
-        SendString(command+"\n");
-        String pocet = ReceiveASCII(20);
-        int sizeFromSystem = Convert.ToInt32(pocet);
-        return ReceiveASCII(sizeFromSystem);
+        try
+        {
+            SendString(command + "\n");
+            String pocet = ReceiveASCII(20);
+            int sizeFromSystem = Convert.ToInt32(pocet);
+            return ReceiveASCII(sizeFromSystem);
+        }
+        catch {
+            return "0";
+        }
     }
 
     public Bitmap recv_picture(String command)
