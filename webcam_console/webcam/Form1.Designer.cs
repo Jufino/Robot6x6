@@ -34,7 +34,6 @@
             this.pictureBox4 = new System.Windows.Forms.PictureBox();
             this.pictureBox6 = new System.Windows.Forms.PictureBox();
             this.pictureBox7 = new System.Windows.Forms.PictureBox();
-            this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.maxGreenV = new System.Windows.Forms.NumericUpDown();
             this.maxGreenS = new System.Windows.Forms.NumericUpDown();
@@ -75,12 +74,18 @@
             this.label16 = new System.Windows.Forms.Label();
             this.erodeO = new System.Windows.Forms.NumericUpDown();
             this.dilateO = new System.Windows.Forms.NumericUpDown();
+            this.groupBox9 = new System.Windows.Forms.GroupBox();
+            this.groupBox10 = new System.Windows.Forms.GroupBox();
+            this.groupBox11 = new System.Windows.Forms.GroupBox();
+            this.groupBox12 = new System.Windows.Forms.GroupBox();
+            this.groupBox13 = new System.Windows.Forms.GroupBox();
+            this.groupBox14 = new System.Windows.Forms.GroupBox();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox6)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox7)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.maxGreenV)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.maxGreenS)).BeginInit();
@@ -105,13 +110,20 @@
             this.groupBox8.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.erodeO)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dilateO)).BeginInit();
+            this.groupBox9.SuspendLayout();
+            this.groupBox10.SuspendLayout();
+            this.groupBox11.SuspendLayout();
+            this.groupBox12.SuspendLayout();
+            this.groupBox13.SuspendLayout();
+            this.groupBox14.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
             // button1
             // 
             this.button1.Location = new System.Drawing.Point(13, 13);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(1253, 23);
+            this.button1.Size = new System.Drawing.Size(1302, 23);
             this.button1.TabIndex = 0;
             this.button1.Text = "Open connection";
             this.button1.UseVisualStyleBackColor = true;
@@ -119,7 +131,7 @@
             // 
             // pictureBox2
             // 
-            this.pictureBox2.Location = new System.Drawing.Point(340, 43);
+            this.pictureBox2.Location = new System.Drawing.Point(6, 19);
             this.pictureBox2.Name = "pictureBox2";
             this.pictureBox2.Size = new System.Drawing.Size(320, 240);
             this.pictureBox2.TabIndex = 2;
@@ -127,15 +139,15 @@
             // 
             // pictureBox3
             // 
-            this.pictureBox3.Location = new System.Drawing.Point(24, 291);
+            this.pictureBox3.Location = new System.Drawing.Point(6, 19);
             this.pictureBox3.Name = "pictureBox3";
-            this.pictureBox3.Size = new System.Drawing.Size(300, 300);
+            this.pictureBox3.Size = new System.Drawing.Size(500, 500);
             this.pictureBox3.TabIndex = 3;
             this.pictureBox3.TabStop = false;
             // 
             // pictureBox4
             // 
-            this.pictureBox4.Location = new System.Drawing.Point(13, 42);
+            this.pictureBox4.Location = new System.Drawing.Point(6, 19);
             this.pictureBox4.Name = "pictureBox4";
             this.pictureBox4.Size = new System.Drawing.Size(320, 240);
             this.pictureBox4.TabIndex = 4;
@@ -143,7 +155,7 @@
             // 
             // pictureBox6
             // 
-            this.pictureBox6.Location = new System.Drawing.Point(666, 291);
+            this.pictureBox6.Location = new System.Drawing.Point(7, 19);
             this.pictureBox6.Name = "pictureBox6";
             this.pictureBox6.Size = new System.Drawing.Size(320, 240);
             this.pictureBox6.TabIndex = 6;
@@ -151,28 +163,20 @@
             // 
             // pictureBox7
             // 
-            this.pictureBox7.Location = new System.Drawing.Point(666, 43);
+            this.pictureBox7.Location = new System.Drawing.Point(6, 19);
             this.pictureBox7.Name = "pictureBox7";
             this.pictureBox7.Size = new System.Drawing.Size(320, 240);
             this.pictureBox7.TabIndex = 6;
             this.pictureBox7.TabStop = false;
-            // 
-            // pictureBox1
-            // 
-            this.pictureBox1.Location = new System.Drawing.Point(339, 290);
-            this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(321, 240);
-            this.pictureBox1.TabIndex = 7;
-            this.pictureBox1.TabStop = false;
             // 
             // groupBox1
             // 
             this.groupBox1.Controls.Add(this.groupBox7);
             this.groupBox1.Controls.Add(this.groupBox6);
             this.groupBox1.Controls.Add(this.groupBox5);
-            this.groupBox1.Location = new System.Drawing.Point(992, 291);
+            this.groupBox1.Location = new System.Drawing.Point(333, 19);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(274, 239);
+            this.groupBox1.Size = new System.Drawing.Size(274, 240);
             this.groupBox1.TabIndex = 8;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Green mask parameters";
@@ -284,12 +288,12 @@
             this.groupBox2.Controls.Add(this.groupBox8);
             this.groupBox2.Controls.Add(this.groupBox4);
             this.groupBox2.Controls.Add(this.groupBox3);
-            this.groupBox2.Location = new System.Drawing.Point(992, 44);
+            this.groupBox2.Location = new System.Drawing.Point(332, 19);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(274, 238);
+            this.groupBox2.Size = new System.Drawing.Size(274, 240);
             this.groupBox2.TabIndex = 8;
             this.groupBox2.TabStop = false;
-            this.groupBox2.Text = "Orange mask parameters";
+            this.groupBox2.Text = "Mask parameters";
             // 
             // groupBox4
             // 
@@ -686,19 +690,87 @@
             0,
             0});
             // 
+            // groupBox9
+            // 
+            this.groupBox9.Controls.Add(this.pictureBox4);
+            this.groupBox9.Location = new System.Drawing.Point(697, 42);
+            this.groupBox9.Name = "groupBox9";
+            this.groupBox9.Size = new System.Drawing.Size(337, 268);
+            this.groupBox9.TabIndex = 9;
+            this.groupBox9.TabStop = false;
+            this.groupBox9.Text = "RGB image with operator posstion";
+            // 
+            // groupBox10
+            // 
+            this.groupBox10.Controls.Add(this.pictureBox7);
+            this.groupBox10.Controls.Add(this.groupBox2);
+            this.groupBox10.Location = new System.Drawing.Point(698, 316);
+            this.groupBox10.Name = "groupBox10";
+            this.groupBox10.Size = new System.Drawing.Size(617, 269);
+            this.groupBox10.TabIndex = 10;
+            this.groupBox10.TabStop = false;
+            this.groupBox10.Text = "Orange mask";
+            // 
+            // groupBox11
+            // 
+            this.groupBox11.Controls.Add(this.pictureBox6);
+            this.groupBox11.Controls.Add(this.groupBox1);
+            this.groupBox11.Location = new System.Drawing.Point(698, 591);
+            this.groupBox11.Name = "groupBox11";
+            this.groupBox11.Size = new System.Drawing.Size(617, 269);
+            this.groupBox11.TabIndex = 11;
+            this.groupBox11.TabStop = false;
+            this.groupBox11.Text = "Green mask";
+            // 
+            // groupBox12
+            // 
+            this.groupBox12.Controls.Add(this.pictureBox2);
+            this.groupBox12.Location = new System.Drawing.Point(13, 42);
+            this.groupBox12.Name = "groupBox12";
+            this.groupBox12.Size = new System.Drawing.Size(336, 269);
+            this.groupBox12.TabIndex = 12;
+            this.groupBox12.TabStop = false;
+            this.groupBox12.Text = "Depth image";
+            // 
+            // groupBox13
+            // 
+            this.groupBox13.Controls.Add(this.pictureBox3);
+            this.groupBox13.Location = new System.Drawing.Point(110, 315);
+            this.groupBox13.Name = "groupBox13";
+            this.groupBox13.Size = new System.Drawing.Size(518, 543);
+            this.groupBox13.TabIndex = 13;
+            this.groupBox13.TabStop = false;
+            this.groupBox13.Text = "Map of barrier, robot way";
+            // 
+            // groupBox14
+            // 
+            this.groupBox14.Controls.Add(this.pictureBox1);
+            this.groupBox14.Location = new System.Drawing.Point(355, 42);
+            this.groupBox14.Name = "groupBox14";
+            this.groupBox14.Size = new System.Drawing.Size(336, 269);
+            this.groupBox14.TabIndex = 14;
+            this.groupBox14.TabStop = false;
+            this.groupBox14.Text = "Depth valid mask";
+            // 
+            // pictureBox1
+            // 
+            this.pictureBox1.Location = new System.Drawing.Point(6, 19);
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.Size = new System.Drawing.Size(321, 240);
+            this.pictureBox1.TabIndex = 7;
+            this.pictureBox1.TabStop = false;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1273, 592);
-            this.Controls.Add(this.groupBox2);
-            this.Controls.Add(this.groupBox1);
-            this.Controls.Add(this.pictureBox1);
-            this.Controls.Add(this.pictureBox7);
-            this.Controls.Add(this.pictureBox6);
-            this.Controls.Add(this.pictureBox4);
-            this.Controls.Add(this.pictureBox3);
-            this.Controls.Add(this.pictureBox2);
+            this.ClientSize = new System.Drawing.Size(1611, 870);
+            this.Controls.Add(this.groupBox14);
+            this.Controls.Add(this.groupBox13);
+            this.Controls.Add(this.groupBox12);
+            this.Controls.Add(this.groupBox11);
+            this.Controls.Add(this.groupBox10);
+            this.Controls.Add(this.groupBox9);
             this.Controls.Add(this.button1);
             this.Name = "Form1";
             this.Text = "Camera connection";
@@ -708,7 +780,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox6)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox7)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.groupBox1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.maxGreenV)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.maxGreenS)).EndInit();
@@ -739,6 +810,13 @@
             this.groupBox8.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.erodeO)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dilateO)).EndInit();
+            this.groupBox9.ResumeLayout(false);
+            this.groupBox10.ResumeLayout(false);
+            this.groupBox11.ResumeLayout(false);
+            this.groupBox12.ResumeLayout(false);
+            this.groupBox13.ResumeLayout(false);
+            this.groupBox14.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -751,7 +829,6 @@
         private System.Windows.Forms.PictureBox pictureBox4;
         private System.Windows.Forms.PictureBox pictureBox6;
         private System.Windows.Forms.PictureBox pictureBox7;
-        private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.NumericUpDown maxGreenV;
         private System.Windows.Forms.NumericUpDown maxGreenS;
@@ -792,6 +869,13 @@
         private System.Windows.Forms.Label label16;
         private System.Windows.Forms.NumericUpDown erodeO;
         private System.Windows.Forms.NumericUpDown dilateO;
+        private System.Windows.Forms.GroupBox groupBox9;
+        private System.Windows.Forms.GroupBox groupBox10;
+        private System.Windows.Forms.GroupBox groupBox11;
+        private System.Windows.Forms.GroupBox groupBox12;
+        private System.Windows.Forms.GroupBox groupBox13;
+        private System.Windows.Forms.GroupBox groupBox14;
+        private System.Windows.Forms.PictureBox pictureBox1;
     }
 }
 
