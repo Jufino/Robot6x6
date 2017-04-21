@@ -93,10 +93,12 @@ extern "C" {
 
 #define SPEED_OF_MAP_OBLIVION 5
 #define SPEED_OF_MAP_CREATION 10
-#define MIN_BARRIER_HEIGHT 0.03 //[m]
-#define MAX_BARRIER_HEIGHT 1.2 //[m]
-#define MAP_WIDTH 200
-#define MAP_HEIGHT 200
+#define MIN_BARRIER_CREATION 10
+#define MIN_BARRIER_HEIGHT 0 //[m]
+#define MAX_BARRIER_HEIGHT 10 //[m]
+#define MAP_BARRIER_EXTENDED 180 //[mm]
+#define MAP_WIDTH 300
+#define MAP_HEIGHT 300
 #define MAP_SCALE 0.05 //default [mm]
 #define MAX_DELTA_TRANSLATE 100 //[mm]
 #define MAP_DISTANCE_FROM_OPERATOR 500
@@ -165,8 +167,9 @@ typedef enum {
   GREEN_OPERATOR_MASK1,
   GREEN_OPERATOR_MASK2,
   GREEN_OPERATOR_MASK_VARIABLE,
-  OPERATOR_POSSITION
-} semafor_name_t; //nazabudnut pri pridani inicializovat v initRobot
+  OPERATOR_POSSITION,
+  JOURNEY_POINTS
+ } semafor_name_t; //nazabudnut pri pridani inicializovat v initRobot
 
 typedef enum {
   SEMAFOR_TAG,
