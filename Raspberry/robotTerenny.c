@@ -265,6 +265,7 @@ void initRobot(void) {
   semInit(sem_id, ORANGE_OPERATOR_MASK_VARIABLE, 1);
   semInit(sem_id, GREEN_OPERATOR_MASK_VARIABLE, 1);
   semInit(sem_id, OPERATOR_POSSITION, 1);
+  semInit(sem_id, JOURNEY_POINTS, 1);
 
   mapImage1 = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
   mapImageChoose = 1;
@@ -1307,15 +1308,20 @@ void *syncCameraNetworkConnection(void *arg) {
       LOGInfo(CAMERA_CONN_TAG, 1, "Map sync.");
       Mat map = getMapImage().clone();
       RobotPosition_struct robotPosition = getRobotPossition();
-      int centerX = MAP_WIDTH / 2;
-      int centerY = MAP_HEIGHT / 2;
-      circle(map, Point(centerX, centerY), 40 * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
-      if (28 * MAP_SCALE > 0) {
-        circle(map, Point(centerX, centerY), 28 * MAP_SCALE, Scalar( 0, 255, 255 ), 1, 8); // robot zone
-        line(map, Point(centerX, centerY), Point(centerX + (28 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw), centerY + (28 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
+
+      semWait(sem_id, JOURNEY_POINTS);
+      for (int i = 1; i < journeyPoint.size(); i++) {
+        line(map, journeyPoint.at(i - 1), journeyPoint.at(i), Scalar( 255, 0, 0 ), 1, 8);
+      }
+      semPost(sem_id, JOURNEY_POINTS);
+
+      circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 200 * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
+      if (1400 * MAP_SCALE > 0) {
+        circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 140 * MAP_SCALE, Scalar( 0, 255, 255 ), 1, 8); // robot zone
+        line(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), Point(MAP_WIDTH / 2 + (140 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw), MAP_HEIGHT / 2 + (140 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
       }
       else {
-        circle(map, Point(centerX, centerY), 1, Scalar( 0, 255, 255 ), 1, 8); // robot zone
+        circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 1, Scalar( 0, 255, 255 ), 1, 8); // robot zone
       }
       semWait(sem_id, OPERATOR_POSSITION);
       double minPointX = operatorPossition.x * MAP_SCALE;
@@ -1325,14 +1331,11 @@ void *syncCameraNetworkConnection(void *arg) {
 
       int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
       int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
-      if (operatorPossition.x != -1 && operatorPossition.y != -1)
+      if (operatorPossition.x != -1 && operatorPossition.y != -1) {
         circle(map, Point(x2, z2), 1, Scalar( 0, 255, 255 ), -1, 8);
-      semPost(sem_id, OPERATOR_POSSITION);
-
-      for (int i = 1; i < journeyPoint.size(); i++) {
-        line(map, journeyPoint.at(i - 1), journeyPoint.at(i), Scalar( 255, 0, 0 ), 3, 8);
+        circle(map, Point(x2, z2), MAP_DISTANCE_FROM_OPERATOR * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8);
       }
-
+      semPost(sem_id, OPERATOR_POSSITION);
 
       sendMatImageByWifi(map, 100);
     }
@@ -1821,8 +1824,6 @@ void *syncGenerateMap(void *arg) {
     }
 
     for (int x = 0; x < pointCloudBuffer.cols; x++) {
-      int minPointX = 30000;
-      int minPointZ = 30000;
       for (int y = 0; y < pointCloudBuffer.rows; y++) {
         if ( !pointCloudBuffer.empty() )   {
           Point3f p = pointCloudBuffer.at<Point3f>(y, x);
@@ -1831,34 +1832,30 @@ void *syncGenerateMap(void *arg) {
           float kinectPointZ = p.z;         //hlbka
 
           if (kinectpointY >= MIN_BARRIER_HEIGHT && kinectpointY <= MAX_BARRIER_HEIGHT && kinectPointX != 0 && kinectpointY != 0 && kinectPointZ != 0) {
-            int pointZ = kinectPointZ * 1000 * MAP_SCALE;
-            if (pointZ < minPointZ) minPointZ = pointZ;
+            int pointZ = kinectPointZ * (1000 * MAP_SCALE);
+            int pointX = kinectPointX * (1000 * MAP_SCALE);
 
-            int pointX = kinectPointX * 1000 * MAP_SCALE;
-            minPointX = pointX;
+            double r = sqrt((double)(pointX * pointX + pointZ * pointZ));
+            double angle = acos((-(double)pointX) / r) - 3.14 / 2;
+
+            int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+            int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+
+            if (x2 > 0 && x2 < MAP_WIDTH && z2 > 0 && z2 < MAP_HEIGHT) {
+
+              Vec3b color = map.at<Vec3b>(Point(x2, z2));
+
+              int varMapCreation[3];
+              varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION;
+
+              if (varMapCreation[1] >= 255)
+                color[1] = 255;
+              else
+                color[1] = varMapCreation[1];
+
+              map.at<Vec3b>(Point(x2, z2)) = color;
+            }
           }
-        }
-      }
-      if (minPointX != 30000 && minPointZ != 30000) {
-        double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
-        double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
-
-        int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
-        int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
-
-        if (x2 > 0 && x2 < MAP_WIDTH && z2 > 0 && z2 < MAP_HEIGHT) {
-
-          Vec3b color = map.at<Vec3b>(Point(x2, z2));
-
-          int varMapCreation[3];
-          varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION;
-
-          if (varMapCreation[1] >= 255)
-            color[1] = 255;
-          else
-            color[1] = varMapCreation[1];
-
-          map.at<Vec3b>(Point(x2, z2)) = color;
         }
       }
     }
@@ -1894,7 +1891,6 @@ void *syncOperatorDetect(void *arg) {
 
     char index = pauseGrabKinect();
     Mat rgbOperatorImage = getRGBKinect(index);
-    Mat depthOperatorMap = getDepthScaledKinect(index);
     Mat depthValid = getDepthValidKinect(index);
     Mat pointCloudBuffer = getPointCloudMapKinect(index);
     continueGrabKinect(index);
@@ -1903,16 +1899,8 @@ void *syncOperatorDetect(void *arg) {
     Mat orangeOperatorMaskImage;
     Mat greenOperatorMaskImage;
     Mat depthOperatorMaskImage = Mat(Size(320, 240), CV_8UC1, Scalar(0));
-    if (depthValid.empty())
-      printf("valid empty \n");
-    if (rgbOperatorImage.empty())
-      printf("rgb empty \n");
-    if (depthOperatorMap.empty())
-      printf("depth empty \n");
-    if (pointCloudBuffer.empty())
-      printf("point cloud empty \n");
 
-    if (!rgbOperatorImage.empty() && !depthOperatorMap.empty() && !depthValid.empty() && !pointCloudBuffer.empty()) {
+    if (!rgbOperatorImage.empty() && !depthValid.empty() && !pointCloudBuffer.empty()) {
 
       resize(rgbOperatorImage, rgbOperatorImage, Size(320, 240));
       //resize(depthOperatorMap, depthOperatorMap, Size(320, 240));
@@ -2364,7 +2352,7 @@ bool osemsusednost(Mat &map, vector<Point> *prejdiBody, int x, int y, int nasled
     if (bodNaPrejdenie.x >= 0 && bodNaPrejdenie.x < MAP_WIDTH &&
         bodNaPrejdenie.y >= 0 && bodNaPrejdenie.y < MAP_HEIGHT) {
       Vec3b color = map.at<Vec3b>(bodNaPrejdenie);
-      if (color[1] <= 0 && color[0] <= 0) {
+      if (color[1] < MIN_BARRIER_CREATION && color[0] <= 0 && color[2] <= 0) {
         bool isAtFinish = sqrt(pow(bodNaPrejdenie.x - xO, 2) + pow(bodNaPrejdenie.y - yO, 2)) <= MAP_DISTANCE_FROM_OPERATOR * MAP_SCALE;
         if (!isAtFinish) {
           color[0] = nasledujuceOhodnotenie;
@@ -2412,6 +2400,27 @@ void *syncGenerateJorney(void *arg) {
       Mat map = getMapImage();
       if (map.empty())
         map = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(255, 255, 255));
+
+      //rozsirenie prekazok----------------------------
+      for (int x = 0; x < map.cols; x++) {
+        for (int y = 0; y < map.rows; y++) {
+          Vec3b color = map.at<Vec3b>(Point(x, y));
+          if (color[1] >= MIN_BARRIER_CREATION) {
+            for (int xRect = -(MAP_BARRIER_EXTENDED * MAP_SCALE); xRect <= (MAP_BARRIER_EXTENDED * MAP_SCALE); xRect++) {
+              for (int yRect = -(MAP_BARRIER_EXTENDED * MAP_SCALE); yRect <= (MAP_BARRIER_EXTENDED * MAP_SCALE); yRect++) {
+                int changePointX = x + xRect;
+                int changePointY = y + yRect;
+                if (changePointX >= 0 && changePointX < MAP_WIDTH && changePointY >= 0 && changePointY < MAP_HEIGHT) {
+                  color = map.at<Vec3b>(Point(changePointX, changePointY));
+                  color[2] = 255;
+                  map.at<Vec3b>(Point(changePointX, changePointY)) = color;
+                }
+              }
+            }
+          }
+        }
+      }
+      //-----------------------------------------------
 
       int aktualneOhodnotenie = 0;
       vector<Point> prejdiBody;
@@ -2479,6 +2488,7 @@ void *syncGenerateJorney(void *arg) {
         }
       }
       //zapis bodov----------------
+      semWait(sem_id, JOURNEY_POINTS);
       journeyPoint.clear();
       if (moznyPosun) {
         journeyPoint.push_back(Point(MAP_WIDTH / 2, MAP_HEIGHT / 2));
@@ -2487,12 +2497,9 @@ void *syncGenerateJorney(void *arg) {
         }
         journeyPoint.push_back(realFinish);
       }
+      semPost(sem_id, JOURNEY_POINTS);
       //---------------------------
     }
-
-
-
-//journeyPoint - sem naplnit bodmi
     LOGInfo(MAP_TAG, 1, "End:Jorney generate sync.");
     sleep(SYNC_MAP_GENERATE_TIME);
   }
