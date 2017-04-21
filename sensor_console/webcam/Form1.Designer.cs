@@ -36,43 +36,53 @@
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.zPos = new System.Windows.Forms.TextBox();
             this.yPos = new System.Windows.Forms.TextBox();
+            this.label6 = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
             this.xPos = new System.Windows.Forms.TextBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.yawPos = new System.Windows.Forms.TextBox();
-            this.pitchPos = new System.Windows.Forms.TextBox();
-            this.rollPos = new System.Windows.Forms.TextBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.label2 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
-            this.label4 = new System.Windows.Forms.Label();
-            this.label5 = new System.Windows.Forms.Label();
-            this.label6 = new System.Windows.Forms.Label();
-            this.rollPosDegree = new System.Windows.Forms.TextBox();
-            this.pitchPosDegree = new System.Windows.Forms.TextBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
             this.yawPosDegree = new System.Windows.Forms.TextBox();
+            this.yawPos = new System.Windows.Forms.TextBox();
+            this.pitchPosDegree = new System.Windows.Forms.TextBox();
+            this.pitchPos = new System.Windows.Forms.TextBox();
+            this.rollPosDegree = new System.Windows.Forms.TextBox();
+            this.rollPos = new System.Windows.Forms.TextBox();
             this.groupBox4 = new System.Windows.Forms.GroupBox();
-            this.volts = new System.Windows.Forms.TextBox();
             this.capacityPercent = new System.Windows.Forms.TextBox();
+            this.volts = new System.Windows.Forms.TextBox();
             this.groupBox5 = new System.Windows.Forms.GroupBox();
-            this.redUp = new System.Windows.Forms.CheckBox();
-            this.greenUp = new System.Windows.Forms.CheckBox();
-            this.redMiddle = new System.Windows.Forms.CheckBox();
-            this.greenMiddle = new System.Windows.Forms.CheckBox();
-            this.redDown = new System.Windows.Forms.CheckBox();
             this.greenDown = new System.Windows.Forms.CheckBox();
+            this.greenMiddle = new System.Windows.Forms.CheckBox();
+            this.greenUp = new System.Windows.Forms.CheckBox();
+            this.redDown = new System.Windows.Forms.CheckBox();
+            this.redMiddle = new System.Windows.Forms.CheckBox();
+            this.redUp = new System.Windows.Forms.CheckBox();
             this.groupBox6 = new System.Windows.Forms.GroupBox();
-            this.redKinect = new System.Windows.Forms.RadioButton();
-            this.greenKinect = new System.Windows.Forms.RadioButton();
-            this.orangeKinect = new System.Windows.Forms.RadioButton();
-            this.blinkRedOrangeKinect = new System.Windows.Forms.RadioButton();
-            this.blinkGreenKinect = new System.Windows.Forms.RadioButton();
             this.blinkOrangeKinect = new System.Windows.Forms.RadioButton();
+            this.blinkGreenKinect = new System.Windows.Forms.RadioButton();
+            this.blinkRedOrangeKinect = new System.Windows.Forms.RadioButton();
+            this.orangeKinect = new System.Windows.Forms.RadioButton();
+            this.greenKinect = new System.Windows.Forms.RadioButton();
+            this.redKinect = new System.Windows.Forms.RadioButton();
+            this.groupBox7 = new System.Windows.Forms.GroupBox();
+            this.motorUp = new System.Windows.Forms.Button();
+            this.motorStop = new System.Windows.Forms.Button();
+            this.motorAnticlockwise = new System.Windows.Forms.Button();
+            this.motorDown = new System.Windows.Forms.Button();
+            this.motorClockwise = new System.Windows.Forms.Button();
+            this.speedbox = new System.Windows.Forms.NumericUpDown();
+            this.label7 = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox3.SuspendLayout();
             this.groupBox4.SuspendLayout();
             this.groupBox5.SuspendLayout();
             this.groupBox6.SuspendLayout();
+            this.groupBox7.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.speedbox)).BeginInit();
             this.SuspendLayout();
             // 
             // button1
@@ -159,6 +169,33 @@
             this.yPos.Size = new System.Drawing.Size(100, 20);
             this.yPos.TabIndex = 0;
             // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(6, 74);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(17, 13);
+            this.label6.TabIndex = 4;
+            this.label6.Text = "Z:";
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(6, 48);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(17, 13);
+            this.label5.TabIndex = 4;
+            this.label5.Text = "Y:";
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(6, 22);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(17, 13);
+            this.label4.TabIndex = 4;
+            this.label4.Text = "X:";
+            // 
             // xPos
             // 
             this.xPos.Location = new System.Drawing.Point(29, 19);
@@ -184,35 +221,14 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Angle position";
             // 
-            // yawPos
+            // label3
             // 
-            this.yawPos.Location = new System.Drawing.Point(41, 71);
-            this.yawPos.Name = "yawPos";
-            this.yawPos.Size = new System.Drawing.Size(70, 20);
-            this.yawPos.TabIndex = 3;
-            // 
-            // pitchPos
-            // 
-            this.pitchPos.Location = new System.Drawing.Point(41, 45);
-            this.pitchPos.Name = "pitchPos";
-            this.pitchPos.Size = new System.Drawing.Size(70, 20);
-            this.pitchPos.TabIndex = 2;
-            // 
-            // rollPos
-            // 
-            this.rollPos.Location = new System.Drawing.Point(41, 19);
-            this.rollPos.Name = "rollPos";
-            this.rollPos.Size = new System.Drawing.Size(70, 20);
-            this.rollPos.TabIndex = 1;
-            // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(7, 26);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(28, 13);
-            this.label1.TabIndex = 4;
-            this.label1.Text = "Roll:";
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(7, 75);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(31, 13);
+            this.label3.TabIndex = 4;
+            this.label3.Text = "Yaw:";
             // 
             // label2
             // 
@@ -223,48 +239,28 @@
             this.label2.TabIndex = 4;
             this.label2.Text = "Pitch:";
             // 
-            // label3
+            // label1
             // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(7, 75);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(31, 13);
-            this.label3.TabIndex = 4;
-            this.label3.Text = "Yaw:";
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(7, 26);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(28, 13);
+            this.label1.TabIndex = 4;
+            this.label1.Text = "Roll:";
             // 
-            // label4
+            // yawPosDegree
             // 
-            this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(6, 22);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(17, 13);
-            this.label4.TabIndex = 4;
-            this.label4.Text = "X:";
+            this.yawPosDegree.Location = new System.Drawing.Point(117, 71);
+            this.yawPosDegree.Name = "yawPosDegree";
+            this.yawPosDegree.Size = new System.Drawing.Size(70, 20);
+            this.yawPosDegree.TabIndex = 3;
             // 
-            // label5
+            // yawPos
             // 
-            this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(6, 48);
-            this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(17, 13);
-            this.label5.TabIndex = 4;
-            this.label5.Text = "Y:";
-            // 
-            // label6
-            // 
-            this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(6, 74);
-            this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(17, 13);
-            this.label6.TabIndex = 4;
-            this.label6.Text = "Z:";
-            // 
-            // rollPosDegree
-            // 
-            this.rollPosDegree.Location = new System.Drawing.Point(117, 19);
-            this.rollPosDegree.Name = "rollPosDegree";
-            this.rollPosDegree.Size = new System.Drawing.Size(70, 20);
-            this.rollPosDegree.TabIndex = 1;
+            this.yawPos.Location = new System.Drawing.Point(41, 71);
+            this.yawPos.Name = "yawPos";
+            this.yawPos.Size = new System.Drawing.Size(70, 20);
+            this.yawPos.TabIndex = 3;
             // 
             // pitchPosDegree
             // 
@@ -273,12 +269,26 @@
             this.pitchPosDegree.Size = new System.Drawing.Size(70, 20);
             this.pitchPosDegree.TabIndex = 2;
             // 
-            // yawPosDegree
+            // pitchPos
             // 
-            this.yawPosDegree.Location = new System.Drawing.Point(117, 71);
-            this.yawPosDegree.Name = "yawPosDegree";
-            this.yawPosDegree.Size = new System.Drawing.Size(70, 20);
-            this.yawPosDegree.TabIndex = 3;
+            this.pitchPos.Location = new System.Drawing.Point(41, 45);
+            this.pitchPos.Name = "pitchPos";
+            this.pitchPos.Size = new System.Drawing.Size(70, 20);
+            this.pitchPos.TabIndex = 2;
+            // 
+            // rollPosDegree
+            // 
+            this.rollPosDegree.Location = new System.Drawing.Point(117, 19);
+            this.rollPosDegree.Name = "rollPosDegree";
+            this.rollPosDegree.Size = new System.Drawing.Size(70, 20);
+            this.rollPosDegree.TabIndex = 1;
+            // 
+            // rollPos
+            // 
+            this.rollPos.Location = new System.Drawing.Point(41, 19);
+            this.rollPos.Name = "rollPos";
+            this.rollPos.Size = new System.Drawing.Size(70, 20);
+            this.rollPos.TabIndex = 1;
             // 
             // groupBox4
             // 
@@ -291,19 +301,19 @@
             this.groupBox4.TabStop = false;
             this.groupBox4.Text = "Voltage";
             // 
-            // volts
-            // 
-            this.volts.Location = new System.Drawing.Point(7, 20);
-            this.volts.Name = "volts";
-            this.volts.Size = new System.Drawing.Size(100, 20);
-            this.volts.TabIndex = 0;
-            // 
             // capacityPercent
             // 
             this.capacityPercent.Location = new System.Drawing.Point(6, 45);
             this.capacityPercent.Name = "capacityPercent";
             this.capacityPercent.Size = new System.Drawing.Size(100, 20);
             this.capacityPercent.TabIndex = 0;
+            // 
+            // volts
+            // 
+            this.volts.Location = new System.Drawing.Point(7, 20);
+            this.volts.Name = "volts";
+            this.volts.Size = new System.Drawing.Size(100, 20);
+            this.volts.TabIndex = 0;
             // 
             // groupBox5
             // 
@@ -320,35 +330,15 @@
             this.groupBox5.TabStop = false;
             this.groupBox5.Text = "Leds";
             // 
-            // redUp
+            // greenDown
             // 
-            this.redUp.AutoSize = true;
-            this.redUp.Location = new System.Drawing.Point(7, 21);
-            this.redUp.Name = "redUp";
-            this.redUp.Size = new System.Drawing.Size(46, 17);
-            this.redUp.TabIndex = 0;
-            this.redUp.Text = "Red";
-            this.redUp.UseVisualStyleBackColor = true;
-            // 
-            // greenUp
-            // 
-            this.greenUp.AutoSize = true;
-            this.greenUp.Location = new System.Drawing.Point(59, 21);
-            this.greenUp.Name = "greenUp";
-            this.greenUp.Size = new System.Drawing.Size(55, 17);
-            this.greenUp.TabIndex = 0;
-            this.greenUp.Text = "Green";
-            this.greenUp.UseVisualStyleBackColor = true;
-            // 
-            // redMiddle
-            // 
-            this.redMiddle.AutoSize = true;
-            this.redMiddle.Location = new System.Drawing.Point(6, 45);
-            this.redMiddle.Name = "redMiddle";
-            this.redMiddle.Size = new System.Drawing.Size(46, 17);
-            this.redMiddle.TabIndex = 0;
-            this.redMiddle.Text = "Red";
-            this.redMiddle.UseVisualStyleBackColor = true;
+            this.greenDown.AutoSize = true;
+            this.greenDown.Location = new System.Drawing.Point(58, 68);
+            this.greenDown.Name = "greenDown";
+            this.greenDown.Size = new System.Drawing.Size(55, 17);
+            this.greenDown.TabIndex = 0;
+            this.greenDown.Text = "Green";
+            this.greenDown.UseVisualStyleBackColor = true;
             // 
             // greenMiddle
             // 
@@ -360,6 +350,16 @@
             this.greenMiddle.Text = "Green";
             this.greenMiddle.UseVisualStyleBackColor = true;
             // 
+            // greenUp
+            // 
+            this.greenUp.AutoSize = true;
+            this.greenUp.Location = new System.Drawing.Point(59, 21);
+            this.greenUp.Name = "greenUp";
+            this.greenUp.Size = new System.Drawing.Size(55, 17);
+            this.greenUp.TabIndex = 0;
+            this.greenUp.Text = "Green";
+            this.greenUp.UseVisualStyleBackColor = true;
+            // 
             // redDown
             // 
             this.redDown.AutoSize = true;
@@ -370,15 +370,25 @@
             this.redDown.Text = "Red";
             this.redDown.UseVisualStyleBackColor = true;
             // 
-            // greenDown
+            // redMiddle
             // 
-            this.greenDown.AutoSize = true;
-            this.greenDown.Location = new System.Drawing.Point(58, 68);
-            this.greenDown.Name = "greenDown";
-            this.greenDown.Size = new System.Drawing.Size(55, 17);
-            this.greenDown.TabIndex = 0;
-            this.greenDown.Text = "Green";
-            this.greenDown.UseVisualStyleBackColor = true;
+            this.redMiddle.AutoSize = true;
+            this.redMiddle.Location = new System.Drawing.Point(6, 45);
+            this.redMiddle.Name = "redMiddle";
+            this.redMiddle.Size = new System.Drawing.Size(46, 17);
+            this.redMiddle.TabIndex = 0;
+            this.redMiddle.Text = "Red";
+            this.redMiddle.UseVisualStyleBackColor = true;
+            // 
+            // redUp
+            // 
+            this.redUp.AutoSize = true;
+            this.redUp.Location = new System.Drawing.Point(7, 21);
+            this.redUp.Name = "redUp";
+            this.redUp.Size = new System.Drawing.Size(46, 17);
+            this.redUp.TabIndex = 0;
+            this.redUp.Text = "Red";
+            this.redUp.UseVisualStyleBackColor = true;
             // 
             // groupBox6
             // 
@@ -395,49 +405,16 @@
             this.groupBox6.TabStop = false;
             this.groupBox6.Text = "Led Kinect";
             // 
-            // redKinect
+            // blinkOrangeKinect
             // 
-            this.redKinect.AutoSize = true;
-            this.redKinect.Location = new System.Drawing.Point(6, 20);
-            this.redKinect.Name = "redKinect";
-            this.redKinect.Size = new System.Drawing.Size(45, 17);
-            this.redKinect.TabIndex = 0;
-            this.redKinect.TabStop = true;
-            this.redKinect.Text = "Red";
-            this.redKinect.UseVisualStyleBackColor = true;
-            // 
-            // greenKinect
-            // 
-            this.greenKinect.AutoSize = true;
-            this.greenKinect.Location = new System.Drawing.Point(6, 43);
-            this.greenKinect.Name = "greenKinect";
-            this.greenKinect.Size = new System.Drawing.Size(54, 17);
-            this.greenKinect.TabIndex = 0;
-            this.greenKinect.TabStop = true;
-            this.greenKinect.Text = "Green";
-            this.greenKinect.UseVisualStyleBackColor = true;
-            // 
-            // orangeKinect
-            // 
-            this.orangeKinect.AutoSize = true;
-            this.orangeKinect.Location = new System.Drawing.Point(6, 66);
-            this.orangeKinect.Name = "orangeKinect";
-            this.orangeKinect.Size = new System.Drawing.Size(60, 17);
-            this.orangeKinect.TabIndex = 0;
-            this.orangeKinect.TabStop = true;
-            this.orangeKinect.Text = "Orange";
-            this.orangeKinect.UseVisualStyleBackColor = true;
-            // 
-            // blinkRedOrangeKinect
-            // 
-            this.blinkRedOrangeKinect.AutoSize = true;
-            this.blinkRedOrangeKinect.Location = new System.Drawing.Point(6, 89);
-            this.blinkRedOrangeKinect.Name = "blinkRedOrangeKinect";
-            this.blinkRedOrangeKinect.Size = new System.Drawing.Size(105, 17);
-            this.blinkRedOrangeKinect.TabIndex = 0;
-            this.blinkRedOrangeKinect.TabStop = true;
-            this.blinkRedOrangeKinect.Text = "Blink red, orange";
-            this.blinkRedOrangeKinect.UseVisualStyleBackColor = true;
+            this.blinkOrangeKinect.AutoSize = true;
+            this.blinkOrangeKinect.Location = new System.Drawing.Point(6, 135);
+            this.blinkOrangeKinect.Name = "blinkOrangeKinect";
+            this.blinkOrangeKinect.Size = new System.Drawing.Size(84, 17);
+            this.blinkOrangeKinect.TabIndex = 0;
+            this.blinkOrangeKinect.TabStop = true;
+            this.blinkOrangeKinect.Text = "Blink orange";
+            this.blinkOrangeKinect.UseVisualStyleBackColor = true;
             // 
             // blinkGreenKinect
             // 
@@ -450,22 +427,149 @@
             this.blinkGreenKinect.Text = "Blink green";
             this.blinkGreenKinect.UseVisualStyleBackColor = true;
             // 
-            // blinkOrangeKinect
+            // blinkRedOrangeKinect
             // 
-            this.blinkOrangeKinect.AutoSize = true;
-            this.blinkOrangeKinect.Location = new System.Drawing.Point(6, 135);
-            this.blinkOrangeKinect.Name = "blinkOrangeKinect";
-            this.blinkOrangeKinect.Size = new System.Drawing.Size(84, 17);
-            this.blinkOrangeKinect.TabIndex = 0;
-            this.blinkOrangeKinect.TabStop = true;
-            this.blinkOrangeKinect.Text = "Blink orange";
-            this.blinkOrangeKinect.UseVisualStyleBackColor = true;
+            this.blinkRedOrangeKinect.AutoSize = true;
+            this.blinkRedOrangeKinect.Location = new System.Drawing.Point(6, 89);
+            this.blinkRedOrangeKinect.Name = "blinkRedOrangeKinect";
+            this.blinkRedOrangeKinect.Size = new System.Drawing.Size(105, 17);
+            this.blinkRedOrangeKinect.TabIndex = 0;
+            this.blinkRedOrangeKinect.TabStop = true;
+            this.blinkRedOrangeKinect.Text = "Blink red, orange";
+            this.blinkRedOrangeKinect.UseVisualStyleBackColor = true;
+            // 
+            // orangeKinect
+            // 
+            this.orangeKinect.AutoSize = true;
+            this.orangeKinect.Location = new System.Drawing.Point(6, 66);
+            this.orangeKinect.Name = "orangeKinect";
+            this.orangeKinect.Size = new System.Drawing.Size(60, 17);
+            this.orangeKinect.TabIndex = 0;
+            this.orangeKinect.TabStop = true;
+            this.orangeKinect.Text = "Orange";
+            this.orangeKinect.UseVisualStyleBackColor = true;
+            // 
+            // greenKinect
+            // 
+            this.greenKinect.AutoSize = true;
+            this.greenKinect.Location = new System.Drawing.Point(6, 43);
+            this.greenKinect.Name = "greenKinect";
+            this.greenKinect.Size = new System.Drawing.Size(54, 17);
+            this.greenKinect.TabIndex = 0;
+            this.greenKinect.TabStop = true;
+            this.greenKinect.Text = "Green";
+            this.greenKinect.UseVisualStyleBackColor = true;
+            // 
+            // redKinect
+            // 
+            this.redKinect.AutoSize = true;
+            this.redKinect.Location = new System.Drawing.Point(6, 20);
+            this.redKinect.Name = "redKinect";
+            this.redKinect.Size = new System.Drawing.Size(45, 17);
+            this.redKinect.TabIndex = 0;
+            this.redKinect.TabStop = true;
+            this.redKinect.Text = "Red";
+            this.redKinect.UseVisualStyleBackColor = true;
+            // 
+            // groupBox7
+            // 
+            this.groupBox7.Controls.Add(this.label7);
+            this.groupBox7.Controls.Add(this.speedbox);
+            this.groupBox7.Controls.Add(this.motorClockwise);
+            this.groupBox7.Controls.Add(this.motorDown);
+            this.groupBox7.Controls.Add(this.motorAnticlockwise);
+            this.groupBox7.Controls.Add(this.motorStop);
+            this.groupBox7.Controls.Add(this.motorUp);
+            this.groupBox7.Location = new System.Drawing.Point(331, 154);
+            this.groupBox7.Name = "groupBox7";
+            this.groupBox7.Size = new System.Drawing.Size(152, 207);
+            this.groupBox7.TabIndex = 8;
+            this.groupBox7.TabStop = false;
+            this.groupBox7.Text = "Motor  control";
+            // 
+            // motorUp
+            // 
+            this.motorUp.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.motorUp.Location = new System.Drawing.Point(55, 20);
+            this.motorUp.Name = "motorUp";
+            this.motorUp.Size = new System.Drawing.Size(40, 40);
+            this.motorUp.TabIndex = 0;
+            this.motorUp.Text = "↑";
+            this.motorUp.UseVisualStyleBackColor = true;
+            this.motorUp.Click += new System.EventHandler(this.motorUp_Click);
+            // 
+            // motorStop
+            // 
+            this.motorStop.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.motorStop.Location = new System.Drawing.Point(55, 65);
+            this.motorStop.Name = "motorStop";
+            this.motorStop.Size = new System.Drawing.Size(40, 40);
+            this.motorStop.TabIndex = 0;
+            this.motorStop.Text = "S";
+            this.motorStop.UseVisualStyleBackColor = true;
+            this.motorStop.Click += new System.EventHandler(this.motorStop_Click);
+            // 
+            // motorAnticlockwise
+            // 
+            this.motorAnticlockwise.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.motorAnticlockwise.Location = new System.Drawing.Point(10, 65);
+            this.motorAnticlockwise.Name = "motorAnticlockwise";
+            this.motorAnticlockwise.Size = new System.Drawing.Size(40, 40);
+            this.motorAnticlockwise.TabIndex = 0;
+            this.motorAnticlockwise.Text = "↺";
+            this.motorAnticlockwise.UseVisualStyleBackColor = true;
+            this.motorAnticlockwise.Click += new System.EventHandler(this.motorAnticlockwise_Click);
+            // 
+            // motorDown
+            // 
+            this.motorDown.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.motorDown.Location = new System.Drawing.Point(55, 108);
+            this.motorDown.Name = "motorDown";
+            this.motorDown.Size = new System.Drawing.Size(40, 40);
+            this.motorDown.TabIndex = 0;
+            this.motorDown.Text = "↓";
+            this.motorDown.UseVisualStyleBackColor = true;
+            this.motorDown.Click += new System.EventHandler(this.motorDown_Click);
+            // 
+            // motorClockwise
+            // 
+            this.motorClockwise.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.motorClockwise.Location = new System.Drawing.Point(101, 65);
+            this.motorClockwise.Name = "motorClockwise";
+            this.motorClockwise.Size = new System.Drawing.Size(40, 40);
+            this.motorClockwise.TabIndex = 0;
+            this.motorClockwise.Text = "↻";
+            this.motorClockwise.UseVisualStyleBackColor = true;
+            this.motorClockwise.Click += new System.EventHandler(this.motorClockwise_Click);
+            // 
+            // speedbox
+            // 
+            this.speedbox.Location = new System.Drawing.Point(10, 175);
+            this.speedbox.Maximum = new decimal(new int[] {
+            1000,
+            0,
+            0,
+            0});
+            this.speedbox.Name = "speedbox";
+            this.speedbox.Size = new System.Drawing.Size(131, 20);
+            this.speedbox.TabIndex = 1;
+            this.speedbox.ValueChanged += new System.EventHandler(this.speedbox_ValueChanged);
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(7, 159);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(70, 13);
+            this.label7.TabIndex = 2;
+            this.label7.Text = "Speed[mm/s]";
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(492, 323);
+            this.ClientSize = new System.Drawing.Size(490, 367);
+            this.Controls.Add(this.groupBox7);
             this.Controls.Add(this.groupBox6);
             this.Controls.Add(this.groupBox5);
             this.Controls.Add(this.groupBox4);
@@ -488,6 +592,9 @@
             this.groupBox5.PerformLayout();
             this.groupBox6.ResumeLayout(false);
             this.groupBox6.PerformLayout();
+            this.groupBox7.ResumeLayout(false);
+            this.groupBox7.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.speedbox)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -533,6 +640,14 @@
         private System.Windows.Forms.RadioButton orangeKinect;
         private System.Windows.Forms.RadioButton greenKinect;
         private System.Windows.Forms.RadioButton redKinect;
+        private System.Windows.Forms.GroupBox groupBox7;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.NumericUpDown speedbox;
+        private System.Windows.Forms.Button motorClockwise;
+        private System.Windows.Forms.Button motorDown;
+        private System.Windows.Forms.Button motorAnticlockwise;
+        private System.Windows.Forms.Button motorStop;
+        private System.Windows.Forms.Button motorUp;
     }
 }
 

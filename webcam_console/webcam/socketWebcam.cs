@@ -171,7 +171,7 @@ public class SocketWebcam
         }
         catch
         {
-            Console.WriteLine("Problem s konverziou obrazka.\nVelkost so systemu:" + sizeFromSystem + "\nVelkost obrazka:" + obrSize + "\n");
+            Console.WriteLine("Problem s konverziou obrazka "+command+".\nVelkost so systemu:" + sizeFromSystem + "\nVelkost obrazka:" + obrSize + "\n");
         }
         return null;
     }

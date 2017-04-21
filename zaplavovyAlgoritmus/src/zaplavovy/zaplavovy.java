@@ -67,7 +67,7 @@ public class zaplavovy extends javax.swing.JFrame {
         jScrollPane3 = new javax.swing.JScrollPane();
         legendsTable = new javax.swing.JTable();
         jSeparator3 = new javax.swing.JSeparator();
-        vzdialenostOdCiela = new javax.swing.JTextField();
+        vzdialenostOdCielaTextField = new javax.swing.JTextField();
         jLabel4 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -228,7 +228,12 @@ public class zaplavovy extends javax.swing.JFrame {
                 .addContainerGap())
         );
 
-        vzdialenostOdCiela.setText("0");
+        vzdialenostOdCielaTextField.setText("0");
+        vzdialenostOdCielaTextField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                vzdialenostOdCielaTextFieldFocusLost(evt);
+            }
+        });
 
         jLabel4.setText("Vzdialenost od ciela");
 
@@ -247,7 +252,7 @@ public class zaplavovy extends javax.swing.JFrame {
                         .addGap(10, 10, 10)
                         .addComponent(jLabel4)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(vzdialenostOdCiela, javax.swing.GroupLayout.PREFERRED_SIZE, 266, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(vzdialenostOdCielaTextField, javax.swing.GroupLayout.PREFERRED_SIZE, 266, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
@@ -257,7 +262,7 @@ public class zaplavovy extends javax.swing.JFrame {
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(vzdialenostOdCiela, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(vzdialenostOdCielaTextField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jLabel4))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -290,6 +295,7 @@ public class zaplavovy extends javax.swing.JFrame {
     private Bod startBod = null;
     private Bod finishBod = null;
 
+    int vzdialenostOdCiela = 0;
     boolean isAtFinish = false;
     int aktualneOhodnotenie = 1;
     List<BodSOhodnotenim> prejdiBody = new ArrayList<BodSOhodnotenim>();
@@ -449,6 +455,18 @@ public class zaplavovy extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_vymazMapuButtonActionPerformed
 
+    private void vzdialenostOdCielaTextFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_vzdialenostOdCielaTextFieldFocusLost
+        if(vzdialenostOdCielaTextField.getText().isEmpty()){
+            vzdialenostOdCiela = 0;
+        }
+        else if(isNumber(vzdialenostOdCielaTextField.getText())){
+            vzdialenostOdCiela = Integer.parseInt(vzdialenostOdCielaTextField.getText());
+        } else {
+            vzdialenostOdCielaTextField.setText("0");
+            vzdialenostOdCiela= 0;
+        }
+    }//GEN-LAST:event_vzdialenostOdCielaTextFieldFocusLost
+
     void najdiStartACiel() throws Exception {
         startBod = null;
         finishBod = null;
@@ -503,7 +521,6 @@ public class zaplavovy extends javax.swing.JFrame {
         int x = bod.getBod().getX();
         int y = bod.getBod().getY();
         int nasledujuceOhodnotenie = bod.getOhodnotenie() + 1;
-        int t = Integer.parseInt(vzdialenostOdCiela.getText());
         for (int i = 0; i < 8; i++) {
             switch (i) {
                 case 0:
@@ -537,7 +554,7 @@ public class zaplavovy extends javax.swing.JFrame {
                 if (rozsirovanie) {
                     setExtendedBarrierOnMap(bodNaPrejdenie.getBod());
                 } else {
-                    isAtFinish = Math.sqrt(Math.pow(bodNaPrejdenie.getBod().getX() - finishBod.getX(), 2) + Math.pow(bodNaPrejdenie.getBod().getY() - finishBod.getY(), 2)) == t;
+                    isAtFinish = Math.sqrt(Math.pow(bodNaPrejdenie.getBod().getX() - finishBod.getX(), 2) + Math.pow(bodNaPrejdenie.getBod().getY() - finishBod.getY(), 2)) == vzdialenostOdCiela;
                     if (!isAtFinish) {
                         if (!bodNaPrejdenie.getBod().equals(finishBod) && !bodNaPrejdenie.getBod().equals(startBod)) {
                             setValueOnMap(bodNaPrejdenie);
@@ -760,7 +777,7 @@ public class zaplavovy extends javax.swing.JFrame {
         BodSOhodnotenim oznacenyBod = new BodSOhodnotenim(koncovyBod, aktualneOhodnotenie);
         List<Bod> bodyCestyList = new ArrayList<>();
         List<Bod> bodyCestyZoradeneList = new ArrayList<>();
-        String poziciaCieluVociStartu = "RU";
+        String poziciaCieluVociStartu = "";
         if (startBod.getX() < koncovyBod.getX()) {
             poziciaCieluVociStartu += "L";
         } else if (startBod.getX() == koncovyBod.getX()) {
@@ -775,22 +792,18 @@ public class zaplavovy extends javax.swing.JFrame {
         } else {
             poziciaCieluVociStartu += "D";
         }
-        int lastSmer = -1;
+        int lastPriorita = -1;
         boolean moznyPosun = true;
-        BodSOhodnotenim predchadzajuci = oznacenyBod;
         while (oznacenyBod.getOhodnotenie() != 1 && moznyPosun) {
             moznyPosun = false;
-            for (int smer = 1; smer <= 8; smer++) {
-                Bod offsetBodu = posunBoduPodlaPriority(smer, poziciaCieluVociStartu);
+            for (int priorita = 1; priorita <= 8; priorita++) {
+                Bod offsetBodu = posunBoduPodlaPriority(priorita, poziciaCieluVociStartu);
                 Bod moznyNasledujuciBod = new Bod(oznacenyBod.getBod().getX() + offsetBodu.getX(), oznacenyBod.getBod().getY() + offsetBodu.getY());
                 if (isHodnotyZaplavovy(moznyNasledujuciBod) && Integer.parseInt(getValueOnMap(moznyNasledujuciBod)) == oznacenyBod.getOhodnotenie()) {
-                    if (smer != lastSmer && lastSmer != -1) {
-                        if (!predchadzajuci.getBod().equals(koncovyBod)) {
-                            bodyCestyList.add(predchadzajuci.getBod().clone());
-                        }
+                    if (priorita != lastPriorita && lastPriorita != -1) {
+                            bodyCestyList.add(oznacenyBod.getBod().clone());
                     }
-                    lastSmer = smer;
-                    predchadzajuci = oznacenyBod;
+                    lastPriorita = priorita;
                     oznacenyBod.setBod(moznyNasledujuciBod);
                     oznacenyBod.setOhodnotenie(Integer.parseInt(getValueOnMap(moznyNasledujuciBod)) - 1);
                     setWayOnMap(oznacenyBod.getBod());
@@ -881,6 +894,6 @@ public class zaplavovy extends javax.swing.JFrame {
     private javax.swing.JButton spustiZaplavovyAlgoritmusButton;
     private javax.swing.JButton ulozMapuButton;
     private javax.swing.JButton vymazMapuButton;
-    private javax.swing.JTextField vzdialenostOdCiela;
+    private javax.swing.JTextField vzdialenostOdCielaTextField;
     // End of variables declaration//GEN-END:variables
 }

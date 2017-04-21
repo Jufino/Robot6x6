@@ -26,6 +26,9 @@ namespace webcam
             grabThread.Start();
 
         }
+
+        private String speed = "0";
+        private String dir = "S";
         private void sensorGrabFunction()
         {
             while (sensorGrab)
@@ -41,6 +44,7 @@ namespace webcam
                 String capacityPercent = socketWebcam.recv_data("voltPer");
                 String leds = socketWebcam.recv_data("leds");
                 String ledK = socketWebcam.recv_data("ledK");
+
                 if (sensorGrab)
                 {
                     try
@@ -122,6 +126,43 @@ namespace webcam
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             sensorGrab = false;
+        }
+
+        private void motorUp_Click(object sender, EventArgs e)
+        {
+            dir = "F";
+            socketWebcam.SendString("dir;" + dir + "\n");
+
+        }
+
+        private void motorStop_Click(object sender, EventArgs e)
+        {
+            dir = "S";
+            socketWebcam.SendString("dir;" + dir + "\n");
+        }
+
+        private void motorClockwise_Click(object sender, EventArgs e)
+        {
+            dir = "C";
+            socketWebcam.SendString("dir;" + dir + "\n");
+        }
+
+        private void motorDown_Click(object sender, EventArgs e)
+        {
+            dir = "B";
+            socketWebcam.SendString("dir;" + dir + "\n");
+        }
+
+        private void motorAnticlockwise_Click(object sender, EventArgs e)
+        {
+            dir = "A";
+            socketWebcam.SendString("dir;" + dir + "\n");
+        }
+
+        private void speedbox_ValueChanged(object sender, EventArgs e)
+        {
+            speed = speedbox.Value.ToString();
+            socketWebcam.SendString("speed;" + speed + "\n");
         }
     }
 }
