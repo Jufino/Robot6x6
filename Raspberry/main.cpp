@@ -18,14 +18,19 @@
 
 int main(void) {
   initRobot();
+      RobotAcculators robotAcculators = getRobotAcculators();
+          robotAcculators.kinect.roll = 10*(M_PI/180);
+          setRobotAcculators(robotAcculators);
   while (1) {
 
-    RobotAcculators robotAcculators = getRobotAcculators();
-    //RobotSensors robotSensors = getRobotSensors();
-    robotAcculators.kinect.roll = 10*(M_PI/180);
+
+    RobotSensors robotSensors = getRobotSensors();
+
+    printf("%f\n",robotSensors.robotPosition.anglePossition.yaw*(180/M_PI));
     //robotAcculators.leds.LedMiddle = COLOR_ORANGE;
     //robotAcculators.ledKinect = LEDKINECT_RED;
-    setRobotAcculators(robotAcculators);
+//robotAcculators.kinect.yaw = 90*(M_PI/180);
+  //     setRobotAcculators(robotAcculators);
     //printf("%f;%f\n",robotSensors.voltage.volts ,robotSensors.voltage.capacityPercent);*/
     /*   robotAcculators.robotDirection = FORWARD;
        if (robotSensors.buttons.buttonUp)
@@ -49,7 +54,7 @@ int main(void) {
 
 //    printf("acc angle:%f,motorStatus:%d\n",robotSensors.kinect.accAngle.roll,robotSensors.kinect.motorStatus);
 
-    sleep(1);
+    sleep(0.2);
   }
   closeRobot();
   return 0;

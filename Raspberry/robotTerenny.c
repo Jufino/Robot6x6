@@ -1315,22 +1315,28 @@ void *syncCameraNetworkConnection(void *arg) {
       }
       semPost(sem_id, JOURNEY_POINTS);
 
+      semWait(sem_id, ROBOTACCULATORS);
+      double kinectYaw = robotAcculators.kinect.yaw;
+      semPost(sem_id, ROBOTACCULATORS);
+
       circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 200 * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
       if (140 * MAP_SCALE > 0) {
         circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 140 * MAP_SCALE, Scalar( 0, 255, 255 ), 1, 8); // robot zone
         line(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), Point(MAP_WIDTH / 2 + (140 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw), MAP_HEIGHT / 2 + (140 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
+        line(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), Point(MAP_WIDTH / 2 + (140 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw+kinectYaw), MAP_HEIGHT / 2 + (140 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw+kinectYaw)), Scalar( 0, 0, 255 ), 1, 8);
       }
       else {
         circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 1, Scalar( 0, 255, 255 ), 1, 8); // robot zone
       }
+
       semWait(sem_id, OPERATOR_POSSITION);
       double minPointX = operatorPossition.x * MAP_SCALE;
       double minPointZ = operatorPossition.z * MAP_SCALE;
       double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
       double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
 
-      int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
-      int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+      int x2 = r * cos(robotPosition.anglePossition.yaw + angle+kinectYaw) + MAP_WIDTH / 2;
+      int z2 = r * sin(robotPosition.anglePossition.yaw + angle+kinectYaw) + MAP_HEIGHT / 2;
       if (operatorPossition.x != -1 && operatorPossition.z != -1) {
         circle(map, Point(x2, z2), 2, Scalar( 0, 0, 255 ), -1, 8);
         circle(map, Point(x2, z2), MAP_DISTANCE_FROM_OPERATOR * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8);
@@ -1752,7 +1758,7 @@ void *syncPossition(void *arg) {
   robotSensors.robotPosition.axisPossition.z = axis.z;
   robotSensors.robotPosition.anglePossition.roll = angle.roll;
   robotSensors.robotPosition.anglePossition.pitch = angle.pitch;
-  //robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
+  robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
   semPost(sem_id, ROBOTSENSORS);
   LOGInfo(NUCLEO_TAG, 1, "End:Possition sync.");
   return NULL;
@@ -2063,7 +2069,7 @@ void *syncOperatorDetect(void *arg) {
         semWait(sem_id, OPERATOR_POSSITION);
         operatorCameraPossitionX = (double)operatorCenter.x * ((double)pointCloudBuffer.cols / OPERATOR_ANALYSE_WIDTH);
         operatorCameraPossitionY = (double)operatorCenter.y * ((double)pointCloudBuffer.rows / OPERATOR_ANALYSE_HEIGHT);
-        operatorPossition = Point3f(-1,-1,-1);
+        operatorPossition = Point3f(-1, -1, -1);
 
         for (int okolie = 0; okolie < 10; okolie++) {
           if (depthValid.at<uchar>(operatorCameraPossitionY + okolie, operatorCameraPossitionX) > 0) {
@@ -2084,7 +2090,7 @@ void *syncOperatorDetect(void *arg) {
           }
         }
 
-        if(operatorPossition.x == -1 && operatorPossition.y == -1 && operatorPossition.z == -1) {
+        if (operatorPossition.x == -1 && operatorPossition.y == -1 && operatorPossition.z == -1) {
           semWait(sem_id, ROBOTACCULATORS);
           double alfa0 = robotAcculators.kinect.roll;
           semPost(sem_id, ROBOTACCULATORS);
@@ -2175,7 +2181,6 @@ void *syncOperatorDetect(void *arg) {
       depthOperatorMaskChoose = 2;
       semPost(sem_id, DEPTH_OPERATOR_MASK_VARIABLE);
       semPost(sem_id, DEPTH_OPERATOR_MASK2);
-
     }
     else {
       semWait(sem_id, DEPTH_OPERATOR_MASK1);
@@ -2437,9 +2442,9 @@ void *syncGenerateJorney(void *arg) {
     Point3f operatorPossitionLocal = operatorPossition;
     semPost(sem_id, OPERATOR_POSSITION);
 
-    semWait(sem_id, ROBOTACCULATORS);
+    semWait(sem_id, ROBOTSENSORS);
     double kinectYaw = robotAcculators.kinect.yaw;
-    semPost(sem_id, ROBOTACCULATORS);
+    semPost(sem_id, ROBOTSENSORS);
 
     double minPointX = operatorPossitionLocal.x * MAP_SCALE;
     double minPointZ = operatorPossitionLocal.z * MAP_SCALE;
@@ -2707,7 +2712,6 @@ void *syncKinectSensors(void *arg) {
   return NULL;
 }
 
-
 void *syncModules(void *arg) {
   unsigned long timeRunThread[NUMBER_OF_MODULES];
   for (int i = 0; i < NUMBER_OF_MODULES; i++) {
@@ -2722,6 +2726,8 @@ void *syncModules(void *arg) {
 
 //acculators
 #if ENABLE_MOTORS == 1
+    if (timeRunThread[threadIndex] > SYNC_MOTORS_TIME * 2)
+      LOGError(I2C_TAG, "Twice time motor sync.");
     if (timeRunThread[threadIndex] > SYNC_MOTORS_TIME) {
       syncMotors(false);
       timeRunThread[threadIndex] = 0;
@@ -2735,6 +2741,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_KINECTMOTOR == 1
+    if (timeRunThread[threadIndex] > SYNC_KINECTMOTOR_TIME * 2)
+      LOGError(I2C_TAG, "Twice time kinect motor sync.");
     if (timeRunThread[threadIndex] > SYNC_KINECTMOTOR_TIME) {
       syncKinectMotor(false);
       timeRunThread[threadIndex] = 0;
@@ -2747,6 +2755,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_LEDS == 1
+    if (timeRunThread[threadIndex] > SYNC_LEDS_TIME * 2)
+      LOGError(I2C_TAG, "Twice time led sync.");
     if (timeRunThread[threadIndex] > SYNC_LEDS_TIME) {
       syncLeds(false);
       timeRunThread[threadIndex] = 0;
@@ -2759,6 +2769,9 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_KINECTLED == 1
+
+    if (timeRunThread[threadIndex] > SYNC_KINECTLED_TIME * 2)
+      LOGError(I2C_TAG, "Twice time kinect led sync.");
     if (timeRunThread[threadIndex] > SYNC_KINECTLED_TIME) {
       syncKinectLed(false);
       timeRunThread[threadIndex] = 0;
@@ -2772,8 +2785,11 @@ void *syncModules(void *arg) {
 
 //sensors
 #if ENABLE_ULTRASONIC == 1
+    if (timeRunThread[threadIndex] > (SYNC_ULTRASONIC_TIME * 2))
+      LOGError(I2C_TAG, "Twice time ultrasonic sync.");
     if (timeRunThread[threadIndex] > SYNC_ULTRASONIC_TIME) {
       syncUltrasonic(NULL);
+//printf("%lu\n",timeRunThread[threadIndex]);
       timeRunThread[threadIndex] = 0;
     }
     threadIndex++;
@@ -2781,6 +2797,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_BUTTONS == 1
+    if (timeRunThread[threadIndex] > SYNC_BUTTONS_TIME * 2)
+      LOGError(I2C_TAG, "Twice time button sync.");
     if (timeRunThread[threadIndex] > SYNC_BUTTONS_TIME) {
       syncButtons(NULL);
       timeRunThread[threadIndex] = 0;
@@ -2790,6 +2808,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_POSSITION == 1
+    if (timeRunThread[threadIndex] > SYNC_POSSITION_TIME * 2)
+      LOGError(I2C_TAG, "Twice time possition sync.");
     if (timeRunThread[threadIndex] > SYNC_POSSITION_TIME) {
       syncPossition(NULL);
       timeRunThread[threadIndex] = 0;
@@ -2799,6 +2819,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_KINECTSENSORS == 1
+    if (timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME * 2)
+      LOGError(I2C_TAG, "Twice time kinect sensor sync.");
     if (timeRunThread[threadIndex] > SYNC_KINECTSENSORS_TIME) {
       syncKinectSensors(NULL);
       timeRunThread[threadIndex] = 0;
@@ -2808,6 +2830,8 @@ void *syncModules(void *arg) {
 #endif
 
 #if ENABLE_VOLTAGE == 1
+    if (timeRunThread[threadIndex] > SYNC_VOLTAGE_TIME * 2)
+      LOGError(I2C_TAG, "Twice time voltage sync.");
     if (timeRunThread[threadIndex] > SYNC_VOLTAGE_TIME) {
       syncVoltage(NULL);
       timeRunThread[threadIndex] = 0;
@@ -2818,7 +2842,10 @@ void *syncModules(void *arg) {
 
     clock_gettime(CLOCK_MONOTONIC, &tend);
 
-    unsigned long deltaTimeRun = ((tend.tv_sec - tstart.tv_sec) * 1000) + ((tend.tv_nsec - tstart.tv_nsec) / 1000);
+            //printf("%lu;%lu;%lu;%lu;%lu\n",tstart.tv_sec,tend.tv_sec,tstart.tv_nsec,tend.tv_nsec, timeRunThread[0]);
+
+    unsigned long deltaTimeRun = (unsigned long)(((double)(tend.tv_sec - tstart.tv_sec) * 1000000) + ((double)(tend.tv_nsec - tstart.tv_nsec) / 1000));
+
 
     for (int i = 0; i < NUMBER_OF_MODULES; i++) {
       if (timeRunThread[i] <= ULONG_MAX) {
