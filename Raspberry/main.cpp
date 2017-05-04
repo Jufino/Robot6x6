@@ -22,7 +22,7 @@ int main(void) {
 
     RobotAcculators robotAcculators = getRobotAcculators();
     //RobotSensors robotSensors = getRobotSensors();
-    robotAcculators.kinect.roll = 20;
+    robotAcculators.kinect.roll = 10*(M_PI/180);
     //robotAcculators.leds.LedMiddle = COLOR_ORANGE;
     //robotAcculators.ledKinect = LEDKINECT_RED;
     setRobotAcculators(robotAcculators);

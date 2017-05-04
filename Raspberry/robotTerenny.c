@@ -1316,7 +1316,7 @@ void *syncCameraNetworkConnection(void *arg) {
       semPost(sem_id, JOURNEY_POINTS);
 
       circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 200 * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
-      if (1400 * MAP_SCALE > 0) {
+      if (140 * MAP_SCALE > 0) {
         circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 140 * MAP_SCALE, Scalar( 0, 255, 255 ), 1, 8); // robot zone
         line(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), Point(MAP_WIDTH / 2 + (140 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw), MAP_HEIGHT / 2 + (140 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw)), Scalar( 0, 255, 255 ), 1, 8);
       }
@@ -1331,8 +1331,8 @@ void *syncCameraNetworkConnection(void *arg) {
 
       int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
       int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
-      if (operatorPossition.x != -1 && operatorPossition.y != -1) {
-        circle(map, Point(x2, z2), 1, Scalar( 0, 255, 255 ), -1, 8);
+      if (operatorPossition.x != -1 && operatorPossition.z != -1) {
+        circle(map, Point(x2, z2), 2, Scalar( 0, 0, 255 ), -1, 8);
         circle(map, Point(x2, z2), MAP_DISTANCE_FROM_OPERATOR * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8);
       }
       semPost(sem_id, OPERATOR_POSSITION);
@@ -1752,7 +1752,7 @@ void *syncPossition(void *arg) {
   robotSensors.robotPosition.axisPossition.z = axis.z;
   robotSensors.robotPosition.anglePossition.roll = angle.roll;
   robotSensors.robotPosition.anglePossition.pitch = angle.pitch;
-  robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
+  //robotSensors.robotPosition.anglePossition.yaw = angle.yaw;
   semPost(sem_id, ROBOTSENSORS);
   LOGInfo(NUCLEO_TAG, 1, "End:Possition sync.");
   return NULL;
@@ -1790,11 +1790,23 @@ void *syncGenerateMap(void *arg) {
   while (onAllThreads) {
     LOGInfo(MAP_TAG, 1, "Start:Map generate sync.");
     RobotPosition_struct robotPosition = getRobotPossition();
-    Mat pointCloudBuffer = getPointCloudMapKinect();
+
+    char index = pauseGrabKinect();
+    Mat pointCloudBuffer = getPointCloudMapKinect(index);
+    Mat depthValid = getDepthValidKinect(index);
+    continueGrabKinect(index);
 
     Mat map = getMapImage();
     if (map.empty())
       map = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
+
+    semWait(sem_id, ROBOTACCULATORS);
+    double kinectYaw = robotAcculators.kinect.yaw;
+    semPost(sem_id, ROBOTACCULATORS);
+
+    semWait(sem_id, ROBOTSENSORS);
+    double valueUlt = robotSensors.ultrasonic;
+    semPost(sem_id, ROBOTSENSORS);
 
     long robotX = robotPosition.axisPossition.x * MAP_SCALE;
     long robotY = robotPosition.axisPossition.y * MAP_SCALE;
@@ -1807,6 +1819,7 @@ void *syncGenerateMap(void *arg) {
       mapOffsetY = robotY;
     }
 
+    //zabudanie
     for (int x = 0; x < map.cols; x++) {
       for (int y = 0; y < map.rows; y++) {
         Vec3b color = map.at<Vec3b>(Point(x, y));
@@ -1823,30 +1836,31 @@ void *syncGenerateMap(void *arg) {
       }
     }
 
+    //mapovanie na zaklade kinectu
     for (int x = 0; x < pointCloudBuffer.cols; x++) {
       for (int y = 0; y < pointCloudBuffer.rows; y++) {
-        if ( !pointCloudBuffer.empty() )   {
+        if ( !pointCloudBuffer.empty() && depthValid.at<uchar>(y, x) > 0)   {
           Point3f p = pointCloudBuffer.at<Point3f>(y, x);
           float kinectPointX = p.x;         //pozicia vlavo/vpravo na kinecte
           float kinectpointY = p.y + 0.21;  //pozicia hore/dole na kinecte
           float kinectPointZ = p.z;         //hlbka
 
-          if (kinectpointY >= MIN_BARRIER_HEIGHT && kinectpointY <= MAX_BARRIER_HEIGHT && kinectPointX != 0 && kinectpointY != 0 && kinectPointZ != 0) {
+          if (kinectpointY >= MIN_BARRIER_HEIGHT && kinectpointY <= MAX_BARRIER_HEIGHT) {
             int pointZ = kinectPointZ * (1000 * MAP_SCALE);
             int pointX = kinectPointX * (1000 * MAP_SCALE);
 
             double r = sqrt((double)(pointX * pointX + pointZ * pointZ));
             double angle = acos((-(double)pointX) / r) - 3.14 / 2;
 
-            int x2 = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
-            int z2 = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+            int x2 = r * cos(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_WIDTH / 2;
+            int z2 = r * sin(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_HEIGHT / 2;
 
-            if (x2 > 0 && x2 < MAP_WIDTH && z2 > 0 && z2 < MAP_HEIGHT) {
+            if (x2 >= 0 && x2 < MAP_WIDTH && z2 >= 0 && z2 < MAP_HEIGHT) {
 
               Vec3b color = map.at<Vec3b>(Point(x2, z2));
 
               int varMapCreation[3];
-              varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION;
+              varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION_KINECT;
 
               if (varMapCreation[1] >= 255)
                 color[1] = 255;
@@ -1857,6 +1871,26 @@ void *syncGenerateMap(void *arg) {
             }
           }
         }
+      }
+    }
+
+    //mapovanie na zaklade ultrazvuku
+    for (double angle = -(M_PI / 180) * 15; angle <= (M_PI / 180) * 15; angle += (((M_PI / 180) * 15) / 100)) {
+
+      int x = valueUlt * (10 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+      int y = valueUlt * (10 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+
+      if (x > 0 && x < MAP_WIDTH && y > 0 && y < MAP_HEIGHT) {
+        Vec3b color = map.at<Vec3b>(Point(x, y));
+        int varMapCreation[3];
+        varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION_ULT;
+
+        if (varMapCreation[1] >= 255)
+          color[1] = 255;
+        else
+          color[1] = varMapCreation[1];
+
+        map.at<Vec3b>(Point(x, y)) = color;
       }
     }
 
@@ -1898,13 +1932,11 @@ void *syncOperatorDetect(void *arg) {
     Mat hsvOperatorImage;
     Mat orangeOperatorMaskImage;
     Mat greenOperatorMaskImage;
-    Mat depthOperatorMaskImage = Mat(Size(320, 240), CV_8UC1, Scalar(0));
+    Mat depthOperatorMaskImage = Mat(Size(OPERATOR_ANALYSE_WIDTH, OPERATOR_ANALYSE_HEIGHT), CV_8UC1, Scalar(0));
 
     if (!rgbOperatorImage.empty() && !depthValid.empty() && !pointCloudBuffer.empty()) {
 
-      resize(rgbOperatorImage, rgbOperatorImage, Size(320, 240));
-      //resize(depthOperatorMap, depthOperatorMap, Size(320, 240));
-      //resize(depthValid, depthValid, Size(320, 240));
+      resize(rgbOperatorImage, rgbOperatorImage, Size(OPERATOR_ANALYSE_WIDTH, OPERATOR_ANALYSE_HEIGHT));
 
       cvtColor(rgbOperatorImage, hsvOperatorImage, COLOR_BGR2HSV); //konverzia na hsv model
       inRange(hsvOperatorImage, Scalar(iLowH_green, iLowS_green, iLowV_green), Scalar(iHighH_green, iHighS_green, iHighV_green), greenOperatorMaskImage); //vytvorenie masky zelenej farby
@@ -2029,21 +2061,39 @@ void *syncOperatorDetect(void *arg) {
 #endif
 
         semWait(sem_id, OPERATOR_POSSITION);
-        operatorCameraPossitionX = operatorCenter.x * 2;
-        operatorCameraPossitionY = operatorCenter.y * 2;
+        operatorCameraPossitionX = (double)operatorCenter.x * ((double)pointCloudBuffer.cols / OPERATOR_ANALYSE_WIDTH);
+        operatorCameraPossitionY = (double)operatorCenter.y * ((double)pointCloudBuffer.rows / OPERATOR_ANALYSE_HEIGHT);
+        operatorPossition = Point3f(-1,-1,-1);
 
-        if (depthValid.at<uchar>(operatorCameraPossitionY, operatorCameraPossitionX) > 0)
-          operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY, operatorCameraPossitionX);
-        else if (depthValid.at<uchar>(operatorCameraPossitionY + 5, operatorCameraPossitionX) > 0)
-          operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY + 5, operatorCameraPossitionX);
-        else if (depthValid.at<uchar>(operatorCameraPossitionY , operatorCameraPossitionX + 5) > 0)
-          operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY, operatorCameraPossitionX + 5);
-        else if (depthValid.at<uchar>(operatorCameraPossitionY , operatorCameraPossitionX - 5) > 0)
-          operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY, operatorCameraPossitionX - 5);
-        else if (depthValid.at<uchar>(operatorCameraPossitionY - 5 , operatorCameraPossitionX) > 0)
-          operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY - 5, operatorCameraPossitionX);
-        else
-          operatorPossition = Point3f(-1, -1, -1);
+        for (int okolie = 0; okolie < 10; okolie++) {
+          if (depthValid.at<uchar>(operatorCameraPossitionY + okolie, operatorCameraPossitionX) > 0) {
+            operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY + okolie, operatorCameraPossitionX);
+            break;
+          }
+          else if (okolie != 0 && depthValid.at<uchar>(operatorCameraPossitionY , operatorCameraPossitionX + okolie) > 0) {
+            operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY, operatorCameraPossitionX + 5);
+            break;
+          }
+          else if (okolie != 0 && depthValid.at<uchar>(operatorCameraPossitionY , operatorCameraPossitionX - okolie) > 0) {
+            operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY, operatorCameraPossitionX - 5);
+            break;
+          }
+          else if (okolie != 0 && depthValid.at<uchar>(operatorCameraPossitionY - okolie , operatorCameraPossitionX) > 0) {
+            operatorPossition = pointCloudBuffer.at<Point3f>(operatorCameraPossitionY - okolie, operatorCameraPossitionX);
+            break;
+          }
+        }
+
+        if(operatorPossition.x == -1 && operatorPossition.y == -1 && operatorPossition.z == -1) {
+          semWait(sem_id, ROBOTACCULATORS);
+          double alfa0 = robotAcculators.kinect.roll;
+          semPost(sem_id, ROBOTACCULATORS);
+          double alfa1 = (OPERATOR_ANALYSE_HEIGHT - (double)maxY) * ((43 * (M_PI / 180)) / OPERATOR_ANALYSE_HEIGHT);
+          double alfa2 = (operatorCenter.x - OPERATOR_ANALYSE_WIDTH / 2) * ((57 * (M_PI / 180)) / OPERATOR_ANALYSE_HEIGHT);
+          operatorPossition.z = OPERATOR_LEG_HEIGHT / tan(alfa0 + alfa1);
+          operatorPossition.x = tan(alfa2) * operatorPossition.z;
+          operatorPossition.y = -1;
+        }
 
         if (operatorPossition.x != -1 && operatorPossition.y != -1 && operatorPossition.z != -1) {
           operatorPossition.x = operatorPossition.x * 1000;
@@ -2387,13 +2437,17 @@ void *syncGenerateJorney(void *arg) {
     Point3f operatorPossitionLocal = operatorPossition;
     semPost(sem_id, OPERATOR_POSSITION);
 
+    semWait(sem_id, ROBOTACCULATORS);
+    double kinectYaw = robotAcculators.kinect.yaw;
+    semPost(sem_id, ROBOTACCULATORS);
+
     double minPointX = operatorPossitionLocal.x * MAP_SCALE;
     double minPointZ = operatorPossitionLocal.z * MAP_SCALE;
     double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
     double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
 
-    int xO = r * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
-    int zO = r * sin(robotPosition.anglePossition.yaw + angle) + MAP_HEIGHT / 2;
+    int xO = r * cos(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_WIDTH / 2;
+    int zO = r * sin(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_HEIGHT / 2;
 
     if (operatorPossitionLocal.z != -1 && operatorPossitionLocal.x != -1) {
       Point realFinish;
@@ -2500,6 +2554,11 @@ void *syncGenerateJorney(void *arg) {
       semPost(sem_id, JOURNEY_POINTS);
       //---------------------------
     }
+    else {
+      semWait(sem_id, JOURNEY_POINTS);
+      journeyPoint.clear();
+      semPost(sem_id, JOURNEY_POINTS);
+    }
     LOGInfo(MAP_TAG, 1, "End:Jorney generate sync.");
     sleep(SYNC_MAP_GENERATE_TIME);
   }
@@ -2511,7 +2570,7 @@ void *syncKinectMotor(bool checkChange) {
   unsigned char empty[1];
   LOGInfo(KINECT_TAG, 1, "Start:Motor sync.");
   semWait(sem_id, ROBOTACCULATORS);
-  int angle = robotAcculators.kinect.roll * 2;
+  int angle = robotAcculators.kinect.roll * (180 / M_PI) * 2;
   semPost(sem_id, ROBOTACCULATORS);
 
   if (!checkChange) {
