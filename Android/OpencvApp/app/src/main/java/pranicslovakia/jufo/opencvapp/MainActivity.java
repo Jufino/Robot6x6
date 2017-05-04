@@ -44,8 +44,8 @@ public class MainActivity extends Activity  {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        robotCommunicator = new RobotCommunicator("192.168.0.102",1212);
-        robotBitmap = new RobotBitmap(robotCommunicator,"img");
+        robotCommunicator = new RobotCommunicator("192.168.10.1",1212);
+        robotBitmap = new RobotBitmap(robotCommunicator,"imgK");
     }
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
