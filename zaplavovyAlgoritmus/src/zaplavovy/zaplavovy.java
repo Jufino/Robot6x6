@@ -55,7 +55,7 @@ public class zaplavovy extends javax.swing.JFrame {
         jLabel1 = new javax.swing.JLabel();
         spustiZaplavovyAlgoritmusButton = new javax.swing.JButton();
         ulozMapuButton = new javax.swing.JButton();
-        vymazMapuButton = new javax.swing.JButton();
+        vycistiMapuButton = new javax.swing.JButton();
         jSeparator2 = new javax.swing.JSeparator();
         jPanel2 = new javax.swing.JPanel();
         jLabel2 = new javax.swing.JLabel();
@@ -107,10 +107,10 @@ public class zaplavovy extends javax.swing.JFrame {
             }
         });
 
-        vymazMapuButton.setText("Vymaž mapu");
-        vymazMapuButton.addActionListener(new java.awt.event.ActionListener() {
+        vycistiMapuButton.setText("Vyčisti mapu");
+        vycistiMapuButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                vymazMapuButtonActionPerformed(evt);
+                vycistiMapuButtonActionPerformed(evt);
             }
         });
 
@@ -126,7 +126,7 @@ public class zaplavovy extends javax.swing.JFrame {
                         .addGap(0, 0, Short.MAX_VALUE))
                     .addComponent(spustiZaplavovyAlgoritmusButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(ulozMapuButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(vymazMapuButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(vycistiMapuButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(jSeparator2, javax.swing.GroupLayout.Alignment.TRAILING))
                 .addContainerGap())
         );
@@ -140,7 +140,7 @@ public class zaplavovy extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(ulozMapuButton)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(vymazMapuButton)
+                .addComponent(vycistiMapuButton)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
@@ -235,7 +235,7 @@ public class zaplavovy extends javax.swing.JFrame {
             }
         });
 
-        jLabel4.setText("Vzdialenost od ciela");
+        jLabel4.setText("Vzdialenosť od cieľa");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -361,7 +361,7 @@ public class zaplavovy extends javax.swing.JFrame {
 
         FileInputStream fos = null;
         try {
-            File fout = new File("out.txt");
+            File fout = new File("mapa.txt");
             fos = new FileInputStream(fout);
             BufferedReader br = new BufferedReader(new InputStreamReader(fos));
             for (int row = 0; row < model.getRowCount(); row++) {
@@ -390,12 +390,12 @@ public class zaplavovy extends javax.swing.JFrame {
 
     private void spustiZaplavovyAlgoritmusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_spustiZaplavovyAlgoritmusButtonActionPerformed
         try {
-            vymazMapu();
+            vycistiMapu();
             najdiStartACiel();
 
             isAtFinish = false;
             rozsirPrekazky();
-            aktualneOhodnotenie = 1;
+            aktualneOhodnotenie = 0;
             zaplavovyAlgoritmus();
             List<Bod> bodyCesty = najdiCestu();
             if (bodyCesty != null) {
@@ -422,7 +422,7 @@ public class zaplavovy extends javax.swing.JFrame {
     private void ulozMapuButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ulozMapuButtonActionPerformed
         FileOutputStream fos = null;
         try {
-            File fout = new File("out.txt");
+            File fout = new File("mapa.txt");
             fos = new FileOutputStream(fout);
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
             for (int row = 0; row < model.getRowCount(); row++) {
@@ -448,12 +448,12 @@ public class zaplavovy extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_ulozMapuButtonActionPerformed
 
-    private void vymazMapuButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_vymazMapuButtonActionPerformed
-        vymazMapu();
+    private void vycistiMapuButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_vycistiMapuButtonActionPerformed
+        vycistiMapu();
         while (prejdiBody.size() > 0) {
             prejdiBody.remove(0);
         }
-    }//GEN-LAST:event_vymazMapuButtonActionPerformed
+    }//GEN-LAST:event_vycistiMapuButtonActionPerformed
 
     private void vzdialenostOdCielaTextFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_vzdialenostOdCielaTextFieldFocusLost
         if(vzdialenostOdCielaTextField.getText().isEmpty()){
@@ -493,7 +493,7 @@ public class zaplavovy extends javax.swing.JFrame {
         }
     }
 
-    void vymazMapu() {
+    void vycistiMapu() {
         for (int row = 0; row < model.getRowCount(); row++) {
             for (int col = 0; col < model.getColumnCount(); col++) {
                 if (model.getValueAt(row, col) != null
@@ -794,13 +794,13 @@ public class zaplavovy extends javax.swing.JFrame {
         }
         int lastPriorita = -1;
         boolean moznyPosun = true;
-        while (oznacenyBod.getOhodnotenie() != 1 && moznyPosun) {
+        while (oznacenyBod.getOhodnotenie() != 0 && moznyPosun) {
             moznyPosun = false;
             for (int priorita = 1; priorita <= 8; priorita++) {
                 Bod offsetBodu = posunBoduPodlaPriority(priorita, poziciaCieluVociStartu);
                 Bod moznyNasledujuciBod = new Bod(oznacenyBod.getBod().getX() + offsetBodu.getX(), oznacenyBod.getBod().getY() + offsetBodu.getY());
                 if (isHodnotyZaplavovy(moznyNasledujuciBod) && Integer.parseInt(getValueOnMap(moznyNasledujuciBod)) == oznacenyBod.getOhodnotenie()) {
-                    if (priorita != lastPriorita && lastPriorita != -1) {
+                    if (priorita != lastPriorita) {
                             bodyCestyList.add(oznacenyBod.getBod().clone());
                     }
                     lastPriorita = priorita;
@@ -817,7 +817,7 @@ public class zaplavovy extends javax.swing.JFrame {
             for (int i = bodyCestyList.size() - 1; i >= 0; i--) {
                 bodyCestyZoradeneList.add(bodyCestyList.get(i));
             }
-            bodyCestyZoradeneList.add(koncovyBod);
+            //bodyCestyZoradeneList.add(koncovyBod);
             return bodyCestyZoradeneList;
         } else {
             return null;
@@ -893,7 +893,7 @@ public class zaplavovy extends javax.swing.JFrame {
     private javax.swing.JTable pointsTable;
     private javax.swing.JButton spustiZaplavovyAlgoritmusButton;
     private javax.swing.JButton ulozMapuButton;
-    private javax.swing.JButton vymazMapuButton;
+    private javax.swing.JButton vycistiMapuButton;
     private javax.swing.JTextField vzdialenostOdCielaTextField;
     // End of variables declaration//GEN-END:variables
 }
