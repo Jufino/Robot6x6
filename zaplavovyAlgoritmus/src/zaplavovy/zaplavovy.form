@@ -105,7 +105,7 @@
                       </Group>
                       <Component id="spustiZaplavovyAlgoritmusButton" alignment="0" max="32767" attributes="0"/>
                       <Component id="ulozMapuButton" alignment="0" max="32767" attributes="0"/>
-                      <Component id="vymazMapuButton" alignment="1" max="32767" attributes="0"/>
+                      <Component id="vycistiMapuButton" alignment="1" max="32767" attributes="0"/>
                       <Component id="jSeparator2" alignment="1" max="32767" attributes="0"/>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
@@ -122,7 +122,7 @@
                   <EmptySpace max="-2" attributes="0"/>
                   <Component id="ulozMapuButton" min="-2" max="-2" attributes="0"/>
                   <EmptySpace max="-2" attributes="0"/>
-                  <Component id="vymazMapuButton" min="-2" max="-2" attributes="0"/>
+                  <Component id="vycistiMapuButton" min="-2" max="-2" attributes="0"/>
                   <EmptySpace max="32767" attributes="0"/>
                   <Component id="jSeparator2" min="-2" pref="10" max="-2" attributes="0"/>
               </Group>
@@ -154,12 +154,12 @@
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="ulozMapuButtonActionPerformed"/>
           </Events>
         </Component>
-        <Component class="javax.swing.JButton" name="vymazMapuButton">
+        <Component class="javax.swing.JButton" name="vycistiMapuButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Vyma&#x17e; mapu"/>
+            <Property name="text" type="java.lang.String" value="Vy&#x10d;isti mapu"/>
           </Properties>
           <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="vymazMapuButtonActionPerformed"/>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="vycistiMapuButtonActionPerformed"/>
           </Events>
         </Component>
         <Component class="javax.swing.JSeparator" name="jSeparator2">
@@ -303,7 +303,7 @@
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel4">
       <Properties>
-        <Property name="text" type="java.lang.String" value="Vzdialenost od ciela"/>
+        <Property name="text" type="java.lang.String" value="Vzdialenos&#x165; od cie&#x13e;a"/>
       </Properties>
     </Component>
   </SubComponents>
