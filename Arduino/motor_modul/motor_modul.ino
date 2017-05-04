@@ -1,7 +1,7 @@
 #include <Wire.h>
 /*I2C adresa*/
 #define I2CDebug false
-#define speedAndCurrentDebug true
+#define speedAndCurrentDebug false
 #define addressI2C 0x01 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureCurrentAction 50
@@ -17,59 +17,33 @@ bool measureStart = false;
 /*--------------------------------------------------*/
 /* ostatné nastavenia*/
 #define numberOfTimer 3              //pocet casovacov
-#define periodVoltageMeasure 1000000L //perioda pre prudovy regulator [uS]
-#define periodCurrentRegulator 1500L //perioda pre prudovy regulator [uS]
-#define periodSpeedRegulator 150000L //perioda pre rychlostny regulator [uS]
+#define periodVoltageMeasure 1000000L //perioda pre prudovy regulator
+#define periodCurrentRegulator 1500L //perioda pre prudovy regulator
+#define periodSpeedRegulator 100000L //perioda pre rychlostny regulator
 /* filter */
 #define LPF_Beta 0.025 //konštanta dolnopriepustného filtra - https://kiritchatterjee.wordpress.com/2014/11/10/a-simple-digital-low-pass-filter-in-c/
 #define useLPF true   //spustenie alebo vypnutie filtrácie prúdu
-/* premenne prúdového regulátora */
-#define periodaCurrent 0.0015
-#define PCurrent 0.12
-#define ICurrent 0.006
-#define DCurrent 0
-#define uCurrentSaturationMax 255
-#define uCurrentSaturationMin 0
-double kpCurrent = PCurrent;
-double kiCurrent = PCurrent * (periodaCurrent / ICurrent);
-double kdCurrent = PCurrent * (DCurrent / periodaCurrent);
-#define q0Current (kpCurrent+kdCurrent)
-#define q1Current (-kpCurrent-2*kdCurrent+kiCurrent)
-#define q2Current kdCurrent
-#define p1Current ((kiCurrent-kdCurrent)/(kpCurrent+kiCurrent+kdCurrent))
-#define p2Current ((kdCurrent)/(kpCurrent+kiCurrent+kdCurrent))
-double umRegCurrent = 0;
-double ueRegCurrent[] = {0, 0, 0};
-double uRegCurrent[] = {0, 0};
-double eRegCurrent[] = {0, 0, 0};
-double pozadRegCurrent = 0;
+/* konštanty prúdového regulátora */
+#define Pcurrent 2
+#define Icurrent 0.8
+#define Kbcurrent 0.2
 volatile bool onCurrentReg = true;
-/* premenne rychlostneho regulátora */
-#define periodaSpeed 0.15
-#define PSpeed 1.5
-#define ISpeed 1.1
-#define DSpeed 0
-#define uSpeedSaturationMax 600
-#define uSpeedSaturationMin -600
-double kpSpeed = PSpeed;
-double kiSpeed = PSpeed * (periodaSpeed / ISpeed);
-double kdSpeed = PSpeed * (DSpeed / periodaSpeed);
-#define q0Speed (kpSpeed+kdCurrent)
-#define q1Speed (-kpSpeed-2*kdCurrent+kiSpeed)
-#define q2Speed kdSpeed
-#define p1Speed ((kiSpeed-kdCurrent)/(kpSpeed+kiSpeed+kdSpeed))
-#define p2Speed ((kdSpeed)/(kpSpeed+kiCurrent+kdSpeed))
-double umRegSpeed = 0;
-double ueRegSpeed[] = {0, 0, 0};
-double uRegSpeed[] = {0, 0};
-double eRegSpeed[] = {0, 0, 0};
-double pozadRegSpeed = 50;
+/*konštanty rýchlostného regulátora */
+#define Pspeed 0.30
+#define Ispeed 0.27
+#define Kbspeed 0.5
 volatile bool onSpeedReg = true;
-
+#define maxUspeddReg 500
+/*--------------------------------------------------*/
 /*pomocné premenné*/
 unsigned long last_time = 0;
 unsigned long sumCurrent = 0;
 unsigned long timesCurrentMeasure = 0;
+
+double regCurrentIsum = 0;
+double regSpeedIsum = 0;
+double pozadCurrent = 0;
+double pozadSpeed = 0;
 unsigned long time_integral[numberOfTimer];
 long numberTickLast = 0;
 volatile bool periodDone = false;
@@ -219,14 +193,14 @@ void receiveEvent(int howMany) {
       e = Wire.read();
       onSpeedReg = false;
       onCurrentReg = true;
-      pozadRegCurrent = ((d << 8) | e);
+      pozadCurrent = ((d << 8) | e);
       break;
     case 100:
       d = Wire.read();
       e = Wire.read();
       onSpeedReg = true;
       onCurrentReg = true;
-      pozadRegSpeed = (d << 8) | e;
+      pozadSpeed = (d << 8) | e;
       break;
     case 101:
       d = Wire.read();
@@ -234,36 +208,6 @@ void receiveEvent(int howMany) {
       onSpeedReg = false;
       onCurrentReg = false;
       motor((d << 8) | e);
-      break;
-    case 102:
-      d = Wire.read();
-      e = Wire.read();
-      kpCurrent = ((float)((d << 8) | e)) / 1000;
-      break;
-    case 103:
-      d = Wire.read();
-      e = Wire.read();
-      kiCurrent = ((float)((d << 8) | e)) / 1000;
-      break;
-    case 104:
-      d = Wire.read();
-      e = Wire.read();
-      kdCurrent = ((float)((d << 8) | e)) / 1000;
-      break;
-    case 105:
-      d = Wire.read();
-      e = Wire.read();
-      kpSpeed = ((float)((d << 8) | e)) / 1000;
-      break;
-    case 106:
-      d = Wire.read();
-      e = Wire.read();
-      kiSpeed = ((float)((d << 8) | e)) / 1000;
-      break;
-    case 107:
-      d = Wire.read();
-      e = Wire.read();
-      kdSpeed = ((float)((d << 8) | e)) / 1000;
       break;
   }
   if (I2CDebug) {
@@ -304,10 +248,7 @@ void requestEvent() {
   c = -1;
 }
 double uLastSpeed = 0;
-
-
-
-
+double uLastCurrent = 0;
 void loop() {
   /*--------------------------------------------------*/
   /*prikazy pouzitelne cez seriovy port pre meranie*/
@@ -329,10 +270,10 @@ void loop() {
       measureIndex = 0;
       measureStart = true;
       if (measureDebugSpeed)
-        pozadRegSpeed = measureSpeedAction;
+        pozadSpeed = measureSpeedAction;
       else if (measureDebugCurrent) {
-        //pozadRegCurrent = measureCurrentAction;
-        motor(200); //prud pri merani
+        pozadCurrent = measureCurrentAction;
+        //motor(255); //prud pri merani
       }
     }
   }
@@ -387,63 +328,36 @@ void loop() {
     measureSpeedToSend[1] = (measureSpeed >> 8) & 0xFF;
     //------
     if (speedAndCurrentDebug) {
-      Serial.print(uRegCurrent[0]);
-      Serial.print("/");
-      Serial.print(pozadRegCurrent);
-      Serial.print("/");
       Serial.print(averageMeasureCurrent);
       Serial.print("/");
       Serial.println(speedWheel);
     }
     /*--------------------------------------------------*/
     if (onSpeedReg) {
-      /*Regulator rýchlosti*/
-      eRegSpeed[2] = eRegSpeed[1]; //e(k-2)
-      eRegSpeed[1] = eRegSpeed[0]; //e(k-1)
-      eRegSpeed[0] = pozadRegSpeed - speedWheel; //e(k)
+      /*PI regulator rychlosti*/
+      double e = pozadSpeed - speedWheel;
+      regSpeedIsum += Ispeed * e;
+      if (pozadSpeed >= 0) {
+        if (uLastSpeed > maxUspeddReg) regSpeedIsum += -uLastSpeed + maxUspeddReg;
+        else if (uLastSpeed < 0) regSpeedIsum += -uLastSpeed + 0;
+      }
+      else {
+        if (uLastSpeed < -maxUspeddReg) regSpeedIsum += -uLastSpeed - maxUspeddReg;
+        else if (uLastSpeed > 0) regSpeedIsum += -uLastSpeed + 0;
+      }
+      if (e == 0 && pozadSpeed == 0) regSpeedIsum = 0; //ak je pozadovana 0 a tiez odchylka 0 chceme, aby bol aj nulovy prud
+      double u = e * Pspeed + regSpeedIsum;
+      uLastSpeed = u;
+      if (pozadSpeed >= 0) {
+        if (u > maxUspeddReg) u = maxUspeddReg;
+        else if (u < 0) u = 0;
+      }
+      else {
+        if (u < -maxUspeddReg) u = -maxUspeddReg;
+        else if (u > 0) u = 0;
+      }
+      pozadCurrent = u;
 
-      uRegSpeed[1] = uRegSpeed[0];
-      uRegSpeed[0] = uRegSpeed[1] + q0Speed * eRegSpeed[0] + q1Speed * eRegSpeed[1] + q2Speed * eRegSpeed[2] - p1Speed * ueRegSpeed[1] - p2Speed * ueRegSpeed[2];
-
-      if (pozadRegSpeed > 0) {
-        if (uRegSpeed[0] < 0)
-          umRegSpeed = 0;
-        else if (uRegSpeed[0] > uSpeedSaturationMax)
-          umRegSpeed = uSpeedSaturationMax;
-        else
-          umRegSpeed = uRegSpeed[0];
-      }
-      else
-      {
-        if (uRegSpeed[0] < uSpeedSaturationMin)
-          umRegSpeed = uSpeedSaturationMin;
-        else if (uRegSpeed[0] > 0)
-          umRegSpeed = 0;
-        else
-          umRegSpeed = uRegSpeed[0];
-      }
-
-      ueRegSpeed[2] = ueRegSpeed[1];
-      ueRegSpeed[1] = ueRegSpeed[0];
-      ueRegSpeed[0] = uRegSpeed[0] - umRegSpeed;
-      if (pozadRegSpeed > 0) {
-        if (uRegSpeed[0] < 0)
-          uRegSpeed[0] = 0;
-        else if (uRegSpeed[0] > uSpeedSaturationMax)
-          uRegSpeed[0] = uSpeedSaturationMax;
-        else
-          uRegSpeed[0] = uRegSpeed[0];
-      }
-      else
-      {
-        if (uRegSpeed[0] < uSpeedSaturationMin)
-          uRegSpeed[0] = uSpeedSaturationMin;
-        else if (uRegSpeed[0] > 0)
-          uRegSpeed[0] = 0;
-        else
-          uRegSpeed[0] = uRegSpeed[0];
-      }
-      pozadRegCurrent = uRegSpeed[0];
     }
     /*--------------------------------------------------*/
     /*sluzi iba pri merani*/
@@ -451,7 +365,7 @@ void loop() {
       if (numberOfMeasureDataSpeed <= measureIndex) {
         measureStart = false;
         measureIndex = 0;
-        pozadRegSpeed = 0;
+        pozadSpeed = 0;
       }
       else {
         measureData[measureIndex++] = (unsigned char)speedWheel;
@@ -469,38 +383,23 @@ void loop() {
     if (onCurrentReg) {
       /*--------------------------------------------------*/
       /*PI regulator prúdu*/
-      eRegCurrent[2] = eRegCurrent[1]; //e(k-2)
-      eRegCurrent[1] = eRegCurrent[0]; //e(k-1)
-      if (pozadRegCurrent > 0)
-        eRegCurrent[0] = pozadRegCurrent - averageMeasureCurrent; //e(k)
+      double e;
+      if (pozadCurrent > 0)
+        e = pozadCurrent - averageMeasureCurrent;
       else
-        eRegCurrent[0] = -pozadRegCurrent - averageMeasureCurrent; //e(k)
-
-      uRegCurrent[1] = uRegCurrent[0];
-      uRegCurrent[0] = uRegCurrent[1] + q0Current * eRegCurrent[0] + q1Current * eRegCurrent[1] + q2Current * eRegCurrent[2] - p1Current * ueRegCurrent[1] - p2Current * ueRegCurrent[2];
-
-      if (uRegCurrent[0] < uCurrentSaturationMin)
-        umRegCurrent = uCurrentSaturationMin;
-      else if (uRegCurrent[0] > uCurrentSaturationMax)
-        umRegCurrent = uCurrentSaturationMax;
+        e = -pozadCurrent - averageMeasureCurrent;
+      regCurrentIsum += Icurrent * e;
+      if (uLastCurrent > 255) regCurrentIsum += -uLastCurrent + 255;
+      if (uLastCurrent < 0) regCurrentIsum += -uLastCurrent + 0;
+      int u = (int)(e * Pcurrent + regCurrentIsum);
+      uLastCurrent = u;
+      if (u > 255) u = 255;
+      else if (u < 0) u = 0;
+      if (pozadCurrent > 0)
+        motor(u);
       else
-        umRegCurrent = uRegCurrent[0];
+        motor(-u);
 
-      ueRegCurrent[2] = ueRegCurrent[1];
-      ueRegCurrent[1] = ueRegCurrent[0];
-      ueRegCurrent[0] = uRegCurrent[0] - umRegCurrent;
-
-      if (uRegCurrent[0] < uCurrentSaturationMin)
-        uRegCurrent[0] = uCurrentSaturationMin;
-      else if (uRegCurrent[0] > uCurrentSaturationMax)
-        uRegCurrent[0] = uCurrentSaturationMax;
-      else
-        uRegCurrent[0] = uRegCurrent[0];
-
-      if (pozadRegCurrent > 0)
-        motor((int)uRegCurrent[0]);
-      else
-        motor(-(int)uRegCurrent[0]);
     }
     /*--------------------------------------------------*/
     /*sluzi iba pri merani*/
@@ -508,7 +407,7 @@ void loop() {
       if (numberOfMeasureDataCurrent <= measureIndex) {
         measureStart = false;
         measureIndex = 0;
-        pozadRegCurrent = 0;
+        pozadCurrent = 0;
         //motor(0);
       }
       else {

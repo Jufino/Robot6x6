@@ -633,9 +633,9 @@ void GY87::calibrateGyro(uint8_t samples)
     dg.ZAxis = sumZ / samples;
 
     // Calculate threshold vectors
-    th.XAxis = sqrt((sigmaX / samples) - (dg.XAxis * dg.XAxis));
-    th.YAxis = sqrt((sigmaY / samples) - (dg.YAxis * dg.YAxis));
-    th.ZAxis = sqrt((sigmaZ / samples) - (dg.ZAxis * dg.ZAxis));
+    th.XAxis = sqrt((sigmaX / 50) - (dg.XAxis * dg.XAxis));
+    th.YAxis = sqrt((sigmaY / 50) - (dg.YAxis * dg.YAxis));
+    th.ZAxis = sqrt((sigmaZ / 50) - (dg.ZAxis * dg.ZAxis));
 
     // If already set threshold, recalculate threshold vectors
     if (actualThreshold > 0)

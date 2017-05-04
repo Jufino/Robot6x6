@@ -8,11 +8,10 @@ GY87 gy87;
 #define alfaAccelAndGyro 0.95 //pomer zberu dat medzi accelerometrom a gyroscopom
 #define alfaCompass 0.70      //dolnopriepustny filter
 
-#define debug 1
+#define debug 0
 #define I2CDebug 0
 #define printDegree 1
 #define printCalibrate 0
-#define printVoltage 0
 #define pocMaxValue 10
 bool callibrateCompassOn = false;
 bool callibrateGyOn = false;
@@ -30,8 +29,7 @@ float roll = 0;
 float pitch = 0;
 float yaw = 0;
 int poc = 0;
-int sumVoltage = 0;
-int pocVoltage = 0;
+
 unsigned long timer = 0;
 float timeStep = 0.01;
 
@@ -39,7 +37,6 @@ volatile char c = -1;
 byte rollToSend[2];
 byte pitchToSend[2];
 byte yawToSend[2];
-byte voltageToSend[2];
 byte addressI2CToSend[] = {addressI2C};
 
 void setup()
@@ -65,16 +62,16 @@ void setup()
   gy87.setMeasurementMode(HMC5883L_CONTINOUS);
   gy87.setDataRate(HMC5883L_DATARATE_30HZ);
   gy87.setSamples(HMC5883L_SAMPLES_8);
-  /*
-    offX = -12;
-    offY = -215;
-    offZ = -226;
-    EEPROM.update(0, offX);
-    EEPROM.update(1, offX >> 8);
-    EEPROM.update(2, offY);
-    EEPROM.update(3, offY >> 8);
-    EEPROM.update(4, offZ);
-    EEPROM.update(5, offZ >> 8);
+/*
+  offX = -12;
+  offY = -215;
+  offZ = -226;
+  EEPROM.update(0, offX);
+  EEPROM.update(1, offX >> 8);
+  EEPROM.update(2, offY);
+  EEPROM.update(3, offY >> 8);
+  EEPROM.update(4, offZ);
+  EEPROM.update(5, offZ >> 8);
   */
 
   if (EEPROM.length() > 0) {
@@ -184,9 +181,6 @@ void requestEvent() {
     case 3:
       Wire.write(yawToSend, 2);
       break;
-    case 4:
-      Wire.write(voltageToSend, 2);
-      break;
     case 111:
       Wire.write(addressI2CToSend, 1);
       break;
@@ -265,22 +259,6 @@ void loop()
     gy87.calibrateGyro();
     callibrateGyOn = false;
   }
-
-  //bateria napatie
-  uint16_t voltageNormToSend=0;
-  if(pocVoltage < 30){
-    sumVoltage +=analogRead(A6);
-    pocVoltage++;
-  }
-  else{
-    voltageNormToSend = sumVoltage/pocVoltage;
-    voltageToSend[0] = voltageNormToSend;
-    voltageToSend[1] = voltageNormToSend >> 8;
-    pocVoltage = 0;
-    sumVoltage = 0;
-  }
-
-
   interrupts();
   //-------------------------------------------------------
   //debugovanie cez seriovy port
@@ -300,9 +278,6 @@ void loop()
       Serial.print(offY);
       Serial.print(", Z:");
       Serial.println(offZ);
-    }
-    if (printVoltage) {
-      Serial.println(voltageNormToSend);
     }
     poc = 0;
   }
