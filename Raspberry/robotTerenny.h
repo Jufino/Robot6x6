@@ -49,7 +49,7 @@ extern "C" {
 
 #define SYNC_MIN_TIME 1000 // 1 ms
 //sensors
-#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*50
+#define SYNC_POSSITION_TIME         SYNC_MIN_TIME*100
 #define SYNC_ULTRASONIC_TIME        SYNC_MIN_TIME*50
 #define SYNC_KINECTSENSORS_TIME     SYNC_MIN_TIME*50
 #define SYNC_BUTTONS_TIME           SYNC_MIN_TIME*50
@@ -58,21 +58,21 @@ extern "C" {
 #define SYNC_KINECTMOTOR_TIME       SYNC_MIN_TIME*100
 #define SYNC_LEDS_TIME              SYNC_MIN_TIME*2000
 #define SYNC_KINECTLED_TIME         SYNC_MIN_TIME*2000
-#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*100
+#define SYNC_MOTORS_TIME            SYNC_MIN_TIME*500
 
 
-#define SYNC_MAP_GENERATE_TIME      0.3 //v sekundach
-#define SYNC_OPERATOR_DETECT_TIME   0.3
+#define SYNC_MAP_GENERATE_TIME      100000 //v us
+#define SYNC_OPERATOR_DETECT_TIME   1000 // v us
 
 #define ENABLE_I2C 1        //ok
 #define ENABLE_MOTORS 1    //ok
 #define ENABLE_ULTRASONIC 1 //ok
 #define ENABLE_LEDS 1     //ok
 #define ENABLE_BUTTONS 1    //ok
-#define ENABLE_POSSITION 1  //ok
+#define ENABLE_POSSITION 1 //ok
 #define ENABLE_JORNEY_GENERATE 1
 #define ENABLE_MAP_GENERATE 1
-#define ENABLE_MAP_OBLIVION 1
+#define ENABLE_MAP_OBLIVION 
 #define ENABLE_OPERATOR_DETECT 1
 #define ENABLE_KINECTMOTOR 1
 #define ENABLE_KINECTLED 1
@@ -93,24 +93,25 @@ extern "C" {
 #define OPERATOR_ANALYSE_WIDTH 320
 #define OPERATOR_ANALYSE_HEIGHT 240
 
-#define SPEED_OF_MAP_OBLIVION 5
-#define SPEED_OF_MAP_CREATION_KINECT 10
-#define SPEED_OF_MAP_CREATION_ULT 8
-#define MIN_BARRIER_CREATION 10
+#define SPEED_OF_MAP_OBLIVION 28
+#define SPEED_OF_MAP_CREATION_KINECT 30
+#define SPEED_OF_MAP_CREATION_ULT 30
+#define MIN_BARRIER_CREATION 80
 #define MIN_BARRIER_HEIGHT 0 //[m]
 #define MAX_BARRIER_HEIGHT 10 //[m]
 #define MAP_BARRIER_EXTENDED 180 //[mm]
-#define MAP_WIDTH 300
-#define MAP_HEIGHT 300
-#define MAP_SCALE 0.05 //default [mm]
+#define MAP_WIDTH 250
+#define MAP_HEIGHT 250
+#define MAP_SCALE 0.04 //default [mm]
 #define MAX_DELTA_TRANSLATE 100 //[mm]
-#define MAP_DISTANCE_FROM_OPERATOR 500
+#define MAP_DISTANCE_FROM_OPERATOR 800
+#define MAP_NOT_JORNEY_CALCULATE_BEHIND 500 //[mm]
 
 
 #define CAMERA_WIFI  1
 #define CAMERA_PORT  1212
-#define CAMERA_HEIGHT 240
-#define CAMERA_WIDTH 320
+#define CAMERA_HEIGHT 120
+#define CAMERA_WIDTH 160
 #define NUMBER_OF_CAMERA 0
 #define INDEX_CAMERA_LEFT 0 //ak je iba jedna kamera pouziva sa lava
 #define INDEX_CAMERA_RIGHT 1
@@ -270,7 +271,8 @@ struct Voltage_struct {
 struct KinectSensor_struct {
   Angle3d_struct accAngle;
   Axis3d_struct accAxis;
-  motorStatusKinect_t motorStatus;
+  motorStatusKinect_t motorStatusYaw;
+  motorStatusKinect_t motorStatusRoll;
 };
 
 struct RobotSensors {                 //struktura pre snimace aktualizovane s casom refresh hodnot pre jednotlive snimace
@@ -332,10 +334,8 @@ Mat getPointCloudMapKinect(int index = -1);
 
 Mat getMapImage(void);
 Mat getRGBOperator(void);
-Mat getDepthOperatorMask(void);
 Mat getOrangeOperatorMask(void);
 Mat getGreenOperatorMask(void);
-Mat getHSVOperator(void);
 Mat getImageLeft(void);
 Mat getImageRight(void);
 
