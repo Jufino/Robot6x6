@@ -37,7 +37,7 @@ void I2C1_Init(void) {
 	I2C_InitStructure.I2C_OwnAddress1 = slave_address<<1;
 	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
 	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-	I2C_InitStructure.I2C_ClockSpeed = 400000;
+	I2C_InitStructure.I2C_ClockSpeed = 100000;
 
 	I2C_ITConfig(I2C1, I2C_IT_EVT, ENABLE);
 	I2C_ITConfig(I2C1, I2C_IT_BUF, ENABLE);

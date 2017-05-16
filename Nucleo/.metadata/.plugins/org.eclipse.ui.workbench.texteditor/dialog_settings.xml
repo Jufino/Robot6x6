@@ -2,15 +2,22 @@
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
 		<item value="false" key="isRegEx"/>
-		<item value="abs" key="selection"/>
+		<item value="mmPerSec" key="selection"/>
 		<item value="false" key="casesensitive"/>
 		<item value="false" key="incremental"/>
 		<item value="true" key="wrap"/>
 		<item value="false" key="wholeword"/>
 		<list key="findhistory">
+			<item value="mmPerSec"/>
+			<item value="getUlt"/>
+			<item value="ultra"/>
+			<item value="getU"/>
 			<item value="abs"/>
+			<item value="goDirection"/>
+			<item value="chodNaPozadovane"/>
 		</list>
 		<list key="replacehistory">
+			<item value="chodNaPoziciu"/>
 		</list>
 	</section>
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">

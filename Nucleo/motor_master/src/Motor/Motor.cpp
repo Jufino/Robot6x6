@@ -11,6 +11,48 @@ Motor::Motor(uint8_t motorAddr) {
 Motor::~Motor() {
 
 }
+
+void Motor::setSpeedRegulator(double P,double I, double D){
+	uint8_t tmp[2];
+	uint16_t toSend = P*10000;
+
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETPSPEEDREG);
+
+	toSend = I*10000;
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETISPEEDREG);
+
+	toSend = D*10000;
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETDSPEEDREG);
+	I2C2_WriteRegister(this->motorAddr, CALCSPEEDREG);
+}
+
+
+
+void Motor::setCurrentRegulator(double P,double I, double D){
+	uint8_t tmp[2];
+	uint16_t toSend = P*10000;
+
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETPCURRENTREG);
+
+	toSend = I*10000;
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETICURRENTREG);
+
+	toSend = D*10000;
+	tmp[1] = toSend & 0xFF;
+	tmp[0] = (toSend >> 8) & 0xFF;
+	I2C2_BytesWrite(this->motorAddr, tmp, 2, SETDCURRENTREG);
+	I2C2_WriteRegister(this->motorAddr, CALCCURRENTREG);
+}
 //------------------------------------------------------------------
 void Motor::setSpeedMotor(int16_t mmPerSec) {
 	int16_t speedRaw =

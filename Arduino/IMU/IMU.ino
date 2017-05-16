@@ -6,7 +6,8 @@
 GY87 gy87;
 
 #define alfaAccelAndGyro 0.95 //pomer zberu dat medzi accelerometrom a gyroscopom
-#define alfaCompass 0.70      //dolnopriepustny filter
+#define alfaCompass 0.99      //dolnopriepustny filter
+#define alfaFilterCompass 0.5
 
 #define debug 1
 #define I2CDebug 0
@@ -14,17 +15,21 @@ GY87 gy87;
 #define printCalibrate 0
 #define printVoltage 0
 #define pocMaxValue 10
-bool callibrateCompassOn = false;
+bool callibrateCompassOn = false || printCalibrate;
 bool callibrateGyOn = false;
-int minX = 0;
-int maxX = 0;
-int minY = 0;
-int maxY = 0;
-int minZ = 0;
-int maxZ = 0;
-int offX = 0;
-int offY = 0;
-int offZ = 0;
+float minX = 0;
+float maxX = 0;
+float minY = 0;
+float maxY = 0;
+float minZ = 0;
+float maxZ = 0;
+float offX = 0;
+float offY = 0;
+float offZ = 0;
+float xMagneticFiltered = 0;
+float yMagneticFiltered = 0;
+float zMagneticFiltered = 0;
+
 
 float roll = 0;
 float pitch = 0;
@@ -65,23 +70,28 @@ void setup()
   gy87.setMeasurementMode(HMC5883L_CONTINOUS);
   gy87.setDataRate(HMC5883L_DATARATE_30HZ);
   gy87.setSamples(HMC5883L_SAMPLES_8);
-  /*
-    offX = -12;
-    offY = -215;
-    offZ = -226;
-    EEPROM.update(0, offX);
-    EEPROM.update(1, offX >> 8);
-    EEPROM.update(2, offY);
-    EEPROM.update(3, offY >> 8);
-    EEPROM.update(4, offZ);
-    EEPROM.update(5, offZ >> 8);
-  */
 
-  if (EEPROM.length() > 0) {
-    offX = EEPROM.read(0) | (EEPROM.read(1) << 8);
-    offY = EEPROM.read(2) | (EEPROM.read(3) << 8);
-    offY = EEPROM.read(4) | (EEPROM.read(5) << 8);
+  if (!callibrateCompassOn) {
+    offX = 46;
+    offY = -214;
+    offZ = -318;
+    EEPROM.update(0, (int)offX);
+    EEPROM.update(1, (int)offX >> 8);
+    EEPROM.update(2, (int)offY);
+    EEPROM.update(3, (int)offY >> 8);
+    EEPROM.update(4, (int)offZ);
+    EEPROM.update(5, (int)offZ >> 8);
+    if (EEPROM.length() > 0) {
+      offX = EEPROM.read(0) | (EEPROM.read(1) << 8);
+      offY = EEPROM.read(2) | (EEPROM.read(3) << 8);
+      offZ = EEPROM.read(4) | (EEPROM.read(5) << 8);
+    }
+    gy87.setOffset(offX, offY, offZ);
   }
+  else {
+    gy87.setOffset(0, 0, 0);
+  }
+
   if (debug) {
     Serial.print("Compass set offset: X:");
     Serial.print(offX);
@@ -90,7 +100,7 @@ void setup()
     Serial.print(", Z:");
     Serial.println(offZ);
   }
-  gy87.setOffset(offX, offY, offZ);
+
 
   if (debug) Serial.println("Gyroscope calibrate.");
   // Kalibracia gyroskopu, musi byt v klude
@@ -100,6 +110,7 @@ void setup()
   gy87.setThreshold(3);
 
   if (debug) Serial.println("Start measuring...");
+  delay(500);
 }
 
 float tiltCompensate(Vector mag, float roll, float pitch)
@@ -149,13 +160,13 @@ void receiveEvent(int howMany) {
       break;
     case 100:
       if (callibrateCompassOn) {
-        EEPROM.update(0, offX);
-        EEPROM.update(1, offX >> 8);
-        EEPROM.update(2, offY);
-        EEPROM.update(3, offY >> 8);
-        EEPROM.update(4, offZ);
-        EEPROM.update(5, offZ >> 8);
-        gy87.setOffset(offX, offY, offZ);
+        EEPROM.update(0, (int)offX);
+        EEPROM.update(1, (int)offX >> 8);
+        EEPROM.update(2, (int)offY);
+        EEPROM.update(3, (int)offY >> 8);
+        EEPROM.update(4, (int)offZ);
+        EEPROM.update(5, (int)offZ >> 8);
+        gy87.setOffset((int)offX, (int)offY, (int)offZ);
         if (printCalibrate) {
           Serial.print("LOG/Offset compass X:");
           Serial.print(offX);
@@ -197,6 +208,8 @@ void requestEvent() {
   c = -1;
 }
 
+
+
 void loop()
 {
   noInterrupts();
@@ -214,12 +227,13 @@ void loop()
 
   roll += gy.XAxis * timeStep * (PI / 180);
   pitch += gy.YAxis * timeStep * (PI / 180);
-  //yaw -= gy.ZAxis * timeStep * (PI / 180);
+  yaw -= gy.ZAxis * timeStep * (PI / 180);
 
   pitch = pitch * alfaAccelAndGyro + pitchAcc * (1 - alfaAccelAndGyro);
   roll = roll * alfaAccelAndGyro + rollAcc * (1 - alfaAccelAndGyro);
 
-  float compassVal = tiltCompensate(mag, rollAcc, pitchAcc);
+  //float compassVal = atan2(mag.YAxis, mag.XAxis);
+  float compassVal =  tiltCompensate(mag, rollAcc, pitchAcc);
   if (compassVal != -10) {
     compassVal += (4.0 + (26.0 / 60.0)) / (180 / M_PI);
     yaw = yaw * alfaCompass + compassVal * (1 - alfaCompass);
@@ -248,12 +262,16 @@ void loop()
   if (callibrateCompassOn) {
     Vector magRaw = gy87.readRawCompass();
 
-    if (magRaw.XAxis < minX) minX = magRaw.XAxis;
-    if (magRaw.XAxis > maxX) maxX = magRaw.XAxis;
-    if (magRaw.YAxis < minY) minY = magRaw.YAxis;
-    if (magRaw.YAxis > maxY) maxY = magRaw.YAxis;
-    if (magRaw.ZAxis < minZ) minZ = magRaw.ZAxis;
-    if (magRaw.ZAxis > maxZ) maxZ = magRaw.ZAxis;
+    xMagneticFiltered = xMagneticFiltered * alfaFilterCompass + magRaw.XAxis * (1 - alfaFilterCompass);
+    yMagneticFiltered = yMagneticFiltered * alfaFilterCompass + magRaw.YAxis * (1 - alfaFilterCompass);
+    zMagneticFiltered = zMagneticFiltered * alfaFilterCompass + magRaw.ZAxis * (1 - alfaFilterCompass);
+
+    if (xMagneticFiltered < minX) minX = xMagneticFiltered;
+    if (xMagneticFiltered > maxX) maxX = xMagneticFiltered;
+    if (yMagneticFiltered < minY) minY = yMagneticFiltered;
+    if (yMagneticFiltered > maxY) maxY = yMagneticFiltered;
+    if (zMagneticFiltered < minZ) minZ = zMagneticFiltered;
+    if (zMagneticFiltered > maxZ) maxZ = zMagneticFiltered;
 
     offX = (maxX + minX) / 2;
     offY = (maxY + minY) / 2;
@@ -267,13 +285,13 @@ void loop()
   }
 
   //bateria napatie
-  uint16_t voltageNormToSend=0;
-  if(pocVoltage < 30){
-    sumVoltage +=analogRead(A6);
+  uint16_t voltageNormToSend = 0;
+  if (pocVoltage < 30) {
+    sumVoltage += analogRead(A6);
     pocVoltage++;
   }
-  else{
-    voltageNormToSend = sumVoltage/pocVoltage;
+  else {
+    voltageNormToSend = sumVoltage / pocVoltage;
     voltageToSend[0] = voltageNormToSend;
     voltageToSend[1] = voltageNormToSend >> 8;
     pocVoltage = 0;
@@ -294,7 +312,13 @@ void loop()
       Serial.println(yaw * 180 / M_PI);
     }
     if (printCalibrate && callibrateCompassOn) {
-      Serial.print("Offset compass X:");
+      Serial.print("Magnetic X:");
+      Serial.print(xMagneticFiltered);
+      Serial.print(", Y:");
+      Serial.print(yMagneticFiltered);
+      Serial.print(", Z:");
+      Serial.print(zMagneticFiltered);
+      Serial.print("; Offset compass X:");
       Serial.print(offX);
       Serial.print(", Y:");
       Serial.print(offY);

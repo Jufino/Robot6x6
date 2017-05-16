@@ -20,7 +20,7 @@ namespace webcam
         SocketWebcam socketWebcam = new SocketWebcam();
         private void button1_Click(object sender, EventArgs e)
         {
-            socketWebcam.Open("192.168.10.1", "1212");
+            socketWebcam.Open("192.168.100.1", "1212");
             System.Threading.Thread grabThread = new System.Threading.Thread(new System.Threading.ThreadStart(cameraGrabFunction));
             grabThread.Start();
 

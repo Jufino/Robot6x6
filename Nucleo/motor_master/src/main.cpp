@@ -1,9 +1,19 @@
 #include <math.h>
 #include <Motor/Motor.h>
 
-#define alfa 0.5
+#define ALFA 0.5
 
-#define numberOfMotors 6
+#define MIN_OK_DELTA_ANGLE 5*(3.14/180)
+#define MIN_OK_DELTA_DISTANCE 20
+
+#define pSpeed 6
+#define iSpeed 1.1
+#define dSpeed 0
+#define pCurrent 0.12
+#define iCurrent 0.006
+#define dCurrent 0
+
+#define NUMBER_OF_MOTORS 6
 Motor *motor1 = new Motor(MOTOR1);
 Motor *motor2 = new Motor(MOTOR2);
 Motor *motor3 = new Motor(MOTOR3);
@@ -33,7 +43,7 @@ Motor *getMotor(int i) {
 extern "C" {
 #include <Leds/Leds.h>
 #include <Ultrasonic/Ultrasonic.h>
-#include <Servo/Servo.h>
+#include <Servomotor/Servomotor.h>
 #include <Buttons/Buttons.h>
 #include <IMU/IMU.h>
 #include <I2CMasterLib/I2CMasterLib.h>
@@ -50,11 +60,26 @@ volatile uint8_t motorTestValue = 0;
 volatile long x = 0;
 volatile long y = 0;
 volatile long z = 0;
+long xLastSend = 0;
+long yLastSend = 0;
+long zLastSend = 0;
+long xLastMaybeSend = 0;
+long yLastMaybeSend = 0;
+long zLastMaybeSend = 0;
+
+volatile bool chodNaPoziciu = false;
+volatile double yawPozadovane = 0;
+volatile long distancePozadovane = 0;
 
 volatile double yaw = 0;
 volatile double roll = 0;
 volatile double pitch = 0;
 volatile double lastDistance[6];
+double yawEncoders = 0;
+
+volatile bool obnov = true;
+volatile Direction dir = STOP;
+volatile int16_t mmPerSec = 0;
 
 void InitializeTimer(void) {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
@@ -148,6 +173,7 @@ extern "C" void I2C1_ER_IRQHandler(void) {
 	}
 }
 
+long delta;
 extern "C" void I2C1_EV_IRQHandler(void) {
 	I2C1_CommunicationByPeriod = 1;
 	uint16_t value;
@@ -184,25 +210,42 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
 			break;
 		case 7:
-			if (I2C1_BufferIndex == 2)
-				goDirection(FORWARD, I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			if (I2C1_BufferIndex == 3) {
+				dir = FORWARD;
+				mmPerSec = I2C1_Buffer[1] << 8 | I2C1_Buffer[2];
+				obnov = true;
+				chodNaPoziciu = false;
+			}
 			break;
 		case 8:
-			if (I2C1_BufferIndex == 2)
-				goDirection(BACKWARD, I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			if (I2C1_BufferIndex == 3) {
+				dir = BACKWARD;
+				mmPerSec = I2C1_Buffer[1] << 8 | I2C1_Buffer[2];
+				obnov = true;
+				chodNaPoziciu = false;
+			}
 			break;
 		case 9:
-			if (I2C1_BufferIndex == 2)
-				goDirection(ROTATE_CLOCKWISE,
-						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			if (I2C1_BufferIndex == 3) {
+				dir = ROTATE_CLOCKWISE;
+				mmPerSec = I2C1_Buffer[1] << 8 | I2C1_Buffer[2];
+				obnov = true;
+				chodNaPoziciu = false;
+			}
 			break;
 		case 10:
-			if (I2C1_BufferIndex == 2)
-				goDirection(ROTATE_ANTICLOCKWISE,
-						I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
+			if (I2C1_BufferIndex == 3) {
+				dir = ROTATE_ANTICLOCKWISE;
+				mmPerSec = I2C1_Buffer[1] << 8 | I2C1_Buffer[2];
+				obnov = true;
+				chodNaPoziciu = false;
+			}
 			break;
 		case 11:
-			goDirection(STOP, 0);
+			dir = STOP;
+			mmPerSec = 0;
+			obnov = true;
+			chodNaPoziciu = false;
 			break;
 		case 12:
 			if (I2C1_BufferIndex == 2) {
@@ -219,6 +262,35 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 				setServo(I2C1_Buffer[1] << 8 | I2C1_Buffer[2]);
 			}
 			break;
+
+		case 14:
+			if (I2C1_BufferIndex == 3) {
+				chodNaPoziciu = false;
+				yawPozadovane = (double) (I2C1_Buffer[1] << 8 | I2C1_Buffer[2])
+						/ 10000;
+			}
+			break;
+
+		case 15:
+			if (I2C1_BufferIndex == 5) {
+				chodNaPoziciu = false;
+				distancePozadovane |= I2C1_Buffer[1] << 24;
+				distancePozadovane |= I2C1_Buffer[2] << 16;
+				distancePozadovane |= I2C1_Buffer[3] << 8;
+				distancePozadovane |= I2C1_Buffer[4];
+			}
+			break;
+		case 16:
+			chodNaPoziciu = true;
+			break;
+		case 17:
+			xLastSend = xLastMaybeSend;
+			break;
+		case 18:
+			yLastSend = yLastMaybeSend;
+			break;
+		case 19:
+			zLastSend = zLastMaybeSend;
 		case 100:
 			I2C1_BufferIndex = 0;
 			I2C1_Buffer[I2C1_BufferIndex++] = x >> 24;
@@ -292,6 +364,39 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			I2C1_NumberBytesToSend = I2C1_BufferIndex;
 			I2C1_BufferIndex = 0;
 			break;
+		case 108:
+			xLastMaybeSend = x;
+			delta = xLastMaybeSend-xLastSend;
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 109:
+			yLastMaybeSend = y;
+			delta  = yLastMaybeSend-yLastSend;
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
+		case 110:
+			zLastMaybeSend = z;
+			delta = zLastMaybeSend-zLastSend;
+			I2C1_BufferIndex = 0;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 8;
+			I2C1_Buffer[I2C1_BufferIndex++] = delta & 0xFF;
+			I2C1_NumberBytesToSend = I2C1_BufferIndex;
+			I2C1_BufferIndex = 0;
+			break;
 		case 254:
 			I2C1_BufferIndex = 0;
 			I2C1_Buffer[I2C1_BufferIndex++] = motorTestValue & 0xFF;
@@ -318,6 +423,11 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			I2C1->SR1 |= I2C_SR1_AF;
 		}
 	}
+
+	//ev3-2
+	/*	while ((I2C_SR1_TXE & I2C1->SR1) == I2C_SR1_AF) {
+	 I2C1->SR1 |= I2C_SR1_AF;
+	 }*/
 
 	if (I2C1_Transmitter == 0) {
 		//ev4
@@ -346,12 +456,12 @@ extern "C" void TIM2_IRQHandler(void) {
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 		timerDone++;
-		if (!I2C1_CommunicationByPeriod) {
-			I2C1_BufferIndex = 0;
-			I2C1_Init();
-		} else {
-			I2C1_CommunicationByPeriod = 0;
-		}
+		/*		if (!I2C1_CommunicationByPeriod) {
+		 I2C1_BufferIndex = 0;
+		 I2C1_Init();
+		 } else {
+		 I2C1_CommunicationByPeriod = 0;
+		 }*/
 	}
 }
 
@@ -371,29 +481,35 @@ int main(void) {
 	I2C2_Init();
 
 	motorTestValue = 0;
-	for (int i = 0; i < numberOfMotors; i++) {
+	for (int i = 0; i < NUMBER_OF_MOTORS; i++) {
 		if (getMotor(i + 1)->isTestOk()) {
 			motorTestValue |= (1 << i);
+			//getMotor(i + 1)->setSpeedRegulator(pSpeed,iSpeed,dSpeed);
+			//getMotor(i + 1)->setCurrentRegulator(pCurrent,iCurrent,dCurrent);
 		}
 	}
 
+
 	InitializeTimer();
-	yaw = getYaw();
+
+	Direction dir_last;
+	int16_t mmPerSec_last;
 
 	while (1) {
+
 		roll = getRoll();
 		pitch = getPitch();
+		yaw = (yaw + getYaw()) / 2;
 		ultTriger(0);
+
 		if (timerDone > 0) {
 
-			double yawIMU = getYaw();
-
-			for (int i = 1; i <= numberOfMotors / 2; i++) {
+			for (int i = 1; i <= NUMBER_OF_MOTORS / 2; i++) {
 				getMotor(i)->DMADeltaTicksInvoke();
 				getMotor(i + 3)->DMADeltaTicksInvoke();
 			}
 			double speeds[6];
-			for (int i = 1; i <= numberOfMotors; i++) {
+			for (int i = 1; i <= NUMBER_OF_MOTORS; i++) {
 				speeds[i - 1] = (getMotor(i)->getDistance()
 						- lastDistance[i - 1]);
 				lastDistance[i - 1] = getMotor(i)->getDistance();
@@ -407,17 +523,63 @@ int main(void) {
 
 			double omegaT = (vR - vL) / lengthBetweenLeftAndRightWheel;
 
-			yaw = yaw + omegaT;
-			yaw = yaw * alfa + yawIMU * (1 - alfa);
+			yawEncoders = yawEncoders + omegaT;
+			yaw = yaw * ALFA + yawEncoders * (1 - ALFA);
 			if (yaw > 2 * M_PI)
 				yaw -= 2 * M_PI;
 			else if (yaw < 0)
 				yaw += 2 * M_PI;
+
 			x += (long) (vT * cos(yaw));
 			y += (long) (vT * sin(yaw));
+			yawEncoders = yaw;
+
+			if (chodNaPoziciu) {
+				double eAngle = yaw - yawPozadovane;
+				if (fabs(eAngle) > MIN_OK_DELTA_ANGLE) {
+					//regulator uhla
+					int16_t u = eAngle * 100;
+					if (eAngle > 0) {
+						bool test = false;
+						//goDirection(ROTATE_ANTICLOCKWISE, u);
+					} else {
+						bool test = false;
+						//goDirection(ROTATE_CLOCKWISE, u * (-1));
+					}
+				} else {
+					if (fabs(distancePozadovane) > MIN_OK_DELTA_DISTANCE) {
+						//regulator vzdialenosti
+						int16_t u = distancePozadovane * 0.5;
+						if (u > 0){
+							bool test = false;
+							//goDirection(FORWARD, u);
+						}
+						else{
+							bool test = false;
+							//goDirection(BACKWARD, u * (-1));
+						}
+					} else {
+						//goDirection(STOP, 0);
+					}
+				}
+			}
 
 			timerDone = 0;
 		}
+		if (!chodNaPoziciu) {
+			if (dir != dir_last || obnov == true) {
+				goDirection(dir, mmPerSec);
+				dir_last = dir;
+				mmPerSec_last = mmPerSec;
+				obnov = false;
+			} else if (mmPerSec != mmPerSec_last) {
+				goDirection(dir, mmPerSec);
+				dir_last = dir;
+				mmPerSec_last = mmPerSec;
+			}
+		}
+		for (int i = 0; i < 10000; i++)
+			;
 
 	}
 }

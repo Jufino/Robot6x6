@@ -21,6 +21,14 @@ const uint8_t MOTORSADDR[] = { MOTOR1, MOTOR2, MOTOR3, MOTOR4, MOTOR5, MOTOR6 };
 #define SETSPEEDREG 100
 #define SETCURRENTREG 99
 #define SETPWMREG 101
+#define SETPCURRENTREG 102
+#define SETICURRENTREG 103
+#define SETDCURRENTREG 104
+#define SETPSPEEDREG 105
+#define SETISPEEDREG 106
+#define SETDSPEEDREG 107
+#define CALCSPEEDREG 109
+#define CALCCURRENTREG 108
 //------------------------------------------------------------------
 //get register
 #define GETSPEEDREG 1
@@ -92,7 +100,10 @@ public:
 	void setTestValue(uint8_t value);
 	//------------------------------------------------------------------
 	void DMATestInvoke(void);
-
+	//------------------------------------------------------------------
+	void setSpeedRegulator(double P,double I, double D);
+	//------------------------------------------------------------------
+	void setCurrentRegulator(double P,double I, double D);
 };
 
 #endif /* MOTOR_H_ */

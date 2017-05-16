@@ -1,8 +1,8 @@
 #include <Wire.h>
 /*I2C adresa*/
 #define I2CDebug false
-#define speedAndCurrentDebug true
-#define addressI2C 0x01 //motory cislovane  z lava vzadu 
+#define speedAndCurrentDebug false
+#define addressI2C 0x06 //motory cislovane  z lava vzadu 
 /*nastavenia merania */
 #define measureCurrentAction 50
 #define measureSpeedAction 25
@@ -15,6 +15,26 @@ unsigned int measureData[numberOfMeasureData];
 unsigned int measureIndex = 0;
 bool measureStart = false;
 /*--------------------------------------------------*/
+#define calcKp(p) (p)
+#define calcKi(p,i,perioda) (p*(perioda/i))
+#define calcKd(p,d,perioda) (p*(d/perioda))
+//vypocet inkrementalnej casti regulatora
+double calcQ0(double p, double d, double perioda) {
+  return (calcKp(p) + calcKd(p, d, perioda));
+}
+double calcQ1(double p, double i, double d, double perioda) {
+  return (-calcKp(p) - 2 * calcKd(p, d, perioda) + calcKi(p, i, perioda));
+}
+double calcQ2(double p, double d, double perioda) {
+  return calcKd(p, d, perioda) ;
+}
+double calcP1(double p, double i, double d, double perioda) {
+  return ((calcKi(p, i, perioda) - calcKd(p, d, perioda)) / (calcKp(p) + calcKi(p, i, perioda) + calcKd(p, d, perioda)));
+}
+double calcP2(double p, double i, double d, double perioda) {
+  return ((calcKd(p, d, perioda)) / (calcKp(p) + calcKi(p, i, perioda) + calcKd(p, d, perioda)));
+}
+/*--------------------------------------------------*/
 /* ostatné nastavenia*/
 #define numberOfTimer 3              //pocet casovacov
 #define periodVoltageMeasure 1000000L //perioda pre prudovy regulator [uS]
@@ -24,20 +44,25 @@ bool measureStart = false;
 #define LPF_Beta 0.025 //konštanta dolnopriepustného filtra - https://kiritchatterjee.wordpress.com/2014/11/10/a-simple-digital-low-pass-filter-in-c/
 #define useLPF true   //spustenie alebo vypnutie filtrácie prúdu
 /* premenne prúdového regulátora */
-#define periodaCurrent 0.0015
-#define PCurrent 0.12
-#define ICurrent 0.006
-#define DCurrent 0
+double pCurrent = 0.12;
+double iCurrent = 0.006;
+double dCurrent = 0;
 #define uCurrentSaturationMax 255
 #define uCurrentSaturationMin 0
-double kpCurrent = PCurrent;
-double kiCurrent = PCurrent * (periodaCurrent / ICurrent);
-double kdCurrent = PCurrent * (DCurrent / periodaCurrent);
-#define q0Current (kpCurrent+kdCurrent)
-#define q1Current (-kpCurrent-2*kdCurrent+kiCurrent)
-#define q2Current kdCurrent
-#define p1Current ((kiCurrent-kdCurrent)/(kpCurrent+kiCurrent+kdCurrent))
-#define p2Current ((kdCurrent)/(kpCurrent+kiCurrent+kdCurrent))
+volatile double q0Current;
+volatile double q1Current;
+volatile double q2Current;
+volatile double p1Current;
+volatile double p2Current;
+
+void calcAllCurrentRegulatorParameters(double p, double i, double d, double perioda) {
+  q0Current = calcQ0(p, d, perioda);
+  q1Current = calcQ1(p, i, d, perioda);
+  q2Current = calcQ2(p, d, perioda);
+  p1Current = calcP1(p, i, d, perioda);
+  p2Current = calcP2(p, i, d, perioda);
+}
+
 double umRegCurrent = 0;
 double ueRegCurrent[] = {0, 0, 0};
 double uRegCurrent[] = {0, 0};
@@ -45,25 +70,30 @@ double eRegCurrent[] = {0, 0, 0};
 double pozadRegCurrent = 0;
 volatile bool onCurrentReg = true;
 /* premenne rychlostneho regulátora */
-#define periodaSpeed 0.15
-#define PSpeed 1.5
-#define ISpeed 1.1
-#define DSpeed 0
+double pSpeed = 1.5;
+double iSpeed = 1.1;
+double dSpeed = 0;
 #define uSpeedSaturationMax 600
 #define uSpeedSaturationMin -600
-double kpSpeed = PSpeed;
-double kiSpeed = PSpeed * (periodaSpeed / ISpeed);
-double kdSpeed = PSpeed * (DSpeed / periodaSpeed);
-#define q0Speed (kpSpeed+kdCurrent)
-#define q1Speed (-kpSpeed-2*kdCurrent+kiSpeed)
-#define q2Speed kdSpeed
-#define p1Speed ((kiSpeed-kdCurrent)/(kpSpeed+kiSpeed+kdSpeed))
-#define p2Speed ((kdSpeed)/(kpSpeed+kiCurrent+kdSpeed))
+volatile double q0Speed;
+volatile double q1Speed;
+volatile double q2Speed;
+volatile double p1Speed;
+volatile double p2Speed;
+
+void calcAllSpeedRegulatorParameters(double p, double i, double d, double perioda) {
+  q0Speed = calcQ0(p, d, perioda);
+  q1Speed = calcQ1(p, i, d, perioda);
+  q2Speed = calcQ2(p, d, perioda);
+  p1Speed = calcP1(p, i, d, perioda);
+  p2Speed = calcP2(p, i, d, perioda);
+}
+
 double umRegSpeed = 0;
 double ueRegSpeed[] = {0, 0, 0};
 double uRegSpeed[] = {0, 0};
 double eRegSpeed[] = {0, 0, 0};
-double pozadRegSpeed = 50;
+double pozadRegSpeed = 0;
 volatile bool onSpeedReg = true;
 
 /*pomocné premenné*/
@@ -86,6 +116,7 @@ byte numberTickToSend[2];
 byte voltageToSend[2];
 byte addressI2CToSend[] = {addressI2C};
 /*--------------------------------------------------*/
+
 void encoderMotor() {
   char pinA = digitalRead(2);
   char pinB = digitalRead(3);
@@ -200,6 +231,9 @@ void setup() {
   digitalWrite(13, HIGH);
   digitalWrite(A0, HIGH);
 
+  calcAllCurrentRegulatorParameters(pCurrent, iCurrent, dCurrent, (double)periodCurrentRegulator / 1000000);
+  calcAllSpeedRegulatorParameters(pSpeed, iSpeed, dSpeed, (double)periodSpeedRegulator / 1000000);
+
   Wire.begin(addressI2C);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
@@ -238,32 +272,74 @@ void receiveEvent(int howMany) {
     case 102:
       d = Wire.read();
       e = Wire.read();
-      kpCurrent = ((float)((d << 8) | e)) / 1000;
+      pCurrent = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("PCurrent: ");
+        Serial.println(pCurrent);
+      }
       break;
     case 103:
       d = Wire.read();
       e = Wire.read();
-      kiCurrent = ((float)((d << 8) | e)) / 1000;
+      iCurrent = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("ICurrent: ");
+        Serial.println(iCurrent);
+      }
       break;
     case 104:
       d = Wire.read();
       e = Wire.read();
-      kdCurrent = ((float)((d << 8) | e)) / 1000;
+      dCurrent = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("DCurrent: ");
+        Serial.println(dCurrent);
+      }
       break;
     case 105:
       d = Wire.read();
       e = Wire.read();
-      kpSpeed = ((float)((d << 8) | e)) / 1000;
+      pSpeed = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("PSpeed: ");
+        Serial.println(pSpeed);
+      }
       break;
     case 106:
       d = Wire.read();
       e = Wire.read();
-      kiSpeed = ((float)((d << 8) | e)) / 1000;
+      iSpeed = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("ISpeed: ");
+        Serial.println(iSpeed);
+      }
       break;
     case 107:
       d = Wire.read();
       e = Wire.read();
-      kdSpeed = ((float)((d << 8) | e)) / 1000;
+      dSpeed = ((double)((unsigned int)((d << 8) | e))) / 10000;
+      if (I2CDebug) {
+        Serial.print("DSpeed: ");
+        Serial.println(dSpeed);
+      }
+      break;
+    case 108:
+      calcAllCurrentRegulatorParameters(pCurrent, iCurrent, dCurrent, periodCurrentRegulator / 1000000);
+      uRegCurrent[2] = 0;
+      uRegCurrent[1] = 0;
+      uRegCurrent[0] = 0;
+      if (I2CDebug) {
+        Serial.println("Calculate parameters current regulator");
+      }
+      break;
+    case 109:
+      calcAllSpeedRegulatorParameters(pSpeed, iSpeed, dSpeed, periodSpeedRegulator / 1000000);
+      uRegSpeed[2] = 0;
+      uRegSpeed[1] = 0;
+      uRegSpeed[0] = 0;
+      if (I2CDebug) {
+        Serial.println("Calculate parameters speed regulator");
+      }
       break;
   }
   if (I2CDebug) {
@@ -285,8 +361,8 @@ void requestEvent() {
       break;
     case 3:
       Wire.write(numberTickToSend, 2);
-      Serial.print(numberTickForI2C, DEC);
-      Serial.print("/");
+      //Serial.print(numberTickForI2C, DEC);
+      //Serial.print("/");
       numberTickForI2C = 0;
       numberTickToSend[0] = 0;
       numberTickToSend[1] = 0;
@@ -438,11 +514,19 @@ void loop() {
       {
         if (uRegSpeed[0] < uSpeedSaturationMin)
           uRegSpeed[0] = uSpeedSaturationMin;
-        else if (uRegSpeed[0] > 0)
+        else if (uRegSpeed[0] > 0) {
           uRegSpeed[0] = 0;
+        }
         else
           uRegSpeed[0] = uRegSpeed[0];
       }
+
+      if (pozadRegSpeed == 0) {
+        uRegSpeed[2] = 0;
+        uRegSpeed[1] = 0;
+        uRegSpeed[0] = 0; // vynulujeme, pretoze chceme pozadovanu rychlost 0lovu, avsak koleso sa netoci, ale na motore je este stale prud, co je zbytocne, tak aby pri nulovej rychlosti sme sa dostali k nulovemu prudu
+      }
+
       pozadRegCurrent = uRegSpeed[0];
     }
     /*--------------------------------------------------*/
