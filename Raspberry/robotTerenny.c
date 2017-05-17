@@ -44,8 +44,6 @@ Mat orangeOperatorMaskImage1;
 Mat orangeOperatorMaskImage2;
 #endif
 
-Point3f operatorPossition =  Point3f(-1, -1, -1);
-
 const float scaleFactor = 0.05f;
 
 vector<Point> journeyPoint;
@@ -74,10 +72,10 @@ int erode_green = 1;
 int dilate_green = 3;
 
 int iLowH_orange = 0;
-int iHighH_orange = 25;
-int iLowS_orange = 100;
+int iHighH_orange = 20;
+int iLowS_orange = 110;
 int iHighS_orange  = 255;
-int iLowV_orange  = 100;
+int iLowV_orange  = 110;
 int iHighV_orange  = 255;
 int erode_orange = 1;
 int dilate_orange = 3;
@@ -256,11 +254,13 @@ void initRobot(void) {
   semInit(sem_id, HSV_OPERATOR_VARIABLE, 1);
   semInit(sem_id, ORANGE_OPERATOR_MASK_VARIABLE, 1);
   semInit(sem_id, GREEN_OPERATOR_MASK_VARIABLE, 1);
-  semInit(sem_id, OPERATOR_POSSITION, 1);
   semInit(sem_id, JOURNEY_POINTS, 1);
 
   mapImage1 = Mat(MAP_HEIGHT, MAP_WIDTH,  CV_8UC3, Scalar(0, 0, 0));
   mapImageChoose = 1;
+
+  robotAcculators.isManual = true;
+  robotSensors.isFollowOperatorOn = true;
 
   initMotorPowerSupply();
   setMotorPowerSupply(true);
@@ -394,6 +394,13 @@ void initRobot(void) {
 void closeRobot(void) {
   LOGInfo(ROBOT_TAG, 0, "Closing...");
   onAllThreads = false;
+
+  sleep(2); //cakame kym sa ukoncia thready
+
+  semWait(sem_id, ROBOTACCULATORS);
+  robotAcculators.ledKinect = LEDKINECT_BLINK_RED_ORANGE;
+  semPost(sem_id, ROBOTACCULATORS);
+  syncKinectLed(true);
 
   if (ENABLE_KINECTLED == 1 || ENABLE_KINECTMOTOR == 1) {
     XnStatus rc = xnUSBCloseDevice(dev);
@@ -562,6 +569,32 @@ char writeRegisterAndValueS16(unsigned char addr, unsigned char reg, int value) 
   data[2] = value & 0xFF;
   if (setDevice(addr) == 0) {
     while (write(i2cHandle, data, 3) != 3) {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
+      LOGError(I2C_TAG, buffer);
+      if (errorTimeout++ >= I2C_WRITE_TIMEOUT) break;
+    }
+    if (errorTimeout < I2C_WRITE_TIMEOUT)
+      return 0;
+    else {
+      char buffer [50];
+      sprintf (buffer, "addr:%i, write register %i,val %i, errorTimeout:%i", (int)addr, (int)reg, (int)value, (int)errorTimeout);
+      LOGError(I2C_TAG, buffer);
+    }
+  }
+  return -1;
+}
+
+char writeRegisterAndValueS32(unsigned char addr, unsigned char reg, long value) {
+  char errorTimeout = 0;
+  unsigned char data[5];
+  data[0] = reg;
+  data[1] = (value >> 24) & 0xFF;
+  data[2] = (value >> 16) & 0xFF;
+  data[3] = (value >> 8) & 0xFF;
+  data[4] = value & 0xFF;
+  if (setDevice(addr) == 0) {
+    while (write(i2cHandle, data, 5) != 5) {
       char buffer [50];
       sprintf (buffer, "addr:%i, write register %i, errorTimeout:%i", (int)addr, (int)reg, (int)errorTimeout);
       LOGError(I2C_TAG, buffer);
@@ -948,6 +981,13 @@ RobotPosition_struct getRobotPossition(void) {
   return temp;
 }
 
+vector<Point> getJorneyPoints() {
+  semWait(sem_id, JOURNEY_POINTS);
+  vector<Point> bodyCesty = journeyPoint;
+  semPost(sem_id, JOURNEY_POINTS);
+  return bodyCesty;
+}
+
 void sendMatImageByWifi(Mat img, int quality) {
   vector<uchar> buff;
   vector<int> param = vector<int>(2);
@@ -1056,6 +1096,27 @@ void setMove(direction_t direction, unsigned int speed) {
   default:
     writeRegister(STM32_ADDRESS, 11);
   }
+  semPost(sem_id, I2C);
+}
+
+void setAngleRobot(double angle) {
+  semWait(sem_id, I2C);
+  if (angle < 0) angle += 2 * M_PI;
+  else if (angle > 2 * M_PI) angle -= 2 * M_PI;
+  writeRegisterAndValueU16(STM32_ADDRESS, 14, (int)(angle * 10000));
+  //printf("%f,%d\n",angle,(int)(angle * 10000));
+  semPost(sem_id, I2C);
+}
+
+void setDistanceRobot(long distance) {
+  semWait(sem_id, I2C);
+  writeRegisterAndValueS32(STM32_ADDRESS, 15, distance);
+  semPost(sem_id, I2C);
+}
+
+void setGoToAngleAndDistance() {
+  semWait(sem_id, I2C);
+  writeRegister(STM32_ADDRESS, 16);
   semPost(sem_id, I2C);
 }
 
@@ -1270,11 +1331,15 @@ void *syncCameraNetworkConnection(void *arg) {
       for (unsigned int i = 1; i < journeyPoint.size(); i++) {
         line(map, journeyPoint.at(i - 1), journeyPoint.at(i), Scalar( 255, 0, 0 ), 2, 8);
       }
+      if (journeyPoint.size() > 1)
+        circle(map, journeyPoint.at(1), 4, Scalar( 0, 0, 255 ), -1, 8);
       semPost(sem_id, JOURNEY_POINTS);
 
       semWait(sem_id, ROBOTACCULATORS);
       double kinectYaw = robotAcculators.kinect.yaw;
       semPost(sem_id, ROBOTACCULATORS);
+
+
 
       circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 200 * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8); // not visible zone
       if (140 * MAP_SCALE > 0) {
@@ -1285,35 +1350,52 @@ void *syncCameraNetworkConnection(void *arg) {
       else {
         circle(map, Point(MAP_WIDTH / 2, MAP_HEIGHT / 2), 1, Scalar( 0, 255, 255 ), 1, 8); // robot zone
       }
-      char text[20];
-      sprintf(text, "yaw:%f.2", (float)(robotPosition.anglePossition.yaw * (180 / M_PI)));
-      putText(map, text, Point(10, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 
-      semWait(sem_id, OPERATOR_POSSITION);
-      double minPointX = operatorPossition.x * MAP_SCALE;
-      double minPointZ = operatorPossition.z * MAP_SCALE;
+      semWait(sem_id, ROBOTSENSORS);
+      double ultValue = robotSensors.ultrasonic;
+      semPost(sem_id, ROBOTSENSORS);
+      char text[20];
+      sprintf(text, "yaw:%d deg+%d deg", (int)(robotPosition.anglePossition.yaw * (180 / M_PI)), (int)(kinectYaw * (180 / M_PI)));
+      putText(map, text, Point(10, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+      sprintf(text, "ult:%f", ultValue);
+      putText(map, text, Point(10, 50), FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+
+      semWait(sem_id, ROBOTSENSORS);
+      Point3f operatorPossitionLocal = robotSensors.operatorPossition;
+      semPost(sem_id, ROBOTSENSORS);
+
+      double minPointX = operatorPossitionLocal.x * MAP_SCALE;
+      double minPointZ = operatorPossitionLocal.z * MAP_SCALE;
       double r = sqrt((double)(minPointX * minPointX + minPointZ * minPointZ));
       double angle = acos((-(double)minPointX) / r) - 3.14 / 2;
 
       int x2 = r * cos(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_WIDTH / 2;
       int z2 = r * sin(robotPosition.anglePossition.yaw + angle + kinectYaw) + MAP_HEIGHT / 2;
-      if (operatorPossition.x != -1 && operatorPossition.z != -1) {
+      if (!(operatorPossitionLocal.x == -1 && operatorPossitionLocal.z == -1 && operatorPossitionLocal.y == -1)) {
         circle(map, Point(x2, z2), 2, Scalar( 0, 0, 255 ), -1, 8);
         circle(map, Point(x2, z2), MAP_DISTANCE_FROM_OPERATOR * MAP_SCALE, Scalar( 0, 0, 255 ), 1, 8);
       }
-      semPost(sem_id, OPERATOR_POSSITION);
-
 
       double vzd = MAP_NOT_JORNEY_CALCULATE_BEHIND * MAP_SCALE;
-      double x1 = vzd * cos(robotPosition.anglePossition.yaw + kinectYaw + M_PI) + MAP_WIDTH / 2;
-      double y1 = vzd * sin(robotPosition.anglePossition.yaw + kinectYaw + M_PI) + MAP_HEIGHT / 2;
-      double x3 = vzd * cos(robotPosition.anglePossition.yaw + kinectYaw + M_PI / 2) + x1;
-      double y3 = vzd * sin(robotPosition.anglePossition.yaw + kinectYaw + M_PI / 2) + y1;
+
+      double angle1 = robotPosition.anglePossition.yaw + kinectYaw + M_PI;
+      double x1 = vzd * cos(angle1) + MAP_WIDTH / 2;
+      double y1 = vzd * sin(angle1) + MAP_HEIGHT / 2;
+
+      angle1 = angle1 - M_PI / 2;
+      double x3 = vzd * cos(angle1) + x1;
+      double y3 = vzd * sin(angle1) + y1;
+
       double k = (y3 - y1) / (x3 - x1);
       double q = y1 - k * x1;
       double yend = k * (MAP_WIDTH - 1) + q;
-      if (yend > MAP_HEIGHT) yend = MAP_HEIGHT - 1;
-      line(map, Point(0, (int)q), Point(MAP_WIDTH - 1, yend), Scalar( 0, 255, 255 ), 1, 8);
+      if (yend > MAP_HEIGHT - 1) {
+        double xend = (MAP_HEIGHT - q) / k;
+        line(map, Point(0, (int)q), Point(xend, MAP_HEIGHT - 1), Scalar( 0, 255, 255 ), 1, 8);
+      }
+      else {
+        line(map, Point(0, (int)q), Point(MAP_WIDTH - 1, yend), Scalar( 0, 255, 255 ), 1, 8);
+      }
 
       sendMatImageByWifi(map, 100);
     }
@@ -1506,23 +1588,84 @@ void *syncSensorNetworkConnection(void *arg) {
 
       semWait(sem_id, ROBOTACCULATORS);
       if (strcmp(value, "F") == 0)
-        robotAcculators.robotDirection = FORWARD;
+        robotAcculators.direction = FORWARD;
       else if (strcmp(value, "B") == 0)
-        robotAcculators.robotDirection = BACKWARD;
+        robotAcculators.direction = BACKWARD;
       else if (strcmp(value, "C") == 0)
-        robotAcculators.robotDirection = CLOCKWISE;
+        robotAcculators.direction = CLOCKWISE;
       else if (strcmp(value, "A") == 0)
-        robotAcculators.robotDirection = ANTICLOCKWISE;
+        robotAcculators.direction = ANTICLOCKWISE;
       else
-        robotAcculators.robotDirection = STOP;
+        robotAcculators.direction = STOP;
+
+      robotAcculators.isManual = true;
+
       semPost(sem_id, ROBOTACCULATORS);
 
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+    else if (strcmp(command, "sfol") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Follow sync.");
+
+      semWait(sem_id, ROBOTSENSORS);
+      if (strcmp(value, "ON") == 0)
+        robotSensors.isFollowOperatorOn = true;
+      else if (strcmp(value, "OFF") == 0)
+        robotSensors.isFollowOperatorOn = false;
+
+      semPost(sem_id, ROBOTSENSORS);
+
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+    else if (strcmp(command, "gfol") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Follow sync.");
+
+      semWait(sem_id, ROBOTSENSORS);
+      bool val = robotSensors.isFollowOperatorOn;
+      semPost(sem_id, ROBOTSENSORS);
+
+      if (val == true) sendIntByWifi(1);
+      else            sendIntByWifi(0);
+    }
+    else if (strcmp(command, "sleg") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Leg sync.");
+      semWait(sem_id, ROBOTSENSORS);
+      //robotAcculators.speed = atoi(value);
+      //robotAcculators.isManual = true;
+      semPost(sem_id, ROBOTSENSORS);
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+
+    else if (strcmp(command, "gleg") == 0) {
+      LOGInfo(SENSOR_CONN_TAG, 1, "Leg sync.");
+      semWait(sem_id, ROBOTSENSORS);
+      //robotAcculators.speed = atoi(value);
+      //robotAcculators.isManual = true;
+      semPost(sem_id, ROBOTSENSORS);
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+    else if (strcmp(command, "sdbrao") == 0) { //distance between robot and operator
+      LOGInfo(SENSOR_CONN_TAG, 1, "Distance between robot and operator sync.");
+      semWait(sem_id, ROBOTSENSORS);
+      //robotAcculators.speed = atoi(value);
+      //robotAcculators.isManual = true;
+      semPost(sem_id, ROBOTSENSORS);
+      LOGInfo(SENSOR_CONN_TAG, 0, value);
+    }
+
+    else if (strcmp(command, "gdbrao") == 0) { //distance between robot and operator
+      LOGInfo(SENSOR_CONN_TAG, 1, "Distance between robot and operator sync.");
+      semWait(sem_id, ROBOTSENSORS);
+      //robotAcculators.speed = atoi(value);
+      //robotAcculators.isManual = true;
+      semPost(sem_id, ROBOTSENSORS);
       LOGInfo(SENSOR_CONN_TAG, 0, value);
     }
     else if (strcmp(command, "speed") == 0) {
       LOGInfo(SENSOR_CONN_TAG, 1, "Speed sync.");
       semWait(sem_id, ROBOTACCULATORS);
-      robotAcculators.robotSpeed = atoi(value);
+      robotAcculators.speed = atoi(value);
+      robotAcculators.isManual = true;
       semPost(sem_id, ROBOTACCULATORS);
       LOGInfo(SENSOR_CONN_TAG, 0, value);
     }
@@ -1681,17 +1824,27 @@ void *syncLeds(bool checkChange) {
   return NULL;
 }
 
-int pomoc = 0;
+int pocKinecYawMotor = 0;
 void *syncMotors(bool checkChange) {
   LOGInfo(NUCLEO_TAG, 1, "Start:Motors sync.");
   semWait(sem_id, ROBOTACCULATORS);
-  direction_t  robotDirection = robotAcculators.robotDirection;
-  unsigned int robotSpeed = robotAcculators.robotSpeed;
+  bool isManual = robotAcculators.isManual;
+  direction_t  direction = robotAcculators.direction;
+  unsigned int speed = robotAcculators.speed;
+  double angle = robotAcculators.angle;
+  long distance = robotAcculators.distance;
   double kinectYaw = robotAcculators.kinect.yaw;
   semPost(sem_id, ROBOTACCULATORS);
   if (!checkChange) {
-    //setMove(robotDirection, robotSpeed );
-    //usleep(10000);
+    if (isManual) {
+      setMove(direction, speed );
+    }
+    else {
+      setAngleRobot(angle);
+      setDistanceRobot(distance);
+      setGoToAngleAndDistance();
+    }
+
     setServo((int)(kinectYaw * (180 / M_PI)));
 
     semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -1699,29 +1852,64 @@ void *syncMotors(bool checkChange) {
     semPost(sem_id, ROBOTACCULATORS_LAST);
 
     if (kinectYaw != kinectYawLast) {
-      pomoc = 0;
+      pocKinecYawMotor = 0;
     }
 
     semWait(sem_id, ROBOTACCULATORS_LAST);
-    robotAcculatorsLast.robotDirection = robotDirection;
-    robotAcculatorsLast.robotSpeed = robotSpeed;
+    robotAcculatorsLast.direction = direction;
+    robotAcculatorsLast.speed = speed;
     robotAcculatorsLast.kinect.yaw = kinectYaw;
+    robotAcculatorsLast.isManual = isManual;
     semPost(sem_id, ROBOTACCULATORS_LAST);
   }
   else {
     semWait(sem_id, ROBOTACCULATORS_LAST);
-    direction_t  robotDirectionLast = robotAcculatorsLast.robotDirection;
-    unsigned int robotSpeedLast = robotAcculatorsLast.robotSpeed;
+    direction_t  directionLast = robotAcculatorsLast.direction;
+    unsigned int speedLast = robotAcculatorsLast.speed;
     double kinectYawLast = robotAcculatorsLast.kinect.yaw;
+    double angleLast = robotAcculatorsLast.angle;
+    long distanceLast = robotAcculatorsLast.distance;
+    bool isManualLast = robotAcculatorsLast.isManual;
     semPost(sem_id, ROBOTACCULATORS_LAST);
-    if (robotDirection != robotDirectionLast || robotSpeed != robotSpeedLast) {
-      //setMove(robotDirection, robotSpeed );
-      semWait(sem_id, ROBOTACCULATORS_LAST);
-      robotAcculatorsLast.robotDirection = robotDirection;
-      robotAcculatorsLast.robotSpeed = robotSpeed;
-      semPost(sem_id, ROBOTACCULATORS_LAST);
-      LOGInfo(NUCLEO_TAG, 0, "Change motors sync.");
+
+    if (isManual) {
+      if (direction != directionLast || speed != speedLast || isManual != isManualLast) {
+        setMove(direction, speed );
+        semWait(sem_id, ROBOTACCULATORS_LAST);
+        robotAcculatorsLast.direction = direction;
+        robotAcculatorsLast.speed = speed;
+        robotAcculatorsLast.isManual = isManual;
+        semPost(sem_id, ROBOTACCULATORS_LAST);
+        LOGInfo(NUCLEO_TAG, 0, "Change motors sync.");
+      }
     }
+    else {
+      if (angle != angleLast || isManual != isManualLast) {
+        setAngleRobot(angle);
+        semWait(sem_id, ROBOTACCULATORS_LAST);
+        robotAcculatorsLast.angle = angle;
+        semPost(sem_id, ROBOTACCULATORS_LAST);
+        LOGInfo(NUCLEO_TAG, 0, "Change angle sync.");
+      }
+      if (distance != distanceLast || isManual != isManualLast) {
+        setDistanceRobot(distance);
+        semWait(sem_id, ROBOTACCULATORS_LAST);
+        robotAcculatorsLast.distance = distance;
+        semPost(sem_id, ROBOTACCULATORS_LAST);
+        LOGInfo(NUCLEO_TAG, 0, "Change distance sync.");
+      }
+
+      if (angle != angleLast || distance != distanceLast) {
+        setGoToAngleAndDistance();
+      }
+
+      if (isManual != isManualLast) {
+        semWait(sem_id, ROBOTACCULATORS_LAST);
+        robotAcculatorsLast.isManual = isManual;
+        semPost(sem_id, ROBOTACCULATORS_LAST);
+      }
+    }
+
     if (kinectYawLast != kinectYaw) {
       setServo((int)(kinectYaw * (180 / M_PI)));
       semWait(sem_id, ROBOTACCULATORS_LAST);
@@ -1731,17 +1919,17 @@ void *syncMotors(bool checkChange) {
       semWait(sem_id, ROBOTSENSORS);
       robotSensors.kinect.motorStatusYaw = MOTORSTATUSKINECT_MOVING;
       semPost(sem_id, ROBOTSENSORS);
-      pomoc = 0;
+      pocKinecYawMotor = 0;
     }
-    else if (pomoc > 100) {
+    else if (pocKinecYawMotor > 80) {
       semWait(sem_id, ROBOTSENSORS);
       robotSensors.kinect.motorStatusYaw = MOTORSTATUSKINECT_STOPPED;
       semPost(sem_id, ROBOTSENSORS);
       LOGInfo(NUCLEO_TAG, 0, "Change status motor.");
-      pomoc = -1;
+      pocKinecYawMotor = -1;
     }
-    else if (pomoc != -1) {
-      pomoc++;
+    else if (pocKinecYawMotor != -1) {
+      pocKinecYawMotor++;
     }
   }
   LOGInfo(NUCLEO_TAG, 1, "End:Motors sync.");
@@ -1829,35 +2017,37 @@ void *syncGenerateMap(void *arg) {
       }
     }
 
-    semWait(sem_id, ROBOTSENSORS);
-    double valueUlt = robotSensors.ultrasonic;
-    semPost(sem_id, ROBOTSENSORS);
+    /*
 
-    //mapovanie na zaklade ultrazvuku
-    for (double angle = -(M_PI / 180) * 15; angle <= (M_PI / 180) * 15; angle += (((M_PI / 180) * 15) / 100)) {
+        //mapovanie na zaklade ultrazvuku
+        semWait(sem_id, ROBOTSENSORS);
+        double valueUlt = robotSensors.ultrasonic;
+        semPost(sem_id, ROBOTSENSORS);
+       for (double angle = -(M_PI / 180) * 15; angle <= (M_PI / 180) * 15; angle += (((M_PI / 180) * 15) / 100)) {
 
-      int x = valueUlt * (10 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
-      int y = valueUlt * (10 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+          int x = valueUlt * (10 * MAP_SCALE) * cos(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
+          int y = valueUlt * (10 * MAP_SCALE) * sin(robotPosition.anglePossition.yaw + angle) + MAP_WIDTH / 2;
 
-      if (x > 0 && x < MAP_WIDTH && y > 0 && y < MAP_HEIGHT) {
-        Vec3b color = map.at<Vec3b>(Point(x, y));
-        int varMapCreation[3];
-        varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION_ULT;
+          if (x > 0 && x < MAP_WIDTH && y > 0 && y < MAP_HEIGHT) {
+            Vec3b color = map.at<Vec3b>(Point(x, y));
+            int varMapCreation[3];
+            varMapCreation[1] = (int)color[1] + SPEED_OF_MAP_CREATION_ULT;
 
-        if (varMapCreation[1] >= 255)
-          color[1] = 255;
-        else
-          color[1] = varMapCreation[1];
+            if (varMapCreation[1] >= 255)
+              color[1] = 255;
+            else
+              color[1] = varMapCreation[1];
 
-        map.at<Vec3b>(Point(x, y)) = color;
-      }
-    }
-
+            map.at<Vec3b>(Point(x, y)) = color;
+          }
+        }
+    */
     semWait(sem_id, ROBOTSENSORS);
     motorStatusKinect_t motorYawStatus = robotSensors.kinect.motorStatusYaw;
+    motorStatusKinect_t motorRollStatus = robotSensors.kinect.motorStatusRoll;
     semPost(sem_id, ROBOTSENSORS);
 
-    if (motorYawStatus != MOTORSTATUSKINECT_MOVING) {
+    if (motorYawStatus != MOTORSTATUSKINECT_MOVING && motorRollStatus != MOTORSTATUSKINECT_MOVING) {
       char index = pauseGrabKinect();
       Mat pointCloudBuffer = getPointCloudMapKinect(index);
       Mat depthValid = getDepthValidKinect(index);
@@ -2126,9 +2316,10 @@ void *syncOperatorDetect(void *arg) {
         }
       }
 
-      semWait(sem_id, OPERATOR_POSSITION);
-      operatorPossition = operatorPossitionLocal;
-      semPost(sem_id, OPERATOR_POSSITION);
+      semWait(sem_id, ROBOTSENSORS);
+      robotSensors.operatorPossition = operatorPossitionLocal;
+      robotSensors.lastOperatorDirection = offsetXOperator;
+      semPost(sem_id, ROBOTSENSORS);
 
       if (OPERATOR_STATUS_KINECT_LED) {
         semWait(sem_id, ROBOTACCULATORS);
@@ -2137,13 +2328,8 @@ void *syncOperatorDetect(void *arg) {
         }
         else {
           robotAcculators.ledKinect = LEDKINECT_RED;
-          if (offsetXOperator < 0)
-            robotAcculators.kinect.yaw -= 10 * (M_PI / 180);
-          else
-            robotAcculators.kinect.yaw += 10 * (M_PI / 180);
-          if (robotAcculators.kinect.yaw > M_PI / 2) offsetXOperator = -1;
-          else if (robotAcculators.kinect.yaw < -M_PI / 2) offsetXOperator = 1;
-          printf("%d,%f\n", offsetXOperator, robotAcculators.kinect.yaw * (180 / M_PI));
+
+          //printf("%d,%f\n", offsetXOperator, robotAcculators.kinect.yaw * (180 / M_PI));
         }
         semPost(sem_id, ROBOTACCULATORS);
       }
@@ -2420,13 +2606,10 @@ void *syncGenerateJorney(void *arg) {
   while (onAllThreads) {
     LOGInfo(MAP_TAG, 1, "Start:Jorney generate sync.");
 
-    RobotPosition_struct robotPosition = getRobotPossition();
-    semWait(sem_id, OPERATOR_POSSITION);
-    Point3f operatorPossitionLocal = operatorPossition;
-    semPost(sem_id, OPERATOR_POSSITION);
-
     semWait(sem_id, ROBOTSENSORS);
+    RobotPosition_struct robotPosition = robotSensors.robotPosition;
     double kinectYaw = robotAcculators.kinect.yaw;
+    Point3f operatorPossitionLocal = robotSensors.operatorPossition;
     semPost(sem_id, ROBOTSENSORS);
 
     double minPointX = operatorPossitionLocal.x * MAP_SCALE;

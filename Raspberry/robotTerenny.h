@@ -60,7 +60,6 @@ extern "C" {
 #define SYNC_KINECTLED_TIME         SYNC_MIN_TIME*2000
 #define SYNC_MOTORS_TIME            SYNC_MIN_TIME*500
 
-
 #define SYNC_MAP_GENERATE_TIME      100000 //v us
 #define SYNC_OPERATOR_DETECT_TIME   1000 // v us
 
@@ -96,7 +95,7 @@ extern "C" {
 #define SPEED_OF_MAP_OBLIVION 28
 #define SPEED_OF_MAP_CREATION_KINECT 30
 #define SPEED_OF_MAP_CREATION_ULT 30
-#define MIN_BARRIER_CREATION 80
+#define MIN_BARRIER_CREATION 125
 #define MIN_BARRIER_HEIGHT 0 //[m]
 #define MAX_BARRIER_HEIGHT 10 //[m]
 #define MAP_BARRIER_EXTENDED 180 //[mm]
@@ -171,7 +170,6 @@ typedef enum {
   GREEN_OPERATOR_MASK1,
   GREEN_OPERATOR_MASK2,
   GREEN_OPERATOR_MASK_VARIABLE,
-  OPERATOR_POSSITION,
   JOURNEY_POINTS
  } semafor_name_t; //nazabudnut pri pridani inicializovat v initRobot
 
@@ -281,12 +279,17 @@ struct RobotSensors {                 //struktura pre snimace aktualizovane s ca
   RobotPosition_struct  robotPosition; //prepocitana pozicia
   Voltage_struct voltage;
   double ultrasonic;
-
+  Point3f operatorPossition;
+  int lastOperatorDirection;
+  bool isFollowOperatorOn;
 };
 
 struct RobotAcculators {              //struktura pre riadiace veliciny s casom refresh podla jednotlivych hodnot pre riadenie
-  direction_t     robotDirection;
-  unsigned int    robotSpeed;  //rychlost v mm/s
+  direction_t     direction;
+  unsigned int    speed;  //rychlost v mm/s
+  double angle;
+  long distance;
+  bool isManual; // bud ide na bod pomocou angle a vzdialenost alebo smerom a rychlostou cez direction a speed
   Leds_struct     leds;
   Angle3d_struct  kinect;
   ledKinect_t     ledKinect;
@@ -359,6 +362,7 @@ double getUltrasonic(void);
 unsigned char getButtons(void);
 Axis3d_struct getPossitionAxis(void);
 Angle3d_struct getPossitionAngle3d(void);
+vector<Point> getJorneyPoints();
 
 void sendDoubleByWifi(double value);
 void sendIntByWifi(int value);
