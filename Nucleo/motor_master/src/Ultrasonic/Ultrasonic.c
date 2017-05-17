@@ -10,30 +10,30 @@ void Ultrasonic_init(void) {
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource1);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource0);
 
 	EXTI_InitTypeDef EXTI_InitStructure;
-	EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
 	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
 	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
 	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
 	EXTI_Init(&EXTI_InitStructure);
 
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
@@ -64,10 +64,10 @@ void ultTriger(int index) {
 		case 0:
 			TIM_SetCounter(TIM4, 0);
 			chooseUlt = index;
-			GPIOC->BSRRL = GPIO_Pin_0;
-			for (int i = 0; i < 2; i++)
+			GPIOC->BSRRL = GPIO_Pin_1;
+			for (int i = 0; i < 10; i++)
 				; //cca 15 us
-			GPIOC->BSRRH = GPIO_Pin_0;
+			GPIOC->BSRRH = GPIO_Pin_1;
 			break;
 		}
 	}
@@ -82,15 +82,15 @@ uint16_t getUltRaw(int index){
 }
 
 void Ultrasonic_Pin_Interrupt(void) {
-	if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
-		if ((GPIOC->IDR & GPIO_Pin_1) && GPIO_Pin_1) {
+	if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
+		if ((GPIOC->IDR & GPIO_Pin_0) && GPIO_Pin_0) {
 			TIM_SetCounter(TIM4, 0);
 		} else {
 			ultRawValue[chooseUlt] = (uint32_t)((double)ultRawValue[chooseUlt] - (LPF_Beta * ((double)ultRawValue[chooseUlt] - (double)TIM_GetCounter(TIM4))));
 			//ultRawValue[chooseUlt] = TIM_GetCounter(TIM4);
 			chooseUlt = -2;
 		}
-		EXTI_ClearITPendingBit(EXTI_Line1);
+		EXTI_ClearITPendingBit(EXTI_Line0);
 	}
 }
 

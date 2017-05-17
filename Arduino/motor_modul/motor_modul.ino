@@ -73,8 +73,8 @@ volatile bool onCurrentReg = true;
 double pSpeed = 1.5;
 double iSpeed = 1.1;
 double dSpeed = 0;
-#define uSpeedSaturationMax 600
-#define uSpeedSaturationMin -600
+#define uSpeedSaturationMax 1200
+#define uSpeedSaturationMin -1200
 volatile double q0Speed;
 volatile double q1Speed;
 volatile double q2Speed;
@@ -324,7 +324,7 @@ void receiveEvent(int howMany) {
       }
       break;
     case 108:
-      calcAllCurrentRegulatorParameters(pCurrent, iCurrent, dCurrent, periodCurrentRegulator / 1000000);
+      calcAllCurrentRegulatorParameters(pCurrent, iCurrent, dCurrent, (double)periodCurrentRegulator / 1000000);
       uRegCurrent[2] = 0;
       uRegCurrent[1] = 0;
       uRegCurrent[0] = 0;
@@ -333,7 +333,7 @@ void receiveEvent(int howMany) {
       }
       break;
     case 109:
-      calcAllSpeedRegulatorParameters(pSpeed, iSpeed, dSpeed, periodSpeedRegulator / 1000000);
+      calcAllSpeedRegulatorParameters(pSpeed, iSpeed, dSpeed, (double)periodSpeedRegulator / 1000000);
       uRegSpeed[2] = 0;
       uRegSpeed[1] = 0;
       uRegSpeed[0] = 0;

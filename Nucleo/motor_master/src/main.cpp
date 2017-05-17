@@ -6,12 +6,20 @@
 #define MIN_OK_DELTA_ANGLE 5*(3.14/180)
 #define MIN_OK_DELTA_DISTANCE 20
 
-#define pSpeed 6
-#define iSpeed 1.1
+#define pSpeed 4
+#define iSpeed 2.5
 #define dSpeed 0
 #define pCurrent 0.12
 #define iCurrent 0.006
 #define dCurrent 0
+
+#define pAngle 100
+#define iAngle 20
+#define dAngle 0
+
+#define pDistance 3
+#define iDistance 1.3
+#define dDistance 0
 
 #define NUMBER_OF_MOTORS 6
 Motor *motor1 = new Motor(MOTOR1);
@@ -20,6 +28,27 @@ Motor *motor3 = new Motor(MOTOR3);
 Motor *motor4 = new Motor(MOTOR4);
 Motor *motor5 = new Motor(MOTOR5);
 Motor *motor6 = new Motor(MOTOR6);
+
+#define calcKp(p) (p)
+#define calcKi(p,i,perioda) (p*(perioda/i))
+#define calcKd(p,d,perioda) (p*(d/perioda))
+//vypocet inkrementalnej casti regulatora
+double calcQ0(double p, double d, double perioda) {
+  return (calcKp(p) + calcKd(p, d, perioda));
+}
+double calcQ1(double p, double i, double d, double perioda) {
+  return (-calcKp(p) - 2 * calcKd(p, d, perioda) + calcKi(p, i, perioda));
+}
+double calcQ2(double p, double d, double perioda) {
+  return calcKd(p, d, perioda) ;
+}
+double calcP1(double p, double i, double d, double perioda) {
+  return ((calcKi(p, i, perioda) - calcKd(p, d, perioda)) / (calcKp(p) + calcKi(p, i, perioda) + calcKd(p, d, perioda)));
+}
+double calcP2(double p, double i, double d, double perioda) {
+  return ((calcKd(p, d, perioda)) / (calcKp(p) + calcKi(p, i, perioda) + calcKd(p, d, perioda)));
+}
+
 
 Motor *getMotor(int i) {
 	switch (i) {
@@ -150,7 +179,7 @@ double getAverageOfSimilaryValues(double val1, double val2, double val3) {
 		return (val1 + val3) / 2;
 }
 
-extern "C" void EXTI1_IRQHandler(void) {
+extern "C" void EXTI0_IRQHandler(void) {
 	Ultrasonic_Pin_Interrupt();
 }
 
@@ -274,6 +303,7 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 		case 15:
 			if (I2C1_BufferIndex == 5) {
 				chodNaPoziciu = false;
+				distancePozadovane = 0;
 				distancePozadovane |= I2C1_Buffer[1] << 24;
 				distancePozadovane |= I2C1_Buffer[2] << 16;
 				distancePozadovane |= I2C1_Buffer[3] << 8;
@@ -366,7 +396,7 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			break;
 		case 108:
 			xLastMaybeSend = x;
-			delta = xLastMaybeSend-xLastSend;
+			delta = xLastMaybeSend - xLastSend;
 			I2C1_BufferIndex = 0;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
@@ -377,7 +407,7 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			break;
 		case 109:
 			yLastMaybeSend = y;
-			delta  = yLastMaybeSend-yLastSend;
+			delta = yLastMaybeSend - yLastSend;
 			I2C1_BufferIndex = 0;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
@@ -388,7 +418,7 @@ extern "C" void I2C1_EV_IRQHandler(void) {
 			break;
 		case 110:
 			zLastMaybeSend = z;
-			delta = zLastMaybeSend-zLastSend;
+			delta = zLastMaybeSend - zLastSend;
 			I2C1_BufferIndex = 0;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 24;
 			I2C1_Buffer[I2C1_BufferIndex++] = delta >> 16;
@@ -470,6 +500,7 @@ extern "C" void EXTI9_5_IRQHandler(void) {
 }
 
 int main(void) {
+
 	for (unsigned int i = 0; i < 100000; i++)
 		;
 	InitializePWMServo();
@@ -484,16 +515,55 @@ int main(void) {
 	for (int i = 0; i < NUMBER_OF_MOTORS; i++) {
 		if (getMotor(i + 1)->isTestOk()) {
 			motorTestValue |= (1 << i);
-			//getMotor(i + 1)->setSpeedRegulator(pSpeed,iSpeed,dSpeed);
-			//getMotor(i + 1)->setCurrentRegulator(pCurrent,iCurrent,dCurrent);
+			getMotor(i + 1)->setSpeedRegulator(pSpeed, iSpeed, dSpeed);
+			getMotor(i + 1)->setCurrentRegulator(pCurrent, iCurrent, dCurrent);
 		}
 	}
-
 
 	InitializeTimer();
 
 	Direction dir_last;
 	int16_t mmPerSec_last;
+	/*
+	 getMotor(1)->setPWMMotor(255);
+	 getMotor(2)->setPWMMotor(255);
+	 getMotor(3)->setPWMMotor(255);
+	 getMotor(4)->setPWMMotor(-255);
+	 getMotor(5)->setPWMMotor(-255);
+	 getMotor(6)->setPWMMotor(-255);
+	 */
+
+	double q0Angle;
+	double q1Angle;
+	double q2Angle;
+	double p1Angle;
+	double p2Angle;
+	double q0Distance;
+	double q1Distance;
+	double q2Distance;
+	double p1Distance;
+	double p2Distance;
+
+	q0Angle = calcQ0(pAngle, dAngle, 0.1);
+	q1Angle = calcQ1(pAngle, iAngle, dAngle, 0.1);
+	q2Angle = calcQ2(pAngle, dAngle, 0.1);
+	p1Angle = calcP1(pAngle, iAngle, dAngle, 0.1);
+	p2Angle = calcP2(pAngle, iAngle, dAngle, 0.1);
+	double umRegAngle = 0;
+	double ueRegAngle[] = {0, 0, 0};
+	double uRegAngle[] = {0, 0};
+	double eRegAngle[] = {0, 0, 0};
+
+
+	q0Distance = calcQ0(pDistance, dDistance, 0.1);
+	q1Distance = calcQ1(pDistance, iDistance, dDistance, 0.1);
+	q2Distance = calcQ2(pDistance, dDistance, 0.1);
+	p1Distance = calcP1(pDistance, iDistance, dDistance, 0.1);
+	p2Distance = calcP2(pDistance, iDistance, dDistance, 0.1);
+	double umRegDistance = 0;
+	double ueRegDistance[] = {0, 0, 0};
+	double uRegDistance[] = {0, 0};
+	double eRegDistance[] = {0, 0, 0};
 
 	while (1) {
 
@@ -538,28 +608,82 @@ int main(void) {
 				double eAngle = yaw - yawPozadovane;
 				if (fabs(eAngle) > MIN_OK_DELTA_ANGLE) {
 					//regulator uhla
-					int16_t u = eAngle * 100;
-					if (eAngle > 0) {
-						bool test = false;
-						//goDirection(ROTATE_ANTICLOCKWISE, u);
+				      eRegAngle[2] = eRegAngle[1]; //e(k-2)
+				      eRegAngle[1] = eRegAngle[0]; //e(k-1)
+				      eRegAngle[0] = eAngle; //e(k)
+
+				      uRegAngle[1] = uRegAngle[0];
+				      uRegAngle[0] = uRegAngle[1] + q0Angle * eRegAngle[0] + q1Angle * eRegAngle[1] + q2Angle * eRegAngle[2] - p1Angle * ueRegAngle[1] - p2Angle * ueRegAngle[2];
+
+				        if (uRegAngle[0] < -1000)
+				          umRegAngle = -1000;
+				        else if (uRegAngle[0] > 1000)
+				          umRegAngle = 1000;
+				        else
+				          umRegAngle = uRegAngle[0];
+
+				      ueRegAngle[2] = ueRegAngle[1];
+				      ueRegAngle[1] = ueRegAngle[0];
+				      ueRegAngle[0] = uRegAngle[0] - umRegAngle;
+				        if (uRegAngle[0] < -1000)
+				          uRegAngle[0] = -1000;
+				        else if (uRegAngle[0] > 1000)
+				          uRegAngle[0] = 1000;
+
+					if (uRegAngle[0] > 0) {
+						goDirection(ROTATE_ANTICLOCKWISE, uRegAngle[0]);
 					} else {
-						bool test = false;
-						//goDirection(ROTATE_CLOCKWISE, u * (-1));
+						goDirection(ROTATE_CLOCKWISE, uRegAngle[0] * (-1));
 					}
+				      eRegDistance[2] = 0; //e(k-2)
+				      eRegDistance[1] = 0; //e(k-1)
+				      eRegDistance[0] = 0; //e(k)
+				      uRegDistance[1] = 0;
+				      uRegDistance[0] = 0;
+				      umRegDistance = 0;
+				      ueRegDistance[2] = 0;
+				      ueRegDistance[1] = 0;
+				      ueRegDistance[0] = 0;
 				} else {
 					if (fabs(distancePozadovane) > MIN_OK_DELTA_DISTANCE) {
 						//regulator vzdialenosti
-						int16_t u = distancePozadovane * 0.5;
-						if (u > 0){
-							bool test = false;
-							//goDirection(FORWARD, u);
+					      eRegDistance[2] = eRegDistance[1]; //e(k-2)
+					      eRegDistance[1] = eRegDistance[0]; //e(k-1)
+					      eRegDistance[0] = distancePozadovane; //e(k)
+
+					      uRegDistance[1] = uRegDistance[0];
+					      uRegDistance[0] = uRegDistance[1] + q0Distance * eRegDistance[0] + q1Distance * eRegDistance[1] + q2Distance * eRegDistance[2] - p1Distance * ueRegDistance[1] - p2Distance * ueRegDistance[2];
+
+					        if (uRegDistance[0] < -1000)
+					          umRegDistance = -1000;
+					        else if (uRegDistance[0] > 1000)
+					          umRegDistance = 1000;
+					        else
+					          umRegDistance = uRegDistance[0];
+
+					      ueRegDistance[2] = ueRegDistance[1];
+					      ueRegDistance[1] = ueRegDistance[0];
+					      ueRegDistance[0] = uRegDistance[0] - umRegDistance;
+					        if (uRegDistance[0] < -1000)
+					          uRegDistance[0] = -1000;
+					        else if (uRegDistance[0] > 1000)
+					          uRegDistance[0] = 1000;
+						if (uRegDistance[0] > 0) {
+							goDirection(FORWARD, uRegDistance[0]);
+						} else {
+							goDirection(BACKWARD, uRegDistance[0] * (-1));
 						}
-						else{
-							bool test = false;
-							//goDirection(BACKWARD, u * (-1));
-						}
+					      eRegAngle[2] = 0; //e(k-2)
+					      eRegAngle[1] = 0; //e(k-1)
+					      eRegAngle[0] = 0; //e(k)
+					      uRegAngle[1] = 0;
+					      uRegAngle[0] = 0;
+					      umRegAngle = 0;
+					      ueRegAngle[2] = 0;
+					      ueRegAngle[1] = 0;
+					      ueRegAngle[0] = 0;
 					} else {
-						//goDirection(STOP, 0);
+						goDirection(STOP, 0);
 					}
 				}
 			}
